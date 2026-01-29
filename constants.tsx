@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { 
   Building2, 
@@ -43,7 +42,7 @@ export const SERVICES: DetailedServiceItem[] = [
     id: 'plm-implementation',
     code: 'OPS-SYS-03',
     title: 'PLM Systems Implementation',
-    description: 'Expert deployment and optimization of PLM tools (Agile, Windchill) tailored to organizational KPIs and ERP integration.',
+    description: 'Expert deployment and optimization of PLM tools tailored to organizational KPIs and ERP integration.',
     addedValue: 'Centralizes product data, accelerating collaborative development and streamlining regulatory audits.',
     image: 'https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&q=80&w=800',
     icon: 'Database'
@@ -51,7 +50,7 @@ export const SERVICES: DetailedServiceItem[] = [
   {
     id: 'npi',
     code: 'OPS-NPI-04',
-    title: 'NPI: Development to Production',
+    title: 'NPI: Development to Mass Production',
     description: 'Bridging the gap from prototypes to mass production through DFX (DFM/DFA/DFT) methodologies and pilot run management.',
     addedValue: 'Significant reduction in Time-to-Market (TTM) with stable production yields from the first batch.',
     image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=800',
