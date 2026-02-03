@@ -28,8 +28,8 @@ const Hero: React.FC = () => {
             Precision <br/><span className="text-blue-500 drop-shadow-[0_0_15px_rgba(59,130,246,0.3)]">Engineering</span> <br/>Operations.
           </h1>
           
-          <p className="text-xl text-slate-400 mb-12 leading-relaxed max-w-2xl font-light">
-            Providing high-end operational infrastructure and NPI leadership for organizations that demand excellence. From initial concept schematics to stable mass production yields.
+          <p className="text-xl md:text-2xl text-slate-200 mb-12 leading-relaxed max-w-3xl font-medium border-l-4 border-blue-600 pl-6 py-2">
+            We turn complex, multidisciplinary products into <span className="text-blue-400 font-bold underline decoration-blue-500/50">scalable, manufacturable operations.</span>
           </p>
           
           <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-6">

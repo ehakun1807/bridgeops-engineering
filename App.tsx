@@ -4,7 +4,7 @@ import Hero from './components/Hero';
 import ServiceCard from './components/ServiceCard';
 import Expertise from './components/Expertise';
 import ContactForm from './components/ContactForm';
-import MethodologyLayers from './components/MethodologyLayers';
+import MethodologyLayers from './components/MethodologyLayers.tsx';
 import Logo from './components/Logo';
 import { SERVICES } from './constants';
 import { Hammer, ArrowRight } from 'lucide-react';
