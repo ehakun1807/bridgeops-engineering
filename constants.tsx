@@ -24,7 +24,7 @@ export const SERVICES: DetailedServiceItem[] = [
     id: 'infrastructure',
     code: 'OPS-STR-01',
     title: 'Engineering Infrastructure',
-    description: 'Establishing the foundational disciplines, standards, and technical methodologies required for a scalable engineering department.',
+    description: 'Establishing the foundational disciplines, standards, and technical methodologies and tools required for a scalable engineering department.',
     addedValue: 'Prevents "technical debt" in operations, ensuring the company can scale without structural bottlenecks.',
     image: 'https://images.unsplash.com/photo-1504917595217-d4dc5ebe6122?auto=format&fit=crop&q=80&w=800',
     icon: 'Building2'
@@ -87,7 +87,7 @@ export const SERVICES: DetailedServiceItem[] = [
     id: 'manufacturing-support',
     code: 'OPS-ENG-08',
     title: 'Manufacturing Engineering Support',
-    description: 'Direct on-site support for production lines, yield improvement, and creation of detailed manufacturing instructions.',
+    description: 'Direct on-site support for production lines, yield improvement, and End-to-End Engineering support for Local/Global Sub-contractors/Suppliers.',
     addedValue: 'Ensures production line stability and maintains high professional standards for manufacturing personnel.',
     image: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&q=80&w=800',
     icon: 'Wrench'

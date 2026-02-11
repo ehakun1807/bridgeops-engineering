@@ -1,7 +1,11 @@
 import React from 'react';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Hammer, CheckCircle2 } from 'lucide-react';
 
-const Hero: React.FC = () => {
+interface HeroProps {
+  onNavigate?: (view: any) => void;
+}
+
+const Hero: React.FC<HeroProps> = ({ onNavigate }) => {
   return (
     <div className="relative min-h-screen flex items-center overflow-hidden bg-slate-950">
       {/* High-Tech Luxury Background Layers */}
@@ -21,31 +25,47 @@ const Hero: React.FC = () => {
         <div className="max-w-4xl">
           <div className="flex items-center space-x-3 mb-8">
             <div className="h-[2px] w-12 bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.8)]"></div>
-            <span className="text-blue-400 text-xs font-black uppercase tracking-[0.4em] drop-shadow-sm">OpsBridge Engineering</span>
+            <span className="text-blue-400 text-[10px] font-black uppercase tracking-[0.4em] drop-shadow-sm">Operational Execution Partner</span>
           </div>
           
-          <h1 className="text-6xl md:text-8xl font-black text-white leading-[0.95] mb-8 tracking-tighter">
-            Precision <br/><span className="text-blue-500 drop-shadow-[0_0_15px_rgba(59,130,246,0.3)]">Engineering</span> <br/>Operations.
+          <h1 className="text-5xl md:text-7xl font-black text-white leading-[0.95] mb-8 tracking-tighter uppercase">
+            Your Product <br/>Is Ready — <br/><span className="text-blue-500 drop-shadow-[0_0_15px_rgba(59,130,246,0.3)]">Your Operations</span> <br/>Are Not.
           </h1>
           
-          <p className="text-xl md:text-2xl text-slate-200 mb-12 leading-relaxed max-w-3xl font-medium border-l-4 border-blue-600 pl-6 py-2">
-            We turn complex, multidisciplinary products into <span className="text-blue-400 font-bold underline decoration-blue-500/50">scalable, manufacturable operations.</span>
+          <p className="text-lg md:text-xl text-slate-200 mb-8 leading-relaxed max-w-3xl font-medium border-l-4 border-blue-600 pl-6 py-2">
+            OpsBridge helps companies fix the <span className="text-blue-400 font-bold underline decoration-blue-500/50">hidden gaps between engineering and manufacturing</span> before they turn into delays, overruns and broken teams.
           </p>
+
+          <div className="space-y-4 mb-12 max-w-3xl pl-7">
+            <div className="flex items-start space-x-3 group">
+              <CheckCircle2 size={20} className="text-blue-500 mt-0.5 flex-shrink-0 group-hover:scale-110 transition-transform" />
+              <span className="text-slate-300 font-semibold tracking-tight">Reduce time-to-production and late-stage surprises</span>
+            </div>
+            <div className="flex items-start space-x-3 group">
+              <CheckCircle2 size={20} className="text-blue-500 mt-0.5 flex-shrink-0 group-hover:scale-110 transition-transform" />
+              <span className="text-slate-300 font-semibold tracking-tight">Align R&D, Ops and Manufacturing around one execution plan</span>
+            </div>
+            <div className="flex items-start space-x-3 group">
+              <CheckCircle2 size={20} className="text-blue-500 mt-0.5 flex-shrink-0 group-hover:scale-110 transition-transform" />
+              <span className="text-slate-300 font-semibold tracking-tight">Hands-on NPI & Ops engineering — not slide-deck consulting</span>
+            </div>
+          </div>
           
           <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-6">
-            <a 
-              href="#services" 
-              className="w-full sm:w-auto bg-blue-600 text-white px-10 py-5 rounded-sm font-bold text-lg hover:bg-blue-700 transition-all flex items-center justify-center group uppercase tracking-widest shadow-[0_0_30px_rgba(37,99,235,0.4)] hover:shadow-blue-500/50"
+            <button 
+              onClick={() => onNavigate?.('services')}
+              className="w-full sm:w-auto bg-blue-600 text-white px-8 py-4 rounded-sm font-bold text-base hover:bg-blue-700 transition-all flex items-center justify-center group uppercase tracking-widest shadow-[0_0_30px_rgba(37,99,235,0.4)] hover:shadow-blue-500/50"
             >
-              Analyze Services
-              <ArrowRight className="ml-3 group-hover:translate-x-1 transition-transform" size={20} />
-            </a>
-            <a 
-              href="#contact" 
-              className="w-full sm:w-auto bg-white/5 backdrop-blur-md text-white border border-white/10 px-8 py-5 rounded-sm font-bold text-lg hover:bg-white/10 transition-all flex items-center justify-center uppercase tracking-widest"
+              Our Solutions
+              <ArrowRight className="ml-3 group-hover:translate-x-1 transition-transform" size={18} />
+            </button>
+            <button
+              onClick={() => onNavigate?.('contact')}
+              className="w-full sm:w-auto flex items-center space-x-3 px-6 py-4 bg-white/5 border border-white/10 rounded-sm hover:bg-white/10 transition-all group/review text-left"
             >
-              Consultation
-            </a>
+               <Hammer size={16} className="text-blue-400 group-hover/review:rotate-12 transition-transform" />
+               <span className="text-white font-bold text-[10px] uppercase tracking-widest">Get an Ops Readiness Review</span>
+            </button>
           </div>
         </div>
       </div>
