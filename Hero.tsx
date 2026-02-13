@@ -29,11 +29,11 @@ const Hero: React.FC<HeroProps> = ({ onNavigate }) => {
           </div>
           
           <h1 className="text-5xl md:text-7xl font-black text-white leading-[0.95] mb-8 tracking-tighter uppercase">
-            Your Product <br/>Is Ready — <br/><span className="text-blue-500 drop-shadow-[0_0_15px_rgba(59,130,246,0.3)]">Your Operations</span> <br/>Are Not.
+            From Prototype <br/>To Production — <br/><span className="text-blue-500 drop-shadow-[0_0_15px_rgba(59,130,246,0.3)]">Without Chaos.</span>
           </h1>
           
           <p className="text-lg md:text-xl text-slate-200 mb-8 leading-relaxed max-w-3xl font-medium border-l-4 border-blue-600 pl-6 py-2">
-            OpsBridge helps companies fix the <span className="text-blue-400 font-bold underline decoration-blue-500/50">hidden gaps between engineering and manufacturing</span> before they turn into delays, overruns and broken teams.
+            OpsBridge helps Hardware Startups and Tech Companies to fix the <span className="text-blue-400 font-bold underline decoration-blue-500/50">Hidden Gaps between Engineering and Manufacturing</span> before they turn into Delays, Overruns and broken teams.
           </p>
 
           <div className="space-y-4 mb-12 max-w-3xl pl-7">
@@ -64,7 +64,7 @@ const Hero: React.FC<HeroProps> = ({ onNavigate }) => {
               className="w-full sm:w-auto flex items-center space-x-3 px-6 py-4 bg-white/5 border border-white/10 rounded-sm hover:bg-white/10 transition-all group/review text-left"
             >
                <Hammer size={16} className="text-blue-400 group-hover/review:rotate-12 transition-transform" />
-               <span className="text-white font-bold text-[10px] uppercase tracking-widest">Get an Ops Readiness Review</span>
+               <span className="text-white font-bold text-[10px] uppercase tracking-widest">Free 30-minutes Production Readiness Assessment</span>
             </button>
           </div>
         </div>

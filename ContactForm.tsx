@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Send, Mail, MessageSquare, MapPin, Globe } from 'lucide-react';
+import { Send, Mail, MessageSquare, MapPin, MessageCircle } from 'lucide-react';
 
 const ContactForm: React.FC = () => {
   const [formState, setFormState] = useState({ name: '', email: '', company: '', message: '' });
@@ -7,12 +7,26 @@ const ContactForm: React.FC = () => {
 
   // WhatsApp Configuration
   const whatsappNumber = "972523760674";
-  const whatsappMessage = encodeURIComponent("Hello Eran, I'm reaching out via your website and would like to discuss engineering and operations services.");
-  const whatsappLink = `https://wa.me/${whatsappNumber}?text=${whatsappMessage}`;
-
+  
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Form submitted:', formState);
+    
+    // Construct a detailed WhatsApp message from form data
+    const messageBody = `*New Professional Inquiry - OpsBridge Engineering*
+--------------------------------------------
+*Name:* ${formState.name}
+*Email:* ${formState.email}
+*Company/Market:* ${formState.company}
+*Challenge:* ${formState.message}
+--------------------------------------------
+_Sent via OpsBridge Website_`;
+
+    const whatsappLink = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(messageBody)}`;
+    
+    // Open WhatsApp in a new tab
+    window.open(whatsappLink, '_blank');
+    
+    // Set UI to submitted state
     setSubmitted(true);
   };
 
@@ -23,16 +37,18 @@ const ContactForm: React.FC = () => {
           <div className="bg-slate-900 p-12 lg:p-20 text-center shadow-2xl relative overflow-hidden">
              <div className="absolute inset-0 blueprint-grid-dark opacity-10"></div>
             <div className="w-16 h-16 bg-blue-600 text-white flex items-center justify-center mx-auto mb-6 relative z-10">
-              <Send size={32} />
+              <MessageCircle size={32} />
             </div>
-            <h3 className="text-2xl font-black text-white mb-4 relative z-10 uppercase tracking-tighter">Transmission Successful</h3>
-            <p className="text-slate-400 mb-8 text-base relative z-10">Thank you for reaching out. I will review your project details and get back to you shortly.</p>
-            <button 
-              onClick={() => setSubmitted(false)}
-              className="text-blue-500 font-black hover:text-blue-400 transition-colors uppercase tracking-widest text-[10px] relative z-10"
-            >
-              Send Another Message
-            </button>
+            <h3 className="text-2xl font-black text-white mb-4 relative z-10 uppercase tracking-tighter">Redirecting to WhatsApp</h3>
+            <p className="text-slate-400 mb-8 text-base relative z-10">The inquiry details have been prepared for WhatsApp. If the chat didn't open automatically, please click below.</p>
+            <div className="flex flex-col items-center space-y-4">
+              <button 
+                onClick={() => setSubmitted(false)}
+                className="text-blue-500 font-black hover:text-blue-400 transition-colors uppercase tracking-widest text-[10px] relative z-10"
+              >
+                Send Another Message
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -64,7 +80,7 @@ const ContactForm: React.FC = () => {
                 </a>
                 
                 <a 
-                  href={whatsappLink}
+                  href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent("Hello Eran, I'm reaching out via your website and would like to discuss engineering and operations services.")}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center space-x-6 group"
@@ -92,7 +108,7 @@ const ContactForm: React.FC = () => {
           <div className="lg:w-2/3 p-10 lg:p-16 bg-white">
             <div className="mb-10">
               <h3 className="text-3xl font-black text-slate-900 mb-2 tracking-tighter uppercase">Inquiry Form</h3>
-              <p className="text-sm text-slate-500 font-medium">Please provide a brief overview of your operational context.</p>
+              <p className="text-sm text-slate-500 font-medium">This form will send your details directly to my WhatsApp for an immediate response.</p>
             </div>
             
             <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-10 text-left">
@@ -154,9 +170,10 @@ const ContactForm: React.FC = () => {
               <div className="md:col-span-2 pt-6">
                 <button 
                   type="submit" 
-                  className="w-full bg-slate-900 text-white py-4 font-black text-base hover:bg-blue-600 transition-all flex items-center justify-center group uppercase tracking-widest shadow-xl"
+                  className="w-full bg-slate-900 text-white py-4 font-black text-base hover:bg-green-600 transition-all flex items-center justify-center group uppercase tracking-widest shadow-xl"
                 >
-                  <span>Transmit Inquiry</span>
+                  <MessageCircle size={18} className="mr-4" />
+                  <span>Transmit to WhatsApp</span>
                   <Send size={18} className="ml-4 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
                 </button>
               </div>
