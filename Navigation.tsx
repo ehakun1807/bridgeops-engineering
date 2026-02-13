@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { Menu, X } from 'lucide-react';
-import Logo from './Logo';
+import Logo from './Logo.tsx';
 
 interface NavigationProps {
   currentView: string;
@@ -32,7 +33,6 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate }) => {
     setIsOpen(false);
   };
 
-  // Navigation is dark on non-home pages or when scrolled on home
   const isAlwaysDark = currentView !== 'home';
   const navBackground = (scrolled || isAlwaysDark) 
     ? 'bg-slate-950/98 backdrop-blur-md shadow-2xl py-3 border-b border-white/10' 
@@ -46,11 +46,6 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate }) => {
             onClick={() => handleLinkClick('home')} 
             className="flex items-center group transition-transform hover:scale-[1.02]"
           >
-            {/* 
-              Logo:
-              - On Home: White text + Blue dot (scrolled or not)
-              - On Other Pages: Blue text + White dot (for emphasis on black bg)
-            */}
             <Logo 
               scrolled={scrolled || isAlwaysDark} 
               light={true} 
@@ -100,9 +95,8 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate }) => {
         </div>
       </div>
 
-      {/* Mobile Menu */}
       {isOpen && (
-        <div className="md:hidden bg-slate-950 border-b border-white/10 shadow-2xl animate-in slide-in-from-top duration-300">
+        <div className="md:hidden bg-slate-950 border-b border-white/10 shadow-2xl">
           <div className="px-4 pt-4 pb-10 space-y-2">
             {navLinks.map((link) => (
               <button

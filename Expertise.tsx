@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { Award, Briefcase, GraduationCap, Globe, Cpu, Target } from 'lucide-react';
+import { Briefcase, GraduationCap, Globe, Cpu, Target } from 'lucide-react';
 
 const Expertise: React.FC = () => {
   return (
@@ -102,7 +103,6 @@ const Expertise: React.FC = () => {
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </section>

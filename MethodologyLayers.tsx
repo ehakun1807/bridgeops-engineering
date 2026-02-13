@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { Search, Shield, Target, ClipboardCheck, ArrowRight, Activity, Users, Zap, CheckCircle2, AlertCircle, BarChart3, Clock } from 'lucide-react';
+import { Search, Shield, Target, ArrowRight, Activity, Users, Zap, CheckCircle2, AlertCircle, BarChart3, Clock } from 'lucide-react';
 
 const MethodologyLayers: React.FC = () => {
   const layers = [
@@ -59,7 +60,6 @@ const MethodologyLayers: React.FC = () => {
 
   return (
     <div className="bg-white">
-      {/* Header Section */}
       <section className="bg-slate-950 py-24 text-center relative overflow-hidden">
         <div className="absolute inset-0 blueprint-grid-dark opacity-10"></div>
         <div className="max-w-4xl mx-auto px-4 relative z-10">
@@ -76,7 +76,6 @@ const MethodologyLayers: React.FC = () => {
         </div>
       </section>
 
-      {/* Comparison Section - The Added Value */}
       <section className="py-20 bg-slate-50 border-y border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -133,7 +132,6 @@ const MethodologyLayers: React.FC = () => {
         </div>
       </section>
 
-      {/* Layers Content */}
       <section className="py-24 relative bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="space-y-16">
@@ -142,16 +140,14 @@ const MethodologyLayers: React.FC = () => {
                 key={layer.id}
                 className={`flex flex-col lg:flex-row gap-12 items-stretch rounded-none overflow-hidden ${layer.bg} border-l-8 ${layer.accent.replace('bg-', 'border-')} shadow-xl transition-transform hover:-translate-y-1`}
               >
-                {/* Visual Label / Number */}
                 <div className={`lg:w-1/6 flex flex-col items-center justify-center p-12 ${layer.accent} text-white`}>
                   <span className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Layer</span>
                   <span className="text-7xl font-black tracking-tighter leading-none">{layer.id}</span>
                   <layer.icon size={40} className="mt-8 opacity-40" />
                 </div>
 
-                {/* Content */}
                 <div className="lg:w-5/6 p-12 lg:p-20">
-                  <div className="mb-10">
+                  <div className="mb-10 text-left">
                     <h2 className={`text-3xl font-black ${layer.text} tracking-tight mb-2 uppercase`}>{layer.title}</h2>
                     <p className={`text-lg font-bold ${layer.text} opacity-60 italic mb-6`}>{layer.subtitle}</p>
                     <div className="flex items-start gap-3 p-4 bg-white/40 backdrop-blur-sm rounded-lg border border-white/50 mb-8 max-w-3xl">
@@ -176,7 +172,6 @@ const MethodologyLayers: React.FC = () => {
             ))}
           </div>
 
-          {/* ROI Stats Section */}
           <div className="mt-32 grid grid-cols-1 md:grid-cols-3 gap-12 border-t border-slate-100 pt-20">
             <div className="text-center">
               <Clock className="mx-auto text-blue-600 mb-4" size={32} />
@@ -195,7 +190,6 @@ const MethodologyLayers: React.FC = () => {
             </div>
           </div>
 
-          {/* Final CTA */}
           <div className="mt-32 text-center">
             <div className="inline-block p-12 bg-slate-900 rounded-none border border-slate-800 shadow-2xl relative overflow-hidden group">
               <div className="absolute inset-0 blueprint-grid-dark opacity-10"></div>

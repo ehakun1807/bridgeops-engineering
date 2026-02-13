@@ -1,20 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import Navigation from './components/Navigation';
-import Hero from './components/Hero';
-import ServiceCard from './components/ServiceCard';
-import Expertise from './components/Expertise';
-import ContactForm from './components/ContactForm';
-import MethodologyLayers from './components/MethodologyLayers.tsx';
-import Logo from './components/Logo';
-import { SERVICES } from './constants';
-import { Hammer, ArrowRight, Activity, ShieldCheck, Zap, HardHat, Cpu, Rocket, Settings2 } from 'lucide-react';
+import Navigation from './Navigation.tsx';
+import Hero from './Hero.tsx';
+import ServiceCard from './ServiceCard.tsx';
+import Expertise from './Expertise.tsx';
+import ContactForm from './ContactForm.tsx';
+import MethodologyLayers from './MethodologyLayers.tsx';
+import Logo from './Logo.tsx';
+import { SERVICES } from './constants.tsx';
+import { ArrowRight, ShieldCheck, Rocket, Settings2 } from 'lucide-react';
 
 type View = 'home' | 'services' | 'methodology' | 'about' | 'contact';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('home');
 
-  // Scroll to top on view change
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [currentView]);
@@ -30,7 +29,6 @@ const App: React.FC = () => {
           <>
             <Hero onNavigate={navigateTo} />
             
-            {/* Market Focus Ticker / Section */}
             <div className="bg-white py-10 border-b border-slate-100">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex flex-wrap items-center justify-center gap-x-16 gap-y-6 opacity-40 grayscale">
@@ -50,12 +48,11 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            {/* Core USP Banner */}
-            <div className="bg-slate-900 py-14 border-y border-white/5 relative overflow-hidden">
+            <div className="bg-slate-900 py-14 border-y border-white/5 relative overflow-hidden text-left">
               <div className="absolute inset-0 blueprint-grid-dark opacity-10"></div>
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-                   <div>
+                   <div className="text-left">
                       <h3 className="text-white text-2xl md:text-4xl font-black tracking-tighter leading-tight uppercase">
                         From Lab to <br/><span className="text-blue-500 italic">Production Floor.</span>
                       </h3>
@@ -77,7 +74,7 @@ const App: React.FC = () => {
 
             <section className="py-20 bg-slate-50">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-8">
+                <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-8 text-left">
                   <div>
                     <div className="flex items-center space-x-2 mb-4">
                       <div className="w-10 h-[1px] bg-blue-600"></div>
@@ -132,7 +129,7 @@ const App: React.FC = () => {
 
       case 'about':
         return (
-          <div className="pt-24 min-h-screen bg-white">
+          <div className="pt-24 min-h-screen bg-white text-left">
             <Expertise />
             <section className="py-20 bg-slate-900 text-white relative overflow-hidden">
                <div className="absolute inset-0 blueprint-grid-dark opacity-10"></div>
@@ -179,7 +176,7 @@ const App: React.FC = () => {
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 border-b border-white/5 pb-16 mb-16">
-            <div>
+            <div className="text-left">
               <button onClick={() => navigateTo('home')} className="block mb-8">
                 <Logo light={true} />
               </button>
@@ -188,7 +185,7 @@ const App: React.FC = () => {
               </p>
             </div>
             
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-12">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-12 text-left">
               <div className="space-y-6">
                 <p className="text-[9px] font-black text-slate-600 uppercase tracking-[0.3em]">Navigation</p>
                 <ul className="space-y-3 text-xs font-bold uppercase tracking-tight">
