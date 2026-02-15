@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Send, Mail, MessageSquare, MapPin, MessageCircle } from 'lucide-react';
 
@@ -53,13 +54,6 @@ const ContactForm: React.FC = () => {
               <h2 className="text-3xl font-black mb-6 leading-tight uppercase tracking-tighter">Engineering <br/><span className="text-blue-500 text-4xl italic">Advisory</span></h2>
               <p className="text-slate-400 text-base mb-10 font-medium leading-relaxed">Let's discuss how we can stabilize your production line and improve your gross margins.</p>
               <div className="space-y-8">
-                <a href="mailto:OpsBridgENG@gmail.com" className="flex items-center space-x-6 group">
-                  <div className="bg-white/10 p-3 transition-colors group-hover:bg-blue-600"><Mail size={20} className="text-blue-500 group-hover:text-white" /></div>
-                  <div className="flex flex-col">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">Email</span>
-                    <span className="font-bold tracking-tight text-base">OpsBridgENG@gmail.com</span>
-                  </div>
-                </a>
                 <a 
                   href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent("Hello Eran, I'm reaching out via your website.")}`}
                   target="_blank"
@@ -117,7 +111,7 @@ const ContactForm: React.FC = () => {
               <div className="md:col-span-2 pt-6">
                 <button type="submit" className="w-full bg-slate-900 text-white py-4 font-black text-base hover:bg-green-600 transition-all flex items-center justify-center group uppercase tracking-widest shadow-xl">
                   <MessageCircle size={18} className="mr-4" />
-                  <span>Transmit to WhatsApp</span>
+                  <span>Transmit Form</span>
                   <Send size={18} className="ml-4 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
                 </button>
               </div>
