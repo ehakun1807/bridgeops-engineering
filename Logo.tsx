@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Share2 } from 'lucide-react';
 
@@ -5,7 +6,7 @@ interface LogoProps {
   scrolled?: boolean;
   light?: boolean;
   isDarkMenu?: boolean; 
-  isHighlighted?: boolean; // New prop to emphasize brand color on specific pages
+  isHighlighted?: boolean;
 }
 
 const Logo: React.FC<LogoProps> = ({ scrolled, light, isDarkMenu, isHighlighted }) => {

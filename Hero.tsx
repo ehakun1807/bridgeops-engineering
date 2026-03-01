@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { ArrowRight, Hammer, CheckCircle2 } from 'lucide-react';
 
@@ -8,7 +9,6 @@ interface HeroProps {
 const Hero: React.FC<HeroProps> = ({ onNavigate }) => {
   return (
     <div className="relative min-h-screen flex items-center overflow-hidden bg-slate-950">
-      {/* High-Tech Luxury Background Layers */}
       <div className="absolute inset-0 z-0">
         <div className="glow-blob w-[500px] h-[500px] bg-blue-600 top-[-10%] left-[-5%]"></div>
         <div className="glow-blob w-[600px] h-[600px] bg-indigo-900 bottom-[-20%] right-[-10%] animation-delay-2000"></div>
