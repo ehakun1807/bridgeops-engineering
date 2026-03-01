@@ -566,11 +566,11 @@ const RampScoreTool: React.FC = () => {
                       <div key={idx} className="group">
                         <div className="flex flex-col mb-2">
                           <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 group-hover:text-blue-500 transition-colors">{kpi.category}</span>
-                          <span className="text-[10px] font-black text-slate-900 uppercase tracking-tight leading-tight h-8 line-clamp-2">{kpi.metric}</span>
+                          <span className="text-[10px] font-black text-slate-900 uppercase tracking-tight leading-tight min-h-[2.5rem]">{kpi.metric}</span>
                         </div>
-                        <div className="bg-slate-50 p-3 border-l-2 border-blue-500 group-hover:bg-blue-50 transition-colors h-24 flex flex-col justify-between">
-                           <div className="text-lg font-black text-blue-600 tracking-tighter">{kpi.target}</div>
-                           <p className="text-[9px] text-slate-500 font-medium leading-tight line-clamp-3">{kpi.description}</p>
+                        <div className="bg-slate-50 p-3 border-l-2 border-blue-500 group-hover:bg-blue-50 transition-colors min-h-[8rem] flex flex-col justify-between">
+                           <div className="text-lg font-black text-blue-600 tracking-tighter mb-2">{kpi.target}</div>
+                           <p className="text-[9px] text-slate-500 font-medium leading-tight">{kpi.description}</p>
                         </div>
                       </div>
                     ))}
@@ -580,8 +580,12 @@ const RampScoreTool: React.FC = () => {
                 {/* Next Steps CTA */}
                 <div className="bg-blue-600 p-8 rounded-sm flex flex-col md:flex-row items-center justify-between gap-6">
                   <div className="text-left">
+                    <p className="text-blue-100 text-sm font-medium mb-4 leading-relaxed max-w-xl">
+                      If your readiness score is below 70%, your ramp-up risk is significantly higher.
+                      We provide a focused Ramp Readiness Audit to identify and close these gaps before scaling production.
+                    </p>
                     <h4 className="text-white font-black uppercase tracking-tight text-lg">Need a detailed audit?</h4>
-                    <p className="text-blue-100 text-sm font-medium">Get a professional on-site assessment of your production line.</p>
+                    <p className="text-blue-100 text-sm font-medium">Get a professional on-site assessment</p>
                   </div>
                   <button className="bg-white text-blue-600 px-8 py-3 font-black uppercase tracking-widest text-[10px] hover:bg-slate-900 hover:text-white transition-all whitespace-nowrap">
                     Book Consultation
