@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { 
   Building2, 
@@ -78,7 +79,7 @@ export const SERVICES: DetailedServiceItem[] = [
     id: 'quality-regulatory',
     code: 'OPS-QLT-07',
     title: 'Quality & Regulatory Interface',
-    description: 'Specialized support for ISO 9001, ISO 13485 (Medical), and ATEX standards, building the bridge between engineering and compliance.',
+    description: 'Specialized support for ISO 9001 General quality management system, ISO 13485 (Medical), and ISO80079 (Explosive Environments) including Class X Devision X and ATEX standards, building the bridge between engineering and compliance.',
     addedValue: 'Mitigates regulatory risks and ensures the product meets global safety and quality benchmarks.',
     image: 'https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&q=80&w=800',
     icon: 'ShieldCheck'
@@ -88,7 +89,7 @@ export const SERVICES: DetailedServiceItem[] = [
     code: 'OPS-ENG-08',
     title: 'Manufacturing Engineering Support',
     description: 'Direct on-site support for production lines, yield improvement, and End-to-End Engineering support for Local/Global Sub-contractors/Suppliers.',
-    addedValue: 'Ensures production line stability and maintains high professional standards for manufacturing personnel.',
+    addedValue: 'Ensures production line stability and maintains high professional standards (GMP) for manufacturing personnel.',
     image: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&q=80&w=800',
     icon: 'Wrench'
   },

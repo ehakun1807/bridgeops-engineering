@@ -1,6 +1,7 @@
 
 import React from 'react';
-import { DetailedServiceItem, ICON_MAP } from './constants.tsx';
+import { DetailedServiceItem } from '../constants';
+import { ICON_MAP } from '../constants';
 
 interface ServiceCardProps {
   service: DetailedServiceItem;
@@ -10,7 +11,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ service }) => {
   const IconComponent = ICON_MAP[service.icon];
 
   return (
-    <div className="group bg-white rounded-none flex flex-col h-full border border-slate-200 relative text-left">
+    <div className="group bg-white rounded-none flex flex-col h-full border border-slate-200 relative">
       <div className="relative h-56 overflow-hidden bg-slate-100">
         <img 
           src={service.image} 

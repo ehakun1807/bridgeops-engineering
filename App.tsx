@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Navigation from './Navigation.tsx';
 import Hero from './Hero.tsx';
@@ -6,13 +7,15 @@ import Expertise from './Expertise.tsx';
 import ContactForm from './ContactForm.tsx';
 import MethodologyLayers from './MethodologyLayers.tsx';
 import Logo from './Logo.tsx';
+import RampScoreTool from './RampScoreTool.tsx';
 import { SERVICES } from './constants.tsx';
-import { ArrowRight, ShieldCheck, Rocket, Settings2 } from 'lucide-react';
+import { ArrowRight, ShieldCheck, Rocket, Settings2, Linkedin } from 'lucide-react';
 
-type View = 'home' | 'services' | 'methodology' | 'about' | 'contact';
+type View = 'home' | 'services' | 'methodology' | 'about' | 'contact' | 'ramp_score';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('home');
+  const linkedInUrl = "https://www.linkedin.com/in/eran-hakun-81a80a1b";
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -71,6 +74,31 @@ const App: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            <section className="py-20 bg-white border-b border-slate-100">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="bg-slate-900 rounded-sm p-8 md:p-16 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-12">
+                   <div className="absolute inset-0 blueprint-grid-dark opacity-10"></div>
+                   <div className="relative z-10 text-left max-w-xl">
+                      <span className="text-blue-500 font-black uppercase tracking-[0.3em] text-[10px] mb-4 block">New: AI Operational Audit</span>
+                      <h2 className="text-3xl md:text-5xl font-black text-white uppercase tracking-tighter leading-none">
+                        Assess Your <br/><span className="text-blue-600">Ramp Readiness.</span>
+                      </h2>
+                      <p className="text-slate-400 mt-6 text-base font-medium leading-relaxed">
+                        Use our AI-driven tool to identify manufacturing risks and get actionable recommendations for your production scale-up.
+                      </p>
+                   </div>
+                   <div className="relative z-10">
+                      <button 
+                        onClick={() => navigateTo('ramp_score')}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-10 py-5 font-black uppercase tracking-[0.2em] text-xs transition-all shadow-2xl shadow-blue-500/20 flex items-center group"
+                      >
+                        Launch Tool <ArrowRight size={16} className="ml-4 group-hover:translate-x-1 transition-transform" />
+                      </button>
+                   </div>
+                </div>
+              </div>
+            </section>
 
             <section className="py-20 bg-slate-50">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -159,6 +187,12 @@ const App: React.FC = () => {
             <ContactForm />
           </div>
         );
+      case 'ramp_score':
+        return (
+          <div className="pt-24 min-h-screen bg-slate-50">
+            <RampScoreTool />
+          </div>
+        );
     }
   };
 
@@ -183,6 +217,17 @@ const App: React.FC = () => {
               <p className="text-slate-500 max-w-sm font-medium leading-relaxed text-sm">
                 OpsBridge Engineering provides executive-level operational guidance and NPI services for the technology sector. Specialized in complex hardware transition to mass production.
               </p>
+              <div className="mt-8">
+                 <a 
+                  href={linkedInUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="inline-flex items-center space-x-2 text-slate-400 hover:text-blue-500 transition-colors group"
+                >
+                  <Linkedin size={20} className="group-hover:scale-110 transition-transform" />
+                  <span className="text-[10px] font-black uppercase tracking-widest">Connect with Eran Hakun</span>
+                </a>
+              </div>
             </div>
             
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-12 text-left">
