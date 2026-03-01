@@ -105,9 +105,14 @@ const RampScoreTool: React.FC = () => {
   const runAssessment = async () => {
     setLoading(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        throw new Error("GEMINI_API_KEY is not defined in the environment variables.");
+      }
+
+      const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-3.1-pro-preview",
         contents: `Assess the manufacturing ramp-up readiness for the following hardware project:
         Product Type: ${formData.productType}
         Complexity: ${formData.complexity}
@@ -115,7 +120,7 @@ const RampScoreTool: React.FC = () => {
         Assembly Steps: ${formData.assemblySteps}
         Supply Chain Maturity: ${formData.supplyChain}
         DMR (Device Master Record) Completeness: ${formData.dmrCompleteness}%
-        Test Coverage: ${formData.testCoverage}%
+        Product Testability Coverage: ${formData.testCoverage}%
         ECO (Engineering Change Order) Governance: ${formData.ecoGovernance}
         Target Production Volume: ${formData.targetVolume} units/month
         Target Regulatory Standards: ${formData.selectedStandards.join(', ') || 'None specified'}
@@ -166,11 +171,16 @@ const RampScoreTool: React.FC = () => {
         }
       });
 
-      const data = JSON.parse(response.text || '{}');
+      if (!response.text) {
+        throw new Error("Model returned an empty response.");
+      }
+
+      const data = JSON.parse(response.text);
       setResult(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Assessment failed:", error);
-      alert("Failed to generate assessment. Please try again.");
+      const errorMessage = error.message || "Unknown error";
+      alert(`Failed to generate assessment: ${errorMessage}. Please check your connection and API key configuration.`);
     } finally {
       setLoading(false);
     }
@@ -197,7 +207,7 @@ const RampScoreTool: React.FC = () => {
           <div className="bg-white p-8 border border-slate-200 shadow-sm rounded-sm">
             <h3 className="text-sm font-black uppercase tracking-widest text-slate-900 mb-8 flex items-center">
               <ClipboardCheck className="mr-2 text-blue-600" size={18} />
-              Project Parameters
+              Readiness Parameters
             </h3>
             
             <div className="space-y-6">
@@ -319,7 +329,7 @@ const RampScoreTool: React.FC = () => {
 
               <div>
                 <div className="flex justify-between mb-2">
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500">Test Coverage</label>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500">Product Testability Coverage</label>
                   <span className="text-[10px] font-bold text-blue-600">{formData.testCoverage}%</span>
                 </div>
                 <input 
