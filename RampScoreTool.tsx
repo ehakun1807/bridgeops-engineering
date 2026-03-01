@@ -112,7 +112,7 @@ const RampScoreTool: React.FC = () => {
 
       const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
-        model: "gemini-3.1-pro-preview",
+        model: "gemini-3-flash-preview",
         contents: `Assess the manufacturing ramp-up readiness for the following hardware project:
         Product Type: ${formData.productType}
         Complexity: ${formData.complexity}
