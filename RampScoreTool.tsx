@@ -111,76 +111,99 @@ const RampScoreTool: React.FC = () => {
       }
 
       const ai = new GoogleGenAI({ apiKey });
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: `Assess the manufacturing ramp-up readiness for the following hardware project:
-        Product Type: ${formData.productType}
-        Complexity: ${formData.complexity}
-        Number of Suppliers: ${formData.numSuppliers}
-        Assembly Steps: ${formData.assemblySteps}
-        Supply Chain Maturity: ${formData.supplyChain}
-        DMR (Device Master Record) Completeness: ${formData.dmrCompleteness}%
-        Product Testability Coverage: ${formData.testCoverage}%
-        ECO (Engineering Change Order) Governance: ${formData.ecoGovernance}
-        Target Production Volume: ${formData.targetVolume} units/month
-        Target Regulatory Standards: ${formData.selectedStandards.join(', ') || 'None specified'}
-        
-        Please provide:
-        1. A Readiness Score (0-100).
-        2. A Risk Level (e.g., LOW, MEDIUM, MEDIUM-HIGH, HIGH).
-        3. Risk Drivers: Specific risks based on the inputs provided.
-        4. Recommended Mitigations: Actionable steps to address the risk drivers.
-        
-        Also provide specific targets and descriptions for the following 10 critical KPIs based on the project parameters:
-        1. Quality: First Pass Yield (FPY) - Percentage of units meeting all specs on first attempt without rework.
-        2. Volume: Production Schedule Attainment - Ability to hit planned production targets (Actual/Planned).
-        3. Speed: Manufacturing Cycle Time - Total time to transform raw materials into finished product.
-        4. Efficiency: Overall Equipment Effectiveness (OEE) - Availability x Performance x Quality.
-        5. Waste: Scrap Rate - Percentage of defective materials/units that cannot be salvaged.
-        6. NPI Maturity: Time-to-Volume - Duration from ramp-up start until full steady-state capacity.
-        7. Scaling: Capacity Utilization - Ratio of actual output to potential output of the facility.
-        8. Workforce: Training Hours per Employee - Investment in workforce readiness and safety.
-        9. Flexibility: Changeover Time - Time required to switch between product variants or batches.
-        10. Reliability: Customer Return Rate (Early Life Failure) - Percentage of products returned shortly after launch.`,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              score: { type: Type.NUMBER, description: "Readiness score from 0 to 100" },
-              riskLevel: { type: Type.STRING, description: "Risk level (e.g. MEDIUM-HIGH)" },
-              risks: { type: Type.ARRAY, items: { type: Type.STRING }, description: "List of major risk drivers detected" },
-              recommendations: { type: Type.ARRAY, items: { type: Type.STRING }, description: "List of recommended mitigations" },
-              analysis: { type: Type.STRING, description: "Brief executive summary of the assessment" },
-              kpis: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    category: { type: Type.STRING },
-                    metric: { type: Type.STRING },
-                    description: { type: Type.STRING },
-                    target: { type: Type.STRING, description: "Recommended target value for this metric" }
-                  },
-                  required: ["category", "metric", "description", "target"]
-                }
+      
+      const maxRetries = 3;
+      let attempt = 0;
+      let lastError: any = null;
+
+      while (attempt < maxRetries) {
+        try {
+          const response = await ai.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: `Assess the manufacturing ramp-up readiness for the following hardware project:
+            Product Type: ${formData.productType}
+            Complexity: ${formData.complexity}
+            Number of Suppliers: ${formData.numSuppliers}
+            Assembly Steps: ${formData.assemblySteps}
+            Supply Chain Maturity: ${formData.supplyChain}
+            DMR (Device Master Record) Completeness: ${formData.dmrCompleteness}%
+            Product Testability Coverage: ${formData.testCoverage}%
+            ECO (Engineering Change Order) Governance: ${formData.ecoGovernance}
+            Target Production Volume: ${formData.targetVolume} units/month
+            Target Regulatory Standards: ${formData.selectedStandards.join(', ') || 'None specified'}
+            
+            Please provide:
+            1. A Readiness Score (0-100).
+            2. A Risk Level (e.g., LOW, MEDIUM, MEDIUM-HIGH, HIGH).
+            3. Risk Drivers: Specific risks based on the inputs provided.
+            4. Recommended Mitigations: Actionable steps to address the risk drivers.
+            
+            Also provide specific targets and descriptions for the following 10 critical KPIs based on the project parameters:
+            1. Quality: First Pass Yield (FPY) - Percentage of units meeting all specs on first attempt without rework.
+            2. Volume: Production Schedule Attainment - Ability to hit planned production targets (Actual/Planned).
+            3. Speed: Manufacturing Cycle Time - Total time to transform raw materials into finished product.
+            4. Efficiency: Overall Equipment Effectiveness (OEE) - Availability x Performance x Quality.
+            5. Waste: Scrap Rate - Percentage of defective materials/units that cannot be salvaged.
+            6. NPI Maturity: Time-to-Volume - Duration from ramp-up start until full steady-state capacity.
+            7. Scaling: Capacity Utilization - Ratio of actual output to potential output of the facility.
+            8. Workforce: Training Hours per Employee - Investment in workforce readiness and safety.
+            9. Flexibility: Changeover Time - Time required to switch between product variants or batches.
+            10. Reliability: Customer Return Rate (Early Life Failure) - Percentage of products returned shortly after launch.`,
+            config: {
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  score: { type: Type.NUMBER, description: "Readiness score from 0 to 100" },
+                  riskLevel: { type: Type.STRING, description: "Risk level (e.g. MEDIUM-HIGH)" },
+                  risks: { type: Type.ARRAY, items: { type: Type.STRING }, description: "List of major risk drivers detected" },
+                  recommendations: { type: Type.ARRAY, items: { type: Type.STRING }, description: "List of recommended mitigations" },
+                  analysis: { type: Type.STRING, description: "Brief executive summary of the assessment" },
+                  kpis: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        category: { type: Type.STRING },
+                        metric: { type: Type.STRING },
+                        description: { type: Type.STRING },
+                        target: { type: Type.STRING, description: "Recommended target value for this metric" }
+                      },
+                      required: ["category", "metric", "description", "target"]
+                    }
+                  }
+                },
+                required: ["score", "riskLevel", "risks", "recommendations", "analysis", "kpis"]
               }
-            },
-            required: ["score", "riskLevel", "risks", "recommendations", "analysis", "kpis"]
+            }
+          });
+
+          if (!response.text) {
+            throw new Error("Model returned an empty response.");
           }
+
+          const data = JSON.parse(response.text);
+          setResult(data);
+          return; // Success!
+        } catch (error: any) {
+          lastError = error;
+          // If it's a 503 (Service Unavailable) or 429 (Too Many Requests), retry
+          if (error.message?.includes("503") || error.message?.includes("429") || error.status === 503 || error.status === 429) {
+            attempt++;
+            if (attempt < maxRetries) {
+              const delay = Math.pow(2, attempt) * 1000; // Exponential backoff: 2s, 4s, 8s
+              console.warn(`Gemini API busy (Attempt ${attempt}). Retrying in ${delay}ms...`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+              continue;
+            }
+          }
+          throw error; // Re-throw if not a retryable error or max retries reached
         }
-      });
-
-      if (!response.text) {
-        throw new Error("Model returned an empty response.");
       }
-
-      const data = JSON.parse(response.text);
-      setResult(data);
     } catch (error: any) {
       console.error("Assessment failed:", error);
       const errorMessage = error.message || "Unknown error";
-      alert(`Failed to generate assessment: ${errorMessage}. Please check your connection and API key configuration.`);
+      alert(`Failed to generate assessment: ${errorMessage}. This is usually due to high demand on the AI model. Please try again in a few moments.`);
     } finally {
       setLoading(false);
     }
