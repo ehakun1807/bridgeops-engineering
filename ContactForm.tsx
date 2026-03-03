@@ -18,10 +18,10 @@ const ContactForm: React.FC = () => {
     setError(null);
 
     try {
-      // Replace 'YOUR_FORM_ID' with your actual Formspree ID later
       const response = await fetch('https://formspree.io/f/xldgjovq', {
         method: 'POST',
         headers: {
+          'Accept': 'application/json',
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -36,14 +36,28 @@ const ContactForm: React.FC = () => {
       if (response.ok) {
         setSubmitted(true);
       } else {
-        throw new Error('Failed to send message');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to send message');
       }
-    } catch (err) {
-      setError('Something went wrong. Please try again or use the direct contact options.');
-      console.error(err);
+    } catch (err: any) {
+      setError('Automated transmission failed. Please use the direct email button below.');
+      console.error('Formspree error:', err);
     } finally {
       setIsSending(false);
     }
+  };
+
+  const handleFallbackMail = () => {
+    const subject = `New Professional Inquiry: ${formState.name} (${formState.company})`;
+    const body = `New Professional Inquiry - BridgeOps ENGINEERING
+--------------------------------------------
+Name: ${formState.name}
+Email: ${formState.email}
+Company/Market: ${formState.company}
+Challenge: ${formState.message}
+--------------------------------------------
+Sent via BridgeOps Website`;
+    window.location.href = `mailto:eran@bridgeops-engineering.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
 
   if (submitted) {
@@ -169,8 +183,18 @@ const ContactForm: React.FC = () => {
               </div>
               
               {error && (
-                <div className="md:col-span-2 text-red-600 text-[10px] font-bold uppercase tracking-widest">
-                  {error}
+                <div className="md:col-span-2 space-y-4">
+                  <div className="text-red-600 text-[10px] font-bold uppercase tracking-widest">
+                    {error}
+                  </div>
+                  <button 
+                    type="button"
+                    onClick={handleFallbackMail}
+                    className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 font-black uppercase tracking-widest text-[10px] transition-colors"
+                  >
+                    <Mail size={14} />
+                    <span>Send via Email Client Instead</span>
+                  </button>
                 </div>
               )}
 
