@@ -9,7 +9,7 @@ import MethodologyLayers from './MethodologyLayers.tsx';
 import Logo from './Logo.tsx';
 import RampScoreTool from './RampScoreTool.tsx';
 import { SERVICES } from './constants.tsx';
-import { ArrowRight, ShieldCheck, Rocket, Settings2, Linkedin } from 'lucide-react';
+import { ArrowRight, ShieldCheck, Rocket, Settings2, Linkedin, Mail } from 'lucide-react';
 
 type View = 'home' | 'services' | 'methodology' | 'about' | 'contact' | 'ramp_score';
 
@@ -218,7 +218,7 @@ const App: React.FC = () => {
               <p className="text-slate-500 max-w-sm font-medium leading-relaxed text-sm">
                 BridgeOps.ENGINEERING provides executive-level operational guidance and NPI services for the technology sector. Specialized in complex hardware transition to mass production.
               </p>
-              <div className="mt-8">
+              <div className="mt-8 space-y-4">
                  <a 
                   href={linkedInUrl} 
                   target="_blank" 
@@ -228,6 +228,15 @@ const App: React.FC = () => {
                   <Linkedin size={20} className="group-hover:scale-110 transition-transform" />
                   <span className="text-[10px] font-black uppercase tracking-widest">Connect with Eran Hakun</span>
                 </a>
+                <div className="block">
+                  <a 
+                    href="mailto:eran@bridgeops-engineering.com"
+                    className="inline-flex items-center space-x-2 text-slate-400 hover:text-blue-500 transition-colors group"
+                  >
+                    <Mail size={20} className="group-hover:scale-110 transition-transform" />
+                    <span className="text-[10px] font-black uppercase tracking-widest">eran@bridgeops-engineering.com</span>
+                  </a>
+                </div>
               </div>
             </div>
             

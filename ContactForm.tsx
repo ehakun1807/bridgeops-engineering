@@ -11,9 +11,20 @@ const ContactForm: React.FC = () => {
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const messageBody = `*New Professional Inquiry - BridgeOps ENGINEERING*\n--------------------------------------------\n*Name:* ${formState.name}\n*Email:* ${formState.email}\n*Company/Market:* ${formState.company}\n*Challenge:* ${formState.message}\n--------------------------------------------\n_Sent via BridgeOps Website_`;
-    const whatsappLink = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(messageBody)}`;
-    window.open(whatsappLink, '_blank');
+    const subject = `New Professional Inquiry: ${formState.name} (${formState.company})`;
+    const body = `New Professional Inquiry - BridgeOps ENGINEERING
+--------------------------------------------
+Name: ${formState.name}
+Email: ${formState.email}
+Company/Market: ${formState.company}
+Challenge: ${formState.message}
+--------------------------------------------
+Sent via BridgeOps Website`;
+
+    const mailtoLink = `mailto:eran@bridgeops-engineering.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    
+    // Open email client
+    window.location.href = mailtoLink;
     setSubmitted(true);
   };
 
@@ -24,10 +35,10 @@ const ContactForm: React.FC = () => {
           <div className="bg-slate-900 p-12 lg:p-20 text-center shadow-2xl relative overflow-hidden">
              <div className="absolute inset-0 blueprint-grid-dark opacity-10"></div>
             <div className="w-16 h-16 bg-blue-600 text-white flex items-center justify-center mx-auto mb-6 relative z-10">
-              <MessageCircle size={32} />
+              <Mail size={32} />
             </div>
-            <h3 className="text-2xl font-black text-white mb-4 relative z-10 uppercase tracking-tighter">Redirecting to WhatsApp</h3>
-            <p className="text-slate-400 mb-8 text-base relative z-10">The inquiry details have been prepared for WhatsApp. If the chat didn't open automatically, please click below.</p>
+            <h3 className="text-2xl font-black text-white mb-4 relative z-10 uppercase tracking-tighter">Opening Email Client</h3>
+            <p className="text-slate-400 mb-8 text-base relative z-10">Your inquiry has been prepared. Please send the email in the window that just opened.</p>
             <div className="flex flex-col items-center space-y-4">
               <button 
                 onClick={() => setSubmitted(false)}
@@ -55,6 +66,19 @@ const ContactForm: React.FC = () => {
               <h2 className="text-3xl font-black mb-6 leading-tight uppercase tracking-tighter">Engineering <br/><span className="text-blue-500 text-4xl italic">Advisory</span></h2>
               <p className="text-slate-400 text-base mb-10 font-medium leading-relaxed">Let's discuss how we can stabilize your production line and improve your gross margins.</p>
               <div className="space-y-8">
+                <a 
+                  href="mailto:eran@bridgeops-engineering.com"
+                  className="flex items-center space-x-6 group"
+                >
+                  <div className="bg-white/10 p-3 transition-colors group-hover:bg-blue-600">
+                    <Mail size={20} className="text-blue-500 group-hover:text-white" />
+                  </div>
+                  <div className="flex flex-col text-left">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">Email</span>
+                    <span className="font-bold text-sm tracking-tight text-white hover:text-blue-400 transition-colors">eran@bridgeops-engineering.com</span>
+                  </div>
+                </a>
+
                 <a 
                   href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent("Hello Eran, I'm reaching out via your website.")}`}
                   target="_blank"
@@ -97,7 +121,7 @@ const ContactForm: React.FC = () => {
           <div className="lg:w-2/3 p-10 lg:p-16 bg-white">
             <div className="mb-10 text-left">
               <h3 className="text-3xl font-black text-slate-900 mb-2 tracking-tighter uppercase">Inquiry Form</h3>
-              <p className="text-sm text-slate-500 font-medium">This form will prepare a message for WhatsApp for an immediate response.</p>
+              <p className="text-sm text-slate-500 font-medium">This form will prepare an email with your inquiry details.</p>
             </div>
             <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-10 text-left">
               <div className="space-y-3">
@@ -125,9 +149,9 @@ const ContactForm: React.FC = () => {
                 <textarea required rows={3} className="w-full bg-slate-50 border-b-2 border-slate-200 px-4 py-2.5 focus:outline-none focus:border-blue-600 transition-all font-bold text-sm text-slate-800 resize-none" placeholder="Describe your current bottleneck..." value={formState.message} onChange={(e) => setFormState({...formState, message: e.target.value})}></textarea>
               </div>
               <div className="md:col-span-2 pt-6">
-                <button type="submit" className="w-full bg-slate-900 text-white py-4 font-black text-base hover:bg-green-600 transition-all flex items-center justify-center group uppercase tracking-widest shadow-xl">
-                  <MessageCircle size={18} className="mr-4" />
-                  <span>Transmit Form</span>
+                <button type="submit" className="w-full bg-slate-900 text-white py-4 font-black text-base hover:bg-blue-600 transition-all flex items-center justify-center group uppercase tracking-widest shadow-xl">
+                  <Mail size={18} className="mr-4" />
+                  <span>Transmit Inquiry</span>
                   <Send size={18} className="ml-4 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
                 </button>
               </div>

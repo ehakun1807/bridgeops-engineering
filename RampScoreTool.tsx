@@ -105,9 +105,11 @@ const RampScoreTool: React.FC = () => {
   const runAssessment = async () => {
     setLoading(true);
     try {
-      const apiKey = process.env.GEMINI_API_KEY;
+      // Robust API key selection for different environments
+      const apiKey = process.env.GEMINI_API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY;
+      
       if (!apiKey) {
-        throw new Error("GEMINI_API_KEY is not defined in the environment variables.");
+        throw new Error("API Key not found. Please ensure GEMINI_API_KEY is set.");
       }
 
       const ai = new GoogleGenAI({ apiKey });
