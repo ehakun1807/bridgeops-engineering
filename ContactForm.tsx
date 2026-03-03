@@ -18,33 +18,37 @@ const ContactForm: React.FC = () => {
     setError(null);
 
     try {
+      const formData = new FormData();
+      formData.append('name', formState.name);
+      formData.append('email', formState.email);
+      formData.append('company', formState.company);
+      formData.append('message', formState.message);
+      formData.append('_subject', `New BridgeOps Inquiry from ${formState.name}`);
+
       const response = await fetch('https://formspree.io/f/xldgjovq', {
         method: 'POST',
+        body: formData,
         headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: formState.name,
-          email: formState.email,
-          company: formState.company,
-          message: formState.message,
-          _subject: `New BridgeOps Inquiry from ${formState.name}`
-        })
+          'Accept': 'application/json'
+        }
       });
 
       if (response.ok) {
         setSubmitted(true);
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to send message');
+        throw new Error('Server rejected the submission');
       }
     } catch (err: any) {
-      setError('Automated transmission failed. Please use the direct email button below.');
-      console.error('Formspree error:', err);
+      setError('Automated transmission blocked by browser or server. Please use one of the direct contact methods below:');
+      console.error('Submission error:', err);
     } finally {
       setIsSending(false);
     }
+  };
+
+  const handleWhatsAppFallback = () => {
+    const messageBody = `*New Professional Inquiry - BridgeOps ENGINEERING*\n--------------------------------------------\n*Name:* ${formState.name}\n*Email:* ${formState.email}\n*Company:* ${formState.company}\n*Challenge:* ${formState.message}\n--------------------------------------------`;
+    window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(messageBody)}`, '_blank');
   };
 
   const handleFallbackMail = () => {
@@ -183,18 +187,28 @@ Sent via BridgeOps Website`;
               </div>
               
               {error && (
-                <div className="md:col-span-2 space-y-4">
+                <div className="md:col-span-2 space-y-6 bg-red-50 p-6 border-l-4 border-red-500">
                   <div className="text-red-600 text-[10px] font-bold uppercase tracking-widest">
                     {error}
                   </div>
-                  <button 
-                    type="button"
-                    onClick={handleFallbackMail}
-                    className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 font-black uppercase tracking-widest text-[10px] transition-colors"
-                  >
-                    <Mail size={14} />
-                    <span>Send via Email Client Instead</span>
-                  </button>
+                  <div className="flex flex-wrap gap-4">
+                    <button 
+                      type="button"
+                      onClick={handleFallbackMail}
+                      className="flex items-center space-x-2 bg-white border border-slate-200 px-4 py-2 text-slate-900 font-black uppercase tracking-widest text-[9px] hover:bg-slate-900 hover:text-white transition-all shadow-sm"
+                    >
+                      <Mail size={14} />
+                      <span>Send via Email</span>
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={handleWhatsAppFallback}
+                      className="flex items-center space-x-2 bg-green-50 text-green-700 border border-green-200 px-4 py-2 font-black uppercase tracking-widest text-[9px] hover:bg-green-600 hover:text-white transition-all shadow-sm"
+                    >
+                      <MessageCircle size={14} />
+                      <span>Send via WhatsApp</span>
+                    </button>
+                  </div>
                 </div>
               )}
 
