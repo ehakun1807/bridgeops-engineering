@@ -65,7 +65,7 @@ const MethodologyLayers: React.FC = () => {
         <div className="max-w-4xl mx-auto px-4 relative z-10">
           <div className="flex items-center justify-center space-x-3 mb-6">
             <Activity className="text-blue-500" size={24} />
-            <span className="text-blue-400 font-black uppercase tracking-[0.4em] text-xs">The OpsBridge Method</span>
+            <span className="text-blue-400 font-black uppercase tracking-[0.4em] text-xs">The BridgeOps Method</span>
           </div>
           <h1 className="text-5xl md:text-7xl font-black text-white tracking-tighter mb-8 leading-tight">
             Three Layers of <br/><span className="text-blue-500">Operational Excellence</span>
@@ -79,7 +79,7 @@ const MethodologyLayers: React.FC = () => {
       <section className="py-20 bg-slate-50 border-y border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-2xl font-black text-slate-900 tracking-tight uppercase">Why OpsBridge?</h2>
+            <h2 className="text-2xl font-black text-slate-900 tracking-tight uppercase">Why BridgeOps?</h2>
             <p className="text-slate-500 mt-2 text-sm">The difference between "Advice" and "Execution"</p>
           </div>
           
@@ -111,7 +111,7 @@ const MethodologyLayers: React.FC = () => {
               </div>
               <div className="flex items-center space-x-3 mb-8 text-blue-500">
                 <CheckCircle2 size={24} />
-                <h3 className="text-lg font-black uppercase tracking-widest">OpsBridge Engineering</h3>
+                <h3 className="text-lg font-black uppercase tracking-widest">BridgeOps.ENGINEERING</h3>
               </div>
               <ul className="space-y-6">
                 <li className="flex items-start text-white font-bold text-sm">

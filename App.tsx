@@ -159,6 +159,7 @@ const App: React.FC = () => {
         return (
           <div className="pt-24 min-h-screen bg-white text-left">
             <Expertise />
+            
             <section className="py-20 bg-slate-900 text-white relative overflow-hidden">
                <div className="absolute inset-0 blueprint-grid-dark opacity-10"></div>
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
@@ -215,7 +216,7 @@ const App: React.FC = () => {
                 <Logo light={true} />
               </button>
               <p className="text-slate-500 max-w-sm font-medium leading-relaxed text-sm">
-                OpsBridge Engineering provides executive-level operational guidance and NPI services for the technology sector. Specialized in complex hardware transition to mass production.
+                BridgeOps.ENGINEERING provides executive-level operational guidance and NPI services for the technology sector. Specialized in complex hardware transition to mass production.
               </p>
               <div className="mt-8">
                  <a 
@@ -258,7 +259,7 @@ const App: React.FC = () => {
           </div>
 
           <div className="flex flex-col md:flex-row justify-between items-center text-slate-600 text-[9px] font-black uppercase tracking-[0.2em]">
-            <p>© {new Date().getFullYear()} OpsBridge Engineering | Eran Hakun. All Rights Reserved.</p>
+            <p>© {new Date().getFullYear()} BridgeOps.ENGINEERING | Eran Hakun. All Rights Reserved.</p>
             <div className="mt-6 md:mt-0 flex space-x-8">
               <span className="flex items-center"><div className="w-1.5 h-1.5 bg-blue-500 mr-2"></div> Technion Graduate (M.E.)</span>
               <span className="flex items-center"><div className="w-1.5 h-1.5 bg-blue-500 mr-2"></div> Global Operations</span>

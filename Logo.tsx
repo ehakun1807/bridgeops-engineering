@@ -20,10 +20,10 @@ const Logo: React.FC<LogoProps> = ({ scrolled, light, isDarkMenu, isHighlighted 
       </div>
       <div className="flex flex-col leading-none text-left">
         <span className={`text-2xl font-black tracking-tighter transition-all duration-300 ${isHighlighted ? 'text-blue-500 drop-shadow-[0_0_8px_rgba(59,130,246,0.4)]' : (useLightText ? 'text-white' : 'text-slate-900')}`}>
-          OpsBridge<span className={isHighlighted ? 'text-white' : 'text-blue-500'}>.</span>
+          BridgeOps<span className={isHighlighted ? 'text-white' : 'text-blue-500'}>.</span>
         </span>
         <span className={`text-[10px] font-black uppercase tracking-[0.3em] transition-colors ${isHighlighted ? 'text-blue-300/60' : (useLightText ? 'text-slate-400' : 'text-slate-500')}`}>
-          Engineering
+          ENGINEERING
         </span>
       </div>
     </div>

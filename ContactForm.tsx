@@ -11,7 +11,7 @@ const ContactForm: React.FC = () => {
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const messageBody = `*New Professional Inquiry - OpsBridge Engineering*\n--------------------------------------------\n*Name:* ${formState.name}\n*Email:* ${formState.email}\n*Company/Market:* ${formState.company}\n*Challenge:* ${formState.message}\n--------------------------------------------\n_Sent via OpsBridge Website_`;
+    const messageBody = `*New Professional Inquiry - BridgeOps ENGINEERING*\n--------------------------------------------\n*Name:* ${formState.name}\n*Email:* ${formState.email}\n*Company/Market:* ${formState.company}\n*Challenge:* ${formState.message}\n--------------------------------------------\n_Sent via BridgeOps Website_`;
     const whatsappLink = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(messageBody)}`;
     window.open(whatsappLink, '_blank');
     setSubmitted(true);

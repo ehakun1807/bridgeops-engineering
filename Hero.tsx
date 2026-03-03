@@ -28,7 +28,7 @@ const Hero: React.FC<HeroProps> = ({ onNavigate }) => {
           </h1>
           
           <p className="text-lg md:text-xl text-slate-200 mb-8 leading-relaxed max-w-3xl font-medium border-l-4 border-blue-600 pl-6 py-2">
-            OpsBridge helps Hardware Startups and Tech Companies to fix the <span className="text-blue-400 font-bold underline decoration-blue-500/50">Hidden Gaps between Engineering and Manufacturing</span> before they turn into Delays, Overruns and broken teams.
+            BridgeOps helps Hardware Startups and Tech Companies to fix the <span className="text-blue-400 font-bold underline decoration-blue-500/50">Hidden Gaps between Engineering and Manufacturing</span> before they turn into Delays, Overruns and broken teams.
           </p>
 
           <div className="space-y-4 mb-12 max-w-3xl pl-7">
