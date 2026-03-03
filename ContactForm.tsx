@@ -18,28 +18,32 @@ const ContactForm: React.FC = () => {
     setError(null);
 
     try {
-      const formData = new FormData();
-      formData.append('name', formState.name);
-      formData.append('email', formState.email);
-      formData.append('company', formState.company);
-      formData.append('message', formState.message);
-      formData.append('_subject', `New BridgeOps Inquiry from ${formState.name}`);
-
-      const response = await fetch('https://formspree.io/f/xldgjovq', {
+      const response = await fetch('https://formsubmit.co/ajax/eran@bridgeops-engineering.com', {
         method: 'POST',
-        body: formData,
         headers: {
+          'Content-Type': 'application/json',
           'Accept': 'application/json'
-        }
+        },
+        body: JSON.stringify({
+          name: formState.name,
+          email: formState.email,
+          company: formState.company,
+          message: formState.message,
+          _subject: `New BridgeOps Inquiry from ${formState.name}`,
+          _template: 'table', // Makes the email look professional
+          _captcha: 'false'   // Disables captcha for smoother UX
+        })
       });
 
-      if (response.ok) {
+      const result = await response.json();
+
+      if (result.success === 'true' || response.ok) {
         setSubmitted(true);
       } else {
-        throw new Error('Server rejected the submission');
+        throw new Error('Submission failed');
       }
     } catch (err: any) {
-      setError('Automated transmission blocked by browser or server. Please use one of the direct contact methods below:');
+      setError('Automated transmission blocked. Please use WhatsApp or Email directly below:');
       console.error('Submission error:', err);
     } finally {
       setIsSending(false);
