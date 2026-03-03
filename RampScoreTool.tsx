@@ -119,7 +119,7 @@ const RampScoreTool: React.FC = () => {
       while (attempt < maxRetries) {
         try {
           const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
+            model: "gemini-flash-latest",
             contents: `Assess the manufacturing ramp-up readiness for the following hardware project:
             Product Type: ${formData.productType}
             Complexity: ${formData.complexity}
@@ -192,7 +192,7 @@ const RampScoreTool: React.FC = () => {
             attempt++;
             if (attempt < maxRetries) {
               const delay = Math.pow(2, attempt) * 1000; // Exponential backoff: 2s, 4s, 8s
-              console.warn(`Gemini API busy (Attempt ${attempt}). Retrying in ${delay}ms...`);
+              console.warn(`Gemini API busy (Attempt ${attempt}/${maxRetries}). Retrying in ${delay}ms...`, error);
               await new Promise(resolve => setTimeout(resolve, delay));
               continue;
             }
@@ -203,7 +203,9 @@ const RampScoreTool: React.FC = () => {
     } catch (error: any) {
       console.error("Assessment failed:", error);
       const errorMessage = error.message || "Unknown error";
-      alert(`Failed to generate assessment: ${errorMessage}. This is usually due to high demand on the AI model. Please try again in a few moments.`);
+      alert(`The AI service is currently experiencing high traffic (Error 503). 
+      
+We've attempted to retry automatically, but the service remains busy. Please try again in 1-2 minutes, or check if your Gemini API key has sufficient quota in the Google AI Studio dashboard.`);
     } finally {
       setLoading(false);
     }
