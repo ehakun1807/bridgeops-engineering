@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Send, Mail, MessageSquare, MapPin, MessageCircle, Linkedin } from 'lucide-react';
+import { Send, Mail, MessageSquare, MapPin, MessageCircle, Linkedin, CheckCircle2, ArrowRight } from 'lucide-react';
 
 const ContactForm: React.FC = () => {
   const [formState, setFormState] = useState({ name: '', email: '', company: '', message: '' });
@@ -9,23 +9,41 @@ const ContactForm: React.FC = () => {
   const whatsappNumber = "972523760674";
   const linkedInUrl = "https://www.linkedin.com/in/eran-hakun-81a80a1b";
   
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const subject = `New Professional Inquiry: ${formState.name} (${formState.company})`;
-    const body = `New Professional Inquiry - BridgeOps ENGINEERING
---------------------------------------------
-Name: ${formState.name}
-Email: ${formState.email}
-Company/Market: ${formState.company}
-Challenge: ${formState.message}
---------------------------------------------
-Sent via BridgeOps Website`;
+  const [isSending, setIsSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-    const mailtoLink = `mailto:eran@bridgeops-engineering.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    
-    // Open email client
-    window.location.href = mailtoLink;
-    setSubmitted(true);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSending(true);
+    setError(null);
+
+    try {
+      // Replace 'YOUR_FORM_ID' with your actual Formspree ID later
+      const response = await fetch('https://formspree.io/f/xldgjovq', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: formState.name,
+          email: formState.email,
+          company: formState.company,
+          message: formState.message,
+          _subject: `New BridgeOps Inquiry from ${formState.name}`
+        })
+      });
+
+      if (response.ok) {
+        setSubmitted(true);
+      } else {
+        throw new Error('Failed to send message');
+      }
+    } catch (err) {
+      setError('Something went wrong. Please try again or use the direct contact options.');
+      console.error(err);
+    } finally {
+      setIsSending(false);
+    }
   };
 
   if (submitted) {
@@ -34,17 +52,18 @@ Sent via BridgeOps Website`;
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="bg-slate-900 p-12 lg:p-20 text-center shadow-2xl relative overflow-hidden">
              <div className="absolute inset-0 blueprint-grid-dark opacity-10"></div>
-            <div className="w-16 h-16 bg-blue-600 text-white flex items-center justify-center mx-auto mb-6 relative z-10">
-              <Mail size={32} />
+            <div className="w-16 h-16 bg-emerald-600 text-white flex items-center justify-center mx-auto mb-6 relative z-10">
+              <CheckCircle2 size={32} />
             </div>
-            <h3 className="text-2xl font-black text-white mb-4 relative z-10 uppercase tracking-tighter">Opening Email Client</h3>
-            <p className="text-slate-400 mb-8 text-base relative z-10">Your inquiry has been prepared. Please send the email in the window that just opened.</p>
-            <div className="flex flex-col items-center space-y-4">
+            <h3 className="text-2xl font-black text-white mb-4 relative z-10 uppercase tracking-tighter">Transmission Successful</h3>
+            <p className="text-slate-400 mb-8 text-base relative z-10">Your inquiry has been received. Our engineering team will review the details and contact you shortly.</p>
+            
+            <div className="flex flex-col items-center space-y-6 relative z-10">
               <button 
                 onClick={() => setSubmitted(false)}
-                className="text-blue-500 font-black hover:text-blue-400 transition-colors uppercase tracking-widest text-[10px] relative z-10"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-10 py-4 font-black uppercase tracking-widest text-xs transition-all shadow-xl shadow-blue-500/20 flex items-center"
               >
-                Send Another Message
+                Send Another Inquiry
               </button>
             </div>
           </div>
@@ -121,7 +140,7 @@ Sent via BridgeOps Website`;
           <div className="lg:w-2/3 p-10 lg:p-16 bg-white">
             <div className="mb-10 text-left">
               <h3 className="text-3xl font-black text-slate-900 mb-2 tracking-tighter uppercase">Inquiry Form</h3>
-              <p className="text-sm text-slate-500 font-medium">This form will prepare an email with your inquiry details.</p>
+              <p className="text-sm text-slate-500 font-medium">Submit your operational challenges for a professional review.</p>
             </div>
             <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-10 text-left">
               <div className="space-y-3">
@@ -148,11 +167,28 @@ Sent via BridgeOps Website`;
                 </label>
                 <textarea required rows={3} className="w-full bg-slate-50 border-b-2 border-slate-200 px-4 py-2.5 focus:outline-none focus:border-blue-600 transition-all font-bold text-sm text-slate-800 resize-none" placeholder="Describe your current bottleneck..." value={formState.message} onChange={(e) => setFormState({...formState, message: e.target.value})}></textarea>
               </div>
+              
+              {error && (
+                <div className="md:col-span-2 text-red-600 text-[10px] font-bold uppercase tracking-widest">
+                  {error}
+                </div>
+              )}
+
               <div className="md:col-span-2 pt-6">
-                <button type="submit" className="w-full bg-slate-900 text-white py-4 font-black text-base hover:bg-blue-600 transition-all flex items-center justify-center group uppercase tracking-widest shadow-xl">
-                  <Mail size={18} className="mr-4" />
-                  <span>Transmit Inquiry</span>
-                  <Send size={18} className="ml-4 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                <button 
+                  type="submit" 
+                  disabled={isSending}
+                  className="w-full bg-slate-900 text-white py-4 font-black text-base hover:bg-blue-600 transition-all flex items-center justify-center group uppercase tracking-widest shadow-xl disabled:opacity-50"
+                >
+                  {isSending ? (
+                    <span className="animate-pulse">Transmitting...</span>
+                  ) : (
+                    <>
+                      <Send size={18} className="mr-4" />
+                      <span>Submit Inquiry</span>
+                      <ArrowRight size={18} className="ml-4 group-hover:translate-x-1 transition-transform" />
+                    </>
+                  )}
                 </button>
               </div>
             </form>
