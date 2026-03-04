@@ -82,7 +82,7 @@ const App: React.FC = () => {
                    <div className="relative z-10 text-left max-w-xl">
                       <span className="text-blue-500 font-black uppercase tracking-[0.3em] text-[10px] mb-4 block">New: AI Operational Audit</span>
                       <h2 className="text-3xl md:text-5xl font-black text-white uppercase tracking-tighter leading-none">
-                        Assess Your <br/><span className="text-blue-600">Ramp Readiness.</span>
+                        Assess Your <br/><span className="text-blue-600">BridgeOps Ramp Readiness.</span>
                       </h2>
                       <p className="text-slate-400 mt-6 text-base font-medium leading-relaxed">
                         Use our AI-driven tool to identify manufacturing risks and get actionable recommendations for your production scale-up.
@@ -90,10 +90,10 @@ const App: React.FC = () => {
                    </div>
                    <div className="relative z-10">
                       <button 
-                        onClick={() => navigateTo('ramp_score')}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-10 py-5 font-black uppercase tracking-[0.2em] text-xs transition-all shadow-2xl shadow-blue-500/20 flex items-center group"
+                        disabled
+                        className="bg-slate-800 text-slate-500 px-10 py-5 font-black uppercase tracking-[0.2em] text-xs transition-all flex items-center cursor-not-allowed"
                       >
-                        Launch Tool <ArrowRight size={16} className="ml-4 group-hover:translate-x-1 transition-transform" />
+                        ...Coming Soon
                       </button>
                    </div>
                 </div>

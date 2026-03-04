@@ -66,6 +66,8 @@ const SEGMENT_STANDARDS: Record<string, string[]> = {
   "Other Hardware": ["ISO 9001", "CE / FCC", "ISO 27001 (Cyber)"]
 };
 
+const IS_COMING_SOON = true;
+
 const RampScoreTool: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [isStandardsOpen, setIsStandardsOpen] = useState(false);
@@ -221,14 +223,30 @@ We've attempted to retry automatically, but the service remains busy. Please try
           <span className="text-[10px] font-black uppercase tracking-widest text-blue-600">AI-Powered Assessment</span>
         </div>
         <h1 className="text-4xl md:text-6xl font-black text-slate-900 tracking-tighter uppercase leading-none">
-          Ramp-Up <br/><span className="text-blue-600 italic">Readiness Score.</span>
+          BridgeOps Ramp-Up <br/><span className="text-blue-600 italic">Readiness Score.</span>
         </h1>
         <p className="text-slate-500 mt-6 text-lg font-medium max-w-2xl leading-relaxed">
           Evaluate your transition from prototype to mass production. Our AI engine analyzes your operational maturity and identifies critical bottlenecks before they impact your launch.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+      {IS_COMING_SOON ? (
+        <div className="bg-slate-900 p-12 text-center border border-white/10 relative overflow-hidden group">
+          <div className="absolute inset-0 blueprint-grid-dark opacity-20"></div>
+          <div className="relative z-10">
+            <div className="w-16 h-16 bg-blue-600/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-blue-500/30">
+              <Zap className="text-blue-500 animate-pulse" size={32} />
+            </div>
+            <h3 className="text-2xl font-black text-white uppercase tracking-tighter mb-4">AI Audit Engine</h3>
+            <p className="text-slate-400 font-medium text-lg mb-8">The BridgeOps Ramp-Up Readiness Score is currently being calibrated for enhanced precision.</p>
+            <div className="inline-flex items-center space-x-3 bg-blue-600 px-8 py-4 text-white font-black uppercase tracking-widest text-xs shadow-2xl">
+              <Loader2 className="animate-spin" size={16} />
+              <span>...Coming Soon</span>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
         {/* Form Section */}
         <div className="lg:col-span-5 space-y-8">
           <div className="bg-white p-8 border border-slate-200 shadow-sm rounded-sm">
@@ -506,7 +524,7 @@ We've attempted to retry automatically, but the service remains busy. Please try
                           result.riskLevel.includes('HIGH') ? 'bg-red-500 text-white' : 
                           result.riskLevel.includes('MEDIUM') ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'
                         }`}>
-                          Ramp-Up Risk: {result.riskLevel}
+                          BridgeOps Ramp-Up Risk: {result.riskLevel}
                         </span>
                       </div>
                       <p className="text-slate-400 text-sm mt-4 max-w-sm leading-relaxed">{result.analysis}</p>
@@ -623,8 +641,9 @@ We've attempted to retry automatically, but the service remains busy. Please try
           </AnimatePresence>
         </div>
       </div>
-    </div>
-  );
+    )}
+  </div>
+);
 };
 
 export default RampScoreTool;

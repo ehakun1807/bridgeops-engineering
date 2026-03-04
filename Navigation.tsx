@@ -23,7 +23,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate }) => {
   const navLinks = [
     { name: 'Home', id: 'home' },
     { name: 'Services', id: 'services' },
-    { name: 'Ramp Score', id: 'ramp_score' },
+    { name: 'BridgeOps Ramp Score', id: 'ramp_score' },
     { name: 'Methodology', id: 'methodology' },
     { name: 'About', id: 'about' },
     { name: 'Contact', id: 'contact' },
@@ -68,6 +68,9 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate }) => {
                   }`}
                 >
                   {link.name}
+                  {link.id === 'ramp_score' && (
+                    <span className="absolute -top-3 -right-6 bg-blue-600 text-[8px] px-1.5 py-0.5 rounded-none font-black">SOON</span>
+                  )}
                   {currentView === link.id && (
                     <span className="absolute -bottom-1 left-0 w-full h-[2px] bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.8)]"></span>
                   )}
@@ -103,11 +106,14 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate }) => {
               <button
                 key={link.id}
                 onClick={() => handleLinkClick(link.id)}
-                className={`block w-full text-left px-4 py-6 text-xl font-black uppercase tracking-[0.3em] border-b border-white/5 transition-colors ${
+                className={`block w-full text-left px-4 py-6 text-xl font-black uppercase tracking-[0.3em] border-b border-white/5 transition-colors flex items-center justify-between ${
                   currentView === link.id ? 'text-blue-400 bg-white/5' : 'text-slate-200 hover:text-white'
                 }`}
               >
                 {link.name}
+                {link.id === 'ramp_score' && (
+                  <span className="bg-blue-600 text-[10px] px-2 py-1 rounded-none font-black">SOON</span>
+                )}
               </button>
             ))}
             <div className="pt-6 px-4">
