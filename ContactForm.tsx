@@ -52,7 +52,7 @@ const ContactForm: React.FC = () => {
 
   const handleWhatsAppFallback = () => {
     const messageBody = `*New Professional Inquiry - BridgeOps ENGINEERING*\n--------------------------------------------\n*Name:* ${formState.name}\n*Email:* ${formState.email}\n*Company:* ${formState.company}\n*Challenge:* ${formState.message}\n--------------------------------------------`;
-    window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(messageBody)}`, '_blank');
+    window.open(`https://api.whatsapp.com/send?phone=${whatsappNumber}&text=${encodeURIComponent(messageBody)}`, '_blank');
   };
 
   const handleFallbackMail = () => {
@@ -121,7 +121,7 @@ Sent via BridgeOps Website`;
                 </a>
 
                 <a 
-                  href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent("Hello Eran, I'm reaching out via your website.")}`}
+                  href={`https://api.whatsapp.com/send?phone=${whatsappNumber}&text=${encodeURIComponent("Hello Eran, I'm reaching out via your website.")}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center space-x-6 group"

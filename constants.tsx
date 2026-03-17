@@ -43,7 +43,7 @@ export const SERVICES: DetailedServiceItem[] = [
     id: 'plm-implementation',
     code: 'OPS-SYS-03',
     title: 'PLM Systems Implementation',
-    description: 'Expert deployment and optimization of PLM tools tailored to organizational KPIs and ERP integration.',
+    description: 'Strategic guidance for the deployment and optimization of PLM tools, tailored to organizational KPIs and seamless ERP integration.',
     addedValue: 'Centralizes product data, accelerating collaborative development and streamlining regulatory audits.',
     image: 'https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&q=80&w=800',
     icon: 'Database'
@@ -61,7 +61,7 @@ export const SERVICES: DetailedServiceItem[] = [
     id: 'cost-reduction',
     code: 'OPS-OPT-05',
     title: 'Operational Excellence & Savings',
-    description: 'Leading strategic projects to reduce COGS, optimize supply chains, and implement FMEA-driven process improvements.',
+    description: 'Escorting strategic projects to reduce COGS, optimize supply chains, and implement FMEA-driven process improvements.',
     addedValue: 'Directly improves gross margins and operational efficiency through data-driven optimization.',
     image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&q=80&w=800',
     icon: 'TrendingDown'

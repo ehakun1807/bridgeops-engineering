@@ -6,15 +6,15 @@ const MethodologyLayers: React.FC = () => {
   const layers = [
     {
       id: 1,
-      title: 'Diagnostic & Alignment',
-      subtitle: 'Smart Entry Strategy',
-      goal: 'To diagnose, map, and define a concrete action plan.',
-      description: 'The foundation of any successful transition. We deep-dive into the existing ecosystem to identify the actual path to production.',
+      title: 'ASSESS',
+      subtitle: 'Production readiness evaluation',
+      goal: '📊 Ramp Readiness Score',
+      description: 'A deep-dive evaluation of your current state to identify the actual path to production and scaling.',
       items: [
-        'R&D ⇄ Ops ⇄ Supply Chain Review',
-        'NPI Bottleneck Identification',
-        'Production & Scaling Readiness Assessment',
-        'Risk Mapping + Operational Roadmap'
+        'Product Maturity',
+        'Supply Chain Readiness',
+        'Manufacturing Readiness',
+        'Ramp Risk'
       ],
       icon: Search,
       bg: 'bg-blue-50',
@@ -23,16 +23,15 @@ const MethodologyLayers: React.FC = () => {
     },
     {
       id: 2,
-      title: 'Fractional Leadership & Execution',
-      subtitle: 'Hands-on Management',
-      goal: 'Creating operational stability and excellence through active leadership.',
-      description: 'We don\'t just advise from the sidelines. We take fractional ownership of the operations function to lead your team to the finish line.',
+      title: 'ALIGN',
+      subtitle: 'Operational architecture',
+      goal: '📄 Production Readiness Blueprint',
+      description: 'Defining the strategic framework and operational model required for a successful transition.',
       items: [
-        'End-to-End NPI Management',
-        'Infrastructure Setup (PLM, KPIs, Processes)',
-        'Building Production Lines, Vendors & Routines',
-        'Direct Interface with Senior Management',
-        'Operational Domain Leadership'
+        'NPI Governance',
+        'Supplier Strategy',
+        'Manufacturing Model',
+        'Ramp Roadmap'
       ],
       icon: Users,
       bg: 'bg-indigo-50',
@@ -41,15 +40,32 @@ const MethodologyLayers: React.FC = () => {
     },
     {
       id: 3,
-      title: 'Projects with Clear Ownership',
-      subtitle: 'Outcome-Driven Excellence',
-      goal: 'Executing specialized engineering projects with defined milestones.',
-      description: 'Specific high-impact initiatives where we take full accountability for the delivery and stabilization of production assets.',
+      title: 'BUILD',
+      subtitle: 'Execution framework',
+      goal: '⚙️ NPI Execution Plan',
+      description: 'Setting up the infrastructure and processes needed to execute the production ramp.',
       items: [
-        'New Production Line Setup',
-        'Product Transfer to Contract Manufacturer (CM)',
-        'Yield Stabilization & Optimization Sprints',
-        'Establishment of OPS / NPI Functions'
+        'NPI Process',
+        'Manufacturing Ramp Plan',
+        'Supply Chain Setup',
+        'Operational KPIs'
+      ],
+      icon: Zap,
+      bg: 'bg-slate-100',
+      text: 'text-slate-900',
+      accent: 'bg-slate-900'
+    },
+    {
+      id: 4,
+      title: 'SCALE',
+      subtitle: 'Production stabilization',
+      goal: '📈 Stable Production Ramp',
+      description: 'Continuous monitoring and optimization to ensure long-term production stability and yield.',
+      items: [
+        'Yield Management',
+        'Supplier Performance',
+        'Quality System compliance',
+        'Ramp Monitoring'
       ],
       icon: Target,
       bg: 'bg-slate-900',
@@ -68,7 +84,7 @@ const MethodologyLayers: React.FC = () => {
             <span className="text-blue-400 font-black uppercase tracking-[0.4em] text-xs">The BridgeOps Method</span>
           </div>
           <h1 className="text-5xl md:text-7xl font-black text-white tracking-tighter mb-8 leading-tight">
-            Three Layers of <br/><span className="text-blue-500">Operational Excellence</span>
+            Four Stages of <br/><span className="text-blue-500">Operational Excellence</span>
           </h1>
           <p className="text-slate-400 text-lg font-medium max-w-2xl mx-auto leading-relaxed">
             Bridging the critical gap between prototype and mass production through an engagement model that blends strategy with hands-on engineering execution.
@@ -141,7 +157,7 @@ const MethodologyLayers: React.FC = () => {
                 className={`flex flex-col lg:flex-row gap-12 items-stretch rounded-none overflow-hidden ${layer.bg} border-l-8 ${layer.accent.replace('bg-', 'border-')} shadow-xl transition-transform hover:-translate-y-1`}
               >
                 <div className={`lg:w-1/6 flex flex-col items-center justify-center p-12 ${layer.accent} text-white`}>
-                  <span className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Layer</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Stage</span>
                   <span className="text-7xl font-black tracking-tighter leading-none">{layer.id}</span>
                   <layer.icon size={40} className="mt-8 opacity-40" />
                 </div>
@@ -152,7 +168,7 @@ const MethodologyLayers: React.FC = () => {
                     <p className={`text-lg font-bold ${layer.text} opacity-60 italic mb-6`}>{layer.subtitle}</p>
                     <div className="flex items-start gap-3 p-4 bg-white/40 backdrop-blur-sm rounded-lg border border-white/50 mb-8 max-w-3xl">
                       <Zap className="text-blue-600 flex-shrink-0 mt-1" size={16} />
-                      <p className={`font-bold ${layer.text} text-sm`}>Impact: <span className="font-medium opacity-80">{layer.goal}</span></p>
+                      <p className={`font-bold ${layer.text} text-sm`}>Result: <span className="font-medium opacity-80">{layer.goal}</span></p>
                     </div>
                     <p className={`text-base ${layer.text} opacity-80 leading-relaxed max-w-4xl font-medium`}>
                       {layer.description}

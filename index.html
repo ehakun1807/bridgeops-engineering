@@ -67,6 +67,17 @@
       html {
         scroll-behavior: smooth;
       }
+      @media print {
+        .no-print {
+          display: none !important;
+        }
+        body {
+          background-color: white !important;
+        }
+        .print\:space-y-12 > * + * {
+          margin-top: 3rem !important;
+        }
+      }
     </style>
   <script type="importmap">
 {

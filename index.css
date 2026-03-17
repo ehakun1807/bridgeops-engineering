@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  body {
+    background-color: white !important;
+    color: black !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  /* Force background colors in print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Page breaks */
+  .page-break, .html2pdf__page-break {
+    page-break-before: always;
+  }
+}
+
+.pdf-export-mode .no-print {
+  display: none !important;
+}
+
+.print-only {
+  display: none;
+}
+
+/* PDF Export Mode - Specific styles for html2pdf */
+.pdf-export-mode {
+  background-color: white !important;
+  color: black !important;
+  padding: 20px !important;
+}
+
+.pdf-export-mode .bg-slate-900 {
+  background-color: #0f172a !important; /* Force slate-900 */
+  color: white !important;
+}
+
+.pdf-export-mode .text-blue-500 {
+  color: #3b82f6 !important;
+}
+
+.pdf-export-mode .bg-blue-600 {
+  background-color: #2563eb !important;
+}
+
+.pdf-export-mode .bg-white {
+  page-break-inside: avoid !important;
+}
+
+.pdf-export-mode .bg-slate-900 {
+  page-break-inside: avoid !important;
+}
+
+.pdf-export-mode .bg-blue-600 {
+  page-break-inside: avoid !important;
+}
+
+.pdf-export-mode .bg-slate-50 {
+  background-color: #f8fafc !important;
+}

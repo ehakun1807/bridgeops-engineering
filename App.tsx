@@ -90,10 +90,10 @@ const App: React.FC = () => {
                    </div>
                    <div className="relative z-10">
                       <button 
-                        disabled
-                        className="bg-slate-800 text-slate-500 px-10 py-5 font-black uppercase tracking-[0.2em] text-xs transition-all flex items-center cursor-not-allowed"
+                        onClick={() => navigateTo('ramp_score')}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-10 py-5 font-black uppercase tracking-[0.2em] text-xs transition-all shadow-2xl shadow-blue-500/20 flex items-center group"
                       >
-                        ...Coming Soon
+                        Launch Tool <ArrowRight size={16} className="ml-4 group-hover:translate-x-1 transition-transform" />
                       </button>
                    </div>
                 </div>
