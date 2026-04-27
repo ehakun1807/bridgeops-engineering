@@ -1,13 +1,27 @@
 import { parseBomsFromXlsx, validateBomRows, BomRow } from '@/utils/bomAnalyzer';
 import * as XLSX from 'xlsx';
 
-// Helper function to create an XLSX file for testing
+// Helper function to create an XLSX file for testing with arrayBuffer polyfill
 function createXlsxFile(data: (string | number | undefined)[][], fileName: string = 'test.xlsx'): File {
   const workbook = XLSX.utils.book_new();
   const worksheet = XLSX.utils.aoa_to_sheet(data);
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
   const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-  return new File([new Uint8Array(buffer)], fileName, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const file = new File([new Uint8Array(buffer)], fileName, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
+  // Polyfill arrayBuffer() for jsdom
+  if (!file.arrayBuffer) {
+    (file as any).arrayBuffer = async function() {
+      return new Promise<ArrayBuffer>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as ArrayBuffer);
+        reader.onerror = reject;
+        reader.readAsArrayBuffer(this);
+      });
+    };
+  }
+
+  return file;
 }
 
 describe('BOM Analyzer', () => {
@@ -114,6 +128,18 @@ describe('BOM Analyzer', () => {
     it('should handle CSV files', async () => {
       const csvContent = 'Manufacturer,Part Number\nTexas Instruments,LM358\nNXP Semiconductors,BC847';
       const file = new File([csvContent], 'test.csv', { type: 'text/csv' });
+
+      // Polyfill arrayBuffer() for jsdom
+      if (!file.arrayBuffer) {
+        (file as any).arrayBuffer = async function() {
+          return new Promise<ArrayBuffer>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as ArrayBuffer);
+            reader.onerror = reject;
+            reader.readAsArrayBuffer(this);
+          });
+        };
+      }
 
       const result = await parseBomsFromXlsx(file);
 

@@ -32,7 +32,10 @@
       "mcp__Claude_Preview__preview_start",
       "Bash(curl -s http://localhost:3000)",
       "mcp__Claude_in_Chrome__tabs_context_mcp",
-      "Bash(awk '/^const ProjectDeepDive/,/^}; *$/' /Users/eranhakun/Downloads/bridgeops-engineering-main/ProjectDeepDive.tsx)"
+      "Bash(awk '/^const ProjectDeepDive/,/^}; *$/' /Users/eranhakun/Downloads/bridgeops-engineering-main/ProjectDeepDive.tsx)",
+      "Bash(npm test *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
     ]
   }
 }
