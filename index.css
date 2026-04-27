@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+@media print {
+  /* -------------------------------------------------------------------
+     Print stylesheet for the Ramp Readiness Snapshot audit.
+     Hides chrome (nav, footer, CTAs, live-score widgets, email capture)
+     and tightens spacing so the audit fits cleanly on A4 / Letter.
+     ------------------------------------------------------------------- */
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  body {
+    background-color: white !important;
+    color: black !important;
+    font-size: 11pt;
+  }
+
+  /* Force background colors to render in print. */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Trim wrappers that only exist to push content below the fixed nav. */
+  main, main > div {
+    padding-top: 0 !important;
+  }
+
+  #report-content {
+    padding-bottom: 0 !important;
+    max-width: 100% !important;
+  }
+
+  /* Reasonable A4 / Letter margins. */
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+
+  /* Don't split a risk / recommendation card across pages. */
+  .print\:break-inside-avoid {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Shrink hero gauge + drop the ambient glow for a cleaner print. */
+  #report-content .bg-slate-900 {
+    box-shadow: none !important;
+  }
+
+  /* Kill decorative animations / blurs that don't translate to print. */
+  .blueprint-grid-dark {
+    display: none !important;
+  }
+
+  /* Don't split the hero or the per-indicator breakdown mid-section. */
+  #report-content > div:first-of-type,
+  #report-content > .grid {
+    page-break-inside: avoid;
+  }
+
+  /* Page breaks */
+  .page-break, .html2pdf__page-break {
+    page-break-before: always;
+  }
+}
+
+.pdf-export-mode .no-print {
+  display: none !important;
+}
+
+.print-only {
+  display: none;
+}
+
+/* PDF Export Mode - Specific styles for html2pdf */
+.pdf-export-mode {
+  background-color: white !important;
+  color: black !important;
+  padding: 20px !important;
+}
+
+.pdf-export-mode .bg-slate-900 {
+  background-color: #0f172a !important; /* Force slate-900 */
+  color: white !important;
+}
+
+.pdf-export-mode .text-blue-500 {
+  color: #3b82f6 !important;
+}
+
+.pdf-export-mode .bg-blue-600 {
+  background-color: #2563eb !important;
+}
+
+.pdf-export-mode .bg-white {
+  page-break-inside: avoid !important;
+}
+
+.pdf-export-mode .bg-slate-900 {
+  page-break-inside: avoid !important;
+}
+
+.pdf-export-mode .bg-blue-600 {
+  page-break-inside: avoid !important;
+}
+
+.pdf-export-mode .bg-slate-50 {
+  background-color: #f8fafc !important;
+}

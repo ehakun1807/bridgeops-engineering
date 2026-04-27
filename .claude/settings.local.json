@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(sudo npm *)",
+      "Bash(~/.local/bin/firebase --version)",
+      "Bash(~/.local/node_modules/.bin/firebase --version)",
+      "Bash(~/.local/node_modules/.bin/firebase login *)",
+      "Bash(npm view *)",
+      "Bash(/Users/eranhakun/.local/node_modules/.bin/firebase-mcp --help)",
+      "Bash(timeout 5 /Users/eranhakun/.local/node_modules/.bin/firebase-mcp)",
+      "Bash(npm list *)",
+      "Bash(npm config *)",
+      "Bash(brew search *)",
+      "Bash(/Applications/Claude.app/Contents/MacOS/claude --help)",
+      "Bash(claude plugin *)",
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "Bash(brew --version)",
+      "Bash(npm --version)",
+      "Bash(claude --version)",
+      "Bash(~/.npm-global/bin/claude --version)",
+      "Bash(~/.npm-global/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe --version)",
+      "Bash(ln -s ../lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe ~/.npm-global/bin/claude)",
+      "Bash(awk 'NR>=575 && NR<=585 {print NR\": \"$0}' /Users/eranhakun/Downloads/bridgeops-engineering-main/ProjectDeepDive.tsx)",
+      "Bash(npx tsc *)",
+      "Bash(pkill -f \"npm run dev\")",
+      "Bash(npm run *)",
+      "Bash(pkill -9 -f \"npm run dev\")",
+      "Bash(pkill -9 -f \"vite\")",
+      "mcp__Claude_in_Chrome__list_connected_browsers",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(curl -s http://localhost:3000)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "Bash(awk '/^const ProjectDeepDive/,/^}; *$/' /Users/eranhakun/Downloads/bridgeops-engineering-main/ProjectDeepDive.tsx)"
+    ]
+  }
+}

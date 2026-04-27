@@ -1,0 +1,90 @@
+
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Store user account and subscription details.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase UID" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "company": { "type": "string" },
+        "role": { "type": "string", "enum": ["client", "admin"] },
+        "plan": { "type": "string", "enum": ["lite", "pro", "enterprise"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "email", "role"]
+    },
+    "Project": {
+      "title": "Operation Project",
+      "description": "A workspace for a specific product or production line.",
+      "type": "object",
+      "properties": {
+        "projectId": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "productType": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "archived"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "name", "status"]
+    },
+    "RampScore": {
+      "title": "Ramp Readiness Score",
+      "description": "Historical records of Ramp Score assessments.",
+      "type": "object",
+      "properties": {
+        "scoreId": { "type": "string" },
+        "userId": { "type": "string" },
+        "projectId": { "type": "string" },
+        "score": { "type": "number" },
+        "riskLevel": { "type": "string" },
+        "formData": { "type": "object" },
+        "resultData": { "type": "object" },
+        "indicators": { "type": "object", "description": "Deep-dive indicator scores" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "score", "createdAt"]
+    },
+    "Task": {
+      "title": "Operational Task",
+      "description": "Action item generated from the assessment to bridge readiness gaps.",
+      "type": "object",
+      "properties": {
+        "taskId": { "type": "string" },
+        "userId": { "type": "string" },
+        "projectId": { "type": "string" },
+        "scoreId": { "type": "string" },
+        "indicator": { "type": "string" },
+        "subIndicator": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["todo", "in_progress", "done"] },
+        "priority": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "completedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Individual user profile documents."
+    },
+    "/projects/{projectId}": {
+      "schema": "Project",
+      "description": "User projects for different products."
+    },
+    "/scores/{scoreId}": {
+      "schema": "RampScore",
+      "description": "Historical assessment records."
+    },
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Individual action items."
+    }
+  }
+}

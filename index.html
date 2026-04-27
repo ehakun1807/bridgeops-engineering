@@ -1,0 +1,128 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BridgeOps.ENGINEERING | Eran Hakun | NPI & Operations Engineering</title>
+
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="BridgeOps.ENGINEERING — NPI and manufacturing engineering services for hardware startups and tech companies. From prototype to mass production with 20+ years of cross-sector experience.">
+    <meta name="author" content="Eran Hakun">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="canonical" href="https://bridgeops.engineering/">
+
+    <!-- Favicon (inline SVG, no extra request) -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230f172a'/%3E%3Cpath d='M14 22h16a8 8 0 010 16h-6a8 8 0 010 16H14V22z' fill='none' stroke='%232563eb' stroke-width='5' stroke-linecap='square'/%3E%3Crect x='44' y='28' width='6' height='28' fill='%232563eb'/%3E%3C/svg%3E">
+
+    <!-- Open Graph / LinkedIn / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://bridgeops.engineering/">
+    <meta property="og:site_name" content="BridgeOps.ENGINEERING">
+    <meta property="og:title" content="BridgeOps.ENGINEERING | From Prototype to Production — Without Chaos">
+    <meta property="og:description" content="Fractional NPI and operations engineering leadership. We bridge the gaps between R&D and Manufacturing so your hardware ships at scale, on time, on budget.">
+    <meta property="og:image" content="https://bridgeops.engineering/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:title" content="BridgeOps.ENGINEERING | Eran Hakun">
+    <meta property="twitter:description" content="NPI and manufacturing engineering services for hardware startups.">
+    <meta property="twitter:image" content="https://bridgeops.engineering/og-image.png">
+
+    <!-- JSON-LD Structured Data: ProfessionalService -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "ProfessionalService",
+      "name": "BridgeOps.ENGINEERING",
+      "description": "NPI and operations engineering consulting for hardware startups and tech companies. Specialized in transition from prototype to mass production.",
+      "url": "https://bridgeops.engineering/",
+      "founder": {
+        "@type": "Person",
+        "name": "Eran Hakun",
+        "jobTitle": "Operations Engineering Consultant",
+        "alumniOf": "Technion - Israel Institute of Technology",
+        "sameAs": "https://www.linkedin.com/in/eran-hakun-81a80a1b"
+      },
+      "areaServed": "Worldwide",
+      "serviceType": [
+        "New Product Introduction (NPI)",
+        "Manufacturing Engineering",
+        "PLM Implementation",
+        "Configuration Management",
+        "Quality & Regulatory (ISO 9001, ISO 13485, ATEX)",
+        "Operational Excellence & COGS Reduction"
+      ],
+      "knowsAbout": [
+        "Hardware & Electro-Mechanical Startups",
+        "Medical & Regulated Devices",
+        "Robotics & Industrial Systems"
+      ]
+    }
+    </script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+        background-color: #f8fafc;
+      }
+      h1, h2, h3 {
+        font-family: 'Montserrat', sans-serif;
+      }
+      .tech-mono {
+        font-family: 'JetBrains Mono', monospace;
+      }
+      .blueprint-grid {
+        background-image:
+          linear-gradient(to right, rgba(51, 65, 85, 0.1) 1px, transparent 1px),
+          linear-gradient(to bottom, rgba(51, 65, 85, 0.1) 1px, transparent 1px);
+        background-size: 40px 40px;
+      }
+      .blueprint-grid-dark {
+        background-image:
+          linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+          linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+        background-size: 50px 50px;
+      }
+      .glow-blob {
+        position: absolute;
+        filter: blur(80px);
+        border-radius: 50%;
+        z-index: 0;
+        opacity: 0.4;
+        animation: pulse 10s infinite alternate;
+      }
+      @keyframes pulse {
+        0% { transform: scale(1) translate(0, 0); }
+        100% { transform: scale(1.2) translate(5%, 5%); }
+      }
+      .glass-card {
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      @media print {
+        .no-print {
+          display: none !important;
+        }
+        body {
+          background-color: white !important;
+        }
+        .print\:space-y-12 > * + * {
+          margin-top: 3rem !important;
+        }
+      }
+    </style>
+    <link rel="stylesheet" href="/index.css">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,156 @@
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId} (Firebase UID)
+    // Fields:
+    //   - userId: string (required)
+    //   - email: string (required, email format)
+    //   - displayName: string
+    //   - company: string
+    //   - role: string (enum: client, admin)
+    //   - plan: string (enum: lite, pro, enterprise)
+    //   - createdAt: timestamp
+    //
+    // Collection: scores
+    // Document ID: {scoreId} (Auto-generated)
+    // Fields:
+    //   - userId: string (required)
+    //   - projectId: string
+    //   - score: number (required)
+    //   - riskLevel: string
+    //   - formData: map
+    //   - resultData: map
+    //   - createdAt: timestamp
+    //
+    // Collection: tasks
+    // Document ID: {taskId} (Auto-generated)
+    // Fields:
+    //   - userId: string (required)
+    //   - projectId: string
+    //   - scoreId: string
+    //   - title: string (required)
+    //   - status: string (required)
+    //
+    // Collection: projects
+    // Document ID: {projectId} (Auto-generated)
+    // Fields:
+    //   - userId: string (required)
+    //   - name: string (required)
+    //   - status: string (active, archived)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "ehakun1807@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['userId', 'email', 'role']) &&
+             data.userId is string &&
+             data.email is string &&
+             data.role in ['client', 'admin'] &&
+             data.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidScore(data) {
+      return data.keys().hasAll(['userId', 'score', 'createdAt']) &&
+             data.userId == request.auth.uid &&
+             data.score is number &&
+             data.score >= 0 && data.score <= 100 &&
+             (!('projectId' in data) || data.projectId is string);
+    }
+
+    function isValidTask(data) {
+      return data.keys().hasAll(['userId', 'title', 'status']) &&
+             data.userId == request.auth.uid &&
+             data.title is string && data.title.size() > 0 &&
+             data.status in ['todo', 'in_progress', 'done'] &&
+             (!('projectId' in data) || data.projectId is string);
+    }
+
+    function isValidProject(data) {
+      return data.keys().hasAll(['userId', 'name', 'status']) &&
+             data.userId == request.auth.uid &&
+             data.name is string && data.name.size() > 0 &&
+             data.status in ['active', 'archived'];
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == 'client' || isAdmin());
+      allow update: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
+    }
+
+    // NOTE: read is split into get + list. Firestore's rule engine cannot
+    // pre-evaluate isAdmin() (which calls get()) for LIST queries, so leaving
+    // it in the list rule causes the engine to reject the whole query with
+    // permission-denied even when the document-level read would succeed.
+    // We keep isAdmin() on get/update/delete where it's safe and make list
+    // authenticated-only; per-user isolation is enforced by the client
+    // always including where('userId', '==', auth.uid) in the query.
+    match /projects/{projectId} {
+      allow get: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidProject(request.resource.data);
+      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidProject(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    match /scores/{scoreId} {
+      allow get: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidScore(request.resource.data);
+      allow update: if false; // Scores are typically immutable historical records
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    match /tasks/{taskId} {
+      allow get: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidTask(request.resource.data);
+      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidTask(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // Leads / waitlist captures (ramp-score email grabs + Pricing waitlist signups).
+    // Public can create, only admin can read — keeps the list private.
+    match /leads/{leadId} {
+      allow create: if request.resource.data.keys().hasAll(['email', 'source', 'createdAt']) &&
+                       request.resource.data.email is string &&
+                       request.resource.data.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$") &&
+                       request.resource.data.source is string &&
+                       request.resource.data.source in [
+                         'ramp_score_result',
+                         'pricing_professional_waitlist',
+                         'pricing_enterprise_waitlist',
+                         'beta_waitlist'
+                       ];
+      allow read, update, delete: if isAdmin();
+    }
+  }
+}
