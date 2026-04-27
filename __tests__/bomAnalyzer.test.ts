@@ -93,7 +93,22 @@ describe('BOM Analyzer', () => {
         ['Texas Instruments', '']
       ]);
 
-      await expect(parseBomsFromXlsx(file)).rejects.toThrow();
+      await expect(parseBomsFromXlsx(file)).rejects.toThrow('Both Manufacturer and Part Number must be non-empty');
+    });
+
+    it('should skip rows with only whitespace', async () => {
+      const file = createXlsxFile([
+        ['Manufacturer', 'Part Number'],
+        ['Texas Instruments', 'LM358'],
+        ['   ', '   '],
+        ['NXP Semiconductors', 'BC847']
+      ]);
+
+      const result = await parseBomsFromXlsx(file);
+
+      expect(result).toHaveLength(2);
+      expect(result[0].manufacturer).toBe('texas instruments');
+      expect(result[1].manufacturer).toBe('nxp semiconductors');
     });
 
     it('should handle CSV files', async () => {
@@ -130,7 +145,7 @@ describe('BOM Analyzer', () => {
       expect(result.valid).toHaveLength(0);
       expect(result.errors).toHaveLength(1);
       expect(result.errors[0].rowIndex).toBe(2);
-      expect(result.errors[0].reason).toContain('control character');
+      expect(result.errors[0].reason).toBe('Contains invalid control character');
     });
 
     it('should flag rows with control characters in part number', () => {
@@ -143,7 +158,7 @@ describe('BOM Analyzer', () => {
       expect(result.valid).toHaveLength(0);
       expect(result.errors).toHaveLength(1);
       expect(result.errors[0].rowIndex).toBe(2);
-      expect(result.errors[0].reason).toContain('control character');
+      expect(result.errors[0].reason).toBe('Contains invalid control character');
     });
 
     it('should flag rows with DEL character (0x7F)', () => {

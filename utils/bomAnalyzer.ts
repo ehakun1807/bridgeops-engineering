@@ -34,6 +34,10 @@ export async function parseBomsFromXlsx(file: File): Promise<BomRow[]> {
     const worksheet = workbook.Sheets[sheetName];
     const data = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false }) as (string | number | undefined)[][];
 
+    if (!Array.isArray(data) || !data.every(row => Array.isArray(row))) {
+      throw new Error('Invalid file structure: expected array of rows');
+    }
+
     if (data.length === 0) {
       throw new Error('File must contain at least one row of data');
     }
@@ -76,9 +80,9 @@ export async function parseBomsFromXlsx(file: File): Promise<BomRow[]> {
     return bomRows;
   } catch (error) {
     if (error instanceof Error) {
-      throw error;
+      throw error; // Re-throw with original context
     }
-    throw new Error('Failed to parse file');
+    throw new Error(`Failed to parse file: ${String(error)}`);
   }
 }
 
