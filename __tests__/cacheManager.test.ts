@@ -16,6 +16,9 @@ jest.mock('firebase/firestore', () => ({
   getDocs: jest.fn(),
   query: jest.fn(),
   where: jest.fn(),
+  serverTimestamp: jest.fn(() => ({
+    toMillis: jest.fn(() => Date.now())
+  })),
   Timestamp: {
     now: jest.fn(() => ({
       toMillis: jest.fn(() => Date.now())
@@ -49,7 +52,10 @@ describe('Cache Manager', () => {
     mockDeleteDoc.mockResolvedValue(undefined);
     mockGetDocs.mockResolvedValue({ docs: [] });
     mockCollection.mockReturnValue('mock-collection');
-    mockDoc.mockReturnValue('mock-doc');
+    mockDoc.mockReturnValue({
+      id: 'mock-doc-id',
+      path: 'componentCache/mock-doc-id'
+    });
   });
 
   describe('getCachedEquivalent', () => {
@@ -208,16 +214,14 @@ describe('Cache Manager', () => {
         sourceUrl: 'https://www.digikey.com/product-detail/12345678'
       };
 
-      const beforeTime = Date.now();
       await setCachedEquivalent('Texas Instruments', 'LM358', entry);
-      const afterTime = Date.now();
 
       const setDocCall = mockSetDoc.mock.calls[0];
       const storedData = setDocCall[1];
 
       expect(storedData.cachedAt).toBeDefined();
-      expect(storedData.cachedAt.getTime?.()).toBeGreaterThanOrEqual(beforeTime);
-      expect(storedData.cachedAt.getTime?.()).toBeLessThanOrEqual(afterTime);
+      // serverTimestamp() returns a Firestore Timestamp object with toMillis method
+      expect(storedData.cachedAt).toHaveProperty('toMillis');
     });
 
     it('should include manufacturer and partNumber', async () => {

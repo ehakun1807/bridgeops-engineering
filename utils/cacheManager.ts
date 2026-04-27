@@ -1,5 +1,5 @@
 import { db } from '../firebase';
-import { collection, doc, getDoc, setDoc, deleteDoc, getDocs } from 'firebase/firestore';
+import { collection, doc, getDoc, setDoc, deleteDoc, getDocs, serverTimestamp } from 'firebase/firestore';
 
 /**
  * Represents a cached component equivalent entry
@@ -59,6 +59,11 @@ export async function getCachedEquivalent(
   partNumber: string
 ): Promise<CacheEntry | null> {
   try {
+    // Input validation
+    if (!manufacturer?.trim() || !partNumber?.trim()) {
+      return null;
+    }
+
     const key = normalizeKey(manufacturer, partNumber);
     const cacheCollection = collection(db, 'componentCache');
     const docRef = doc(cacheCollection, key);
@@ -69,7 +74,12 @@ export async function getCachedEquivalent(
       return null;
     }
 
-    const data = docSnap.data() as FirestoreCacheEntry;
+    const data = docSnap.data();
+
+    // Type validation - ensure required fields exist
+    if (!data || !data.equivalent || !data.newPartNumber) {
+      return null;
+    }
 
     // Check if entry has expired (older than 30 days)
     const cachedAtMs = data.cachedAt?.toMillis?.() || 0;
@@ -81,7 +91,8 @@ export async function getCachedEquivalent(
         await deleteDoc(docRef);
       } catch (deleteError) {
         console.error('Failed to delete expired cache entry:', deleteError);
-        // Continue and return null anyway
+        // Log with context and re-throw to force caller awareness
+        throw new Error(`Cache cleanup failed for key ${key}: ${deleteError instanceof Error ? deleteError.message : String(deleteError)}`);
       }
       return null;
     }
@@ -111,13 +122,18 @@ export async function setCachedEquivalent(
   entry: CacheEntry
 ): Promise<void> {
   try {
+    // Input validation
+    if (!manufacturer?.trim() || !partNumber?.trim()) {
+      return;
+    }
+
     const key = normalizeKey(manufacturer, partNumber);
     const cacheCollection = collection(db, 'componentCache');
     const docRef = doc(cacheCollection, key);
 
     const firestoreEntry: FirestoreCacheEntry = {
       ...entry,
-      cachedAt: new Date(),
+      cachedAt: serverTimestamp() as unknown as Date,
       manufacturer: manufacturer.toLowerCase().trim(),
       partNumber: partNumber.toLowerCase().trim()
     };
