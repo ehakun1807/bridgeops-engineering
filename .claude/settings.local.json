@@ -35,7 +35,9 @@
       "Bash(awk '/^const ProjectDeepDive/,/^}; *$/' /Users/eranhakun/Downloads/bridgeops-engineering-main/ProjectDeepDive.tsx)",
       "Bash(npm test *)",
       "Bash(git add *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(cat)",
+      "Read(//tmp/**)"
     ]
   }
 }
