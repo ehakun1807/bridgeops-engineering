@@ -220,8 +220,21 @@ const RESPONSE_SCHEMA = {
 
 // JSON output instruction for the grounded path — Gemini doesn't allow
 // combining google_search tools with responseSchema, so we ask in prompt.
+//
+// We include a concrete example so the model has a clear template to mirror,
+// and we hammer the "no prose, no fences, no source citations after the
+// closing brace" rule because the grounded path leaks all three when the
+// instruction isn't strong.
 const JSON_OUTPUT_INSTRUCTION = [
-  'Output format — return ONLY a single JSON object. No markdown code fences. No prose before or after.',
+  'OUTPUT FORMAT — STRICT.',
+  '',
+  'Return EXACTLY one JSON object and NOTHING else. Specifically:',
+  '  - The very first character must be "{".',
+  '  - The very last character must be "}".',
+  '  - No markdown code fences (no ``` or ```json).',
+  '  - No prose before, after, or around the JSON.',
+  '  - No "Sources:" / citation footnotes after the closing brace.',
+  '  - No commentary about your search process.',
   '',
   'The object must have EXACTLY these keys and types:',
   '{',
@@ -234,15 +247,74 @@ const JSON_OUTPUT_INSTRUCTION = [
   '  "sourceUrl": string               // datasheet or distributor URL for the recommendation; empty string if none',
   '}',
   '',
-  'Critical: the very first character of your response must be "{" and the very last must be "}".'
+  'Concrete example of a valid response (your output should follow this exact shape, no more, no less):',
+  '{"identification":"Murata GRM155R71H103KA01D — 0402 10nF X7R 50V ±10% MLCC","equivalent":"Murata GRM155R71H103KA01D — 0402 10nF X7R 50V ±10% MLCC","newPartNumber":"GRM155R71H103KA01D","alternatives":["TDK CGA2B3X7R1H103K050BB — 0402 10nF X7R 50V ±10% MLCC","Yageo CC0402KRX7R9BB103 — 0402 10nF X7R 50V ±10% MLCC"],"confidence":"exact","notes":"Currently in production. Equivalent direct replacements verified on Digi-Key.","sourceUrl":"https://www.digikey.com/en/products/detail/murata-electronics/GRM155R71H103KA01D/1641840"}'
 ].join('\n');
 
+/**
+ * Robustly extract a JSON object from a Gemini response.
+ *
+ * Gemini sometimes ignores the "JSON only" instruction on the grounded
+ * path — wrapping the answer in markdown fences, prefacing it with
+ * "Here is the JSON:", or appending search-source citations after the
+ * closing brace. A naive `JSON.parse(textOut)` then fails for everyone.
+ *
+ * Strategy, in order:
+ *   1. Strip an outer markdown fence (```json ... ``` or ``` ... ```).
+ *   2. If the cleaned string is already a balanced JSON object, return it.
+ *   3. Walk the string and return the first BALANCED `{...}` block,
+ *      respecting string literals (so a `}` inside `"some \"text}"` doesn't
+ *      close the outer object). This is more reliable than the naive
+ *      "first { to last }" slice when there's prose containing braces
+ *      on either side.
+ *   4. Fall back to "first { to last }" — better than nothing for
+ *      pathological inputs.
+ *   5. Return the original raw input as a last resort so the caller's
+ *      error logging shows the actual model output.
+ */
 function extractJsonObject(raw: string): string {
   if (!raw) return '';
   let s = raw.trim();
-  const fence = s.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/i);
+
+  // Strip an outer markdown fence if present.
+  const fence = s.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/i);
   if (fence) s = fence[1].trim();
+
+  // Already a clean JSON object?
   if (s.startsWith('{') && s.endsWith('}')) return s;
+
+  // Walk for the first balanced {...} block, respecting string escapes.
+  const start = s.indexOf('{');
+  if (start >= 0) {
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    for (let i = start; i < s.length; i++) {
+      const ch = s[i];
+      if (inString) {
+        if (escape) {
+          escape = false;
+        } else if (ch === '\\') {
+          escape = true;
+        } else if (ch === '"') {
+          inString = false;
+        }
+        continue;
+      }
+      if (ch === '"') {
+        inString = true;
+      } else if (ch === '{') {
+        depth++;
+      } else if (ch === '}') {
+        depth--;
+        if (depth === 0) {
+          return s.slice(start, i + 1);
+        }
+      }
+    }
+  }
+
+  // Fall back to the naive slice — better than handing JSON.parse raw prose.
   const firstBrace = s.indexOf('{');
   const lastBrace = s.lastIndexOf('}');
   if (firstBrace >= 0 && lastBrace > firstBrace) {
@@ -419,7 +491,14 @@ export default async function handler(req: ReqLike, res: ResLike) {
       contents: [{ role: 'user', parts: [{ text: usedPrompt }] }],
       generationConfig: {
         temperature: 0.2,
-        maxOutputTokens: 1024
+        // The grounded path's response includes identification + equivalent
+        // + up to 2 alternatives + notes + sourceUrl, plus the model's
+        // internal search reasoning. 1024 was tight enough that some
+        // responses got truncated mid-JSON, surfacing as
+        // "ai returned malformed response" on the client. 4096 mirrors
+        // /api/ai-coach (similar grounded JSON workload) and gives plenty
+        // of headroom.
+        maxOutputTokens: 4096
       }
     };
     if (useGrounding) {
@@ -524,6 +603,7 @@ export default async function handler(req: ReqLike, res: ResLike) {
   const geminiRes = result.res;
   const data: any = await geminiRes.json();
   const textOut = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  const finishReason = data?.candidates?.[0]?.finishReason;
 
   if (!textOut || typeof textOut !== 'string') {
     console.error('Gemini returned no text:', JSON.stringify(data).slice(0, 400));
@@ -536,7 +616,24 @@ export default async function handler(req: ReqLike, res: ResLike) {
   try {
     parsed = JSON.parse(extractJsonObject(textOut));
   } catch (err) {
-    console.error('Failed to parse Gemini JSON:', textOut.slice(0, 300));
+    // MAX_TOKENS truncation produces unparseable JSON because the closing
+    // brace was never emitted. Surface that as a distinct, actionable
+    // message instead of a generic "malformed response" — at least the
+    // operator can see this is a quota/length issue, not a model issue.
+    if (finishReason === 'MAX_TOKENS') {
+      console.error(
+        'Gemini hit MAX_TOKENS — response truncated. First 300 chars:',
+        textOut.slice(0, 300)
+      );
+      return res.status(502).json(
+        EMPTY_RESPONSE({
+          error:
+            'ai response truncated (MAX_TOKENS) — try simpler manufacturer/part input'
+        })
+      );
+    }
+    console.error('Failed to parse Gemini JSON. finishReason=', finishReason);
+    console.error('First 300 chars of raw text:', textOut.slice(0, 300));
     return res
       .status(502)
       .json(EMPTY_RESPONSE({ error: 'ai returned malformed response' }));
