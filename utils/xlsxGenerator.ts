@@ -5,6 +5,11 @@ export interface AnalysisResult {
   rowIndex: number;
   manufacturer: string;
   partNumber: string;
+  // Production lifecycle status of the ORIGINAL input part (not the
+  // replacement). Drives the colored badge in the in-app table and the
+  // standalone "Component Status" column in the XLSX export. Optional for
+  // backward compatibility with any rows from before this field was added.
+  componentStatus?: 'active' | 'eol' | 'obsolete' | 'unknown' | null;
   equivalent: string | null;
   newPartNumber: string | null;
   confidence: 'exact' | 'spec-based' | null;
@@ -28,10 +33,13 @@ export interface AnalysisResult {
  * @returns Promise<Blob> - XLSX file as a Blob
  */
 export async function generateResultsXlsx(bomRows: BomRow[], results: AnalysisResult[]): Promise<Blob> {
-  // Create header row
+  // Create header row. Component Status sits between the input identifier
+  // columns and the recommendation columns — the engineer sees the status
+  // of the part they ALREADY have before reading what to replace it with.
   const headers = [
     'Manufacturer Name',
     'Manufacturer Part Number',
+    'Component Status',
     'Equivalent Component',
     'New Part Number',
     'Confidence',
@@ -49,6 +57,15 @@ export async function generateResultsXlsx(bomRows: BomRow[], results: AnalysisRe
       const confidenceText = result.confidence === null ? '' :
         result.confidence === 'exact' ? 'Exact Match' :
         result.confidence === 'spec-based' ? 'Spec-Based Match' : '';
+
+      // Component Status display — capitalized and human-friendly. Empty
+      // when the row hasn't returned yet or has errored, so the column
+      // doesn't make false claims about parts we never analyzed.
+      let componentStatusText = '';
+      if (result.componentStatus === 'active') componentStatusText = 'Active';
+      else if (result.componentStatus === 'eol') componentStatusText = 'EOL';
+      else if (result.componentStatus === 'obsolete') componentStatusText = 'Obsolete';
+      else if (result.componentStatus === 'unknown') componentStatusText = 'Unknown';
 
       // Equivalent column shows a status word for not-found / error / still
       // searching so the downloaded sheet is self-explanatory even outside
@@ -71,6 +88,7 @@ export async function generateResultsXlsx(bomRows: BomRow[], results: AnalysisRe
       dataRows.push([
         result.manufacturer,
         result.partNumber,
+        componentStatusText,
         equivalentComponent,
         newPartNumber,
         confidenceText,
@@ -88,6 +106,7 @@ export async function generateResultsXlsx(bomRows: BomRow[], results: AnalysisRe
   worksheet['!cols'] = [
     { wch: 25 }, // Manufacturer Name
     { wch: 25 }, // Manufacturer Part Number
+    { wch: 16 }, // Component Status
     { wch: 35 }, // Equivalent Component
     { wch: 25 }, // New Part Number
     { wch: 18 }, // Confidence

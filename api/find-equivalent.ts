@@ -174,6 +174,12 @@ const RESPONSE_SCHEMA = {
       description:
         'What the component IS — package, value, tolerance, voltage, dielectric / function / pinout etc., decoded from the part number using the manufacturer\'s naming convention. Always fill this in if you can decode any part of the number, even when no replacement is recommended. Empty string ONLY if the part number is total gibberish.'
     },
+    componentStatus: {
+      type: 'string',
+      enum: ['active', 'eol', 'obsolete', 'unknown'],
+      description:
+        'Production lifecycle status of the ORIGINAL input component (NOT the replacement). "active" = currently produced and broadly available from authorized distributors. "eol" = manufacturer has issued an End-of-Life / Last-Time-Buy notice but the part may still be buyable for a limited time. "obsolete" = no longer produced and not generally available through authorized channels. "unknown" = could not determine status with confidence.'
+    },
     equivalent: {
       type: 'string',
       description:
@@ -209,6 +215,7 @@ const RESPONSE_SCHEMA = {
   },
   required: [
     'identification',
+    'componentStatus',
     'equivalent',
     'newPartNumber',
     'alternatives',
@@ -239,6 +246,7 @@ const JSON_OUTPUT_INSTRUCTION = [
   'The object must have EXACTLY these keys and types:',
   '{',
   '  "identification": string,         // what the part IS, decoded from the part number — always try to fill',
+  '  "componentStatus": "active" | "eol" | "obsolete" | "unknown",  // status of the ORIGINAL input part',
   '  "equivalent": string,             // recommended replacement description; empty string if no recommendation',
   '  "newPartNumber": string,          // recommended replacement part number; empty string if no recommendation',
   '  "alternatives": string[],         // up to 2 additional spec-equivalent options from other vendors',
@@ -248,7 +256,7 @@ const JSON_OUTPUT_INSTRUCTION = [
   '}',
   '',
   'Concrete example of a valid response (your output should follow this exact shape, no more, no less):',
-  '{"identification":"Murata GRM155R71H103KA01D — 0402 10nF X7R 50V ±10% MLCC","equivalent":"Murata GRM155R71H103KA01D — 0402 10nF X7R 50V ±10% MLCC","newPartNumber":"GRM155R71H103KA01D","alternatives":["TDK CGA2B3X7R1H103K050BB — 0402 10nF X7R 50V ±10% MLCC","Yageo CC0402KRX7R9BB103 — 0402 10nF X7R 50V ±10% MLCC"],"confidence":"exact","notes":"Currently in production. Equivalent direct replacements verified on Digi-Key.","sourceUrl":"https://www.digikey.com/en/products/detail/murata-electronics/GRM155R71H103KA01D/1641840"}'
+  '{"identification":"Murata GRM155R71H103KA01D — 0402 10nF X7R 50V ±10% MLCC","componentStatus":"active","equivalent":"Murata GRM155R71H103KA01D — 0402 10nF X7R 50V ±10% MLCC","newPartNumber":"GRM155R71H103KA01D","alternatives":["TDK CGA2B3X7R1H103K050BB — 0402 10nF X7R 50V ±10% MLCC","Yageo CC0402KRX7R9BB103 — 0402 10nF X7R 50V ±10% MLCC"],"confidence":"exact","notes":"Currently in production. Equivalent direct replacements verified on Digi-Key.","sourceUrl":"https://www.digikey.com/en/products/detail/murata-electronics/GRM155R71H103KA01D/1641840"}'
 ].join('\n');
 
 /**
@@ -341,19 +349,31 @@ function buildPrompt(manufacturer: string, partNumber: string): string {
     '',
     '2. CORRECT obvious typos. Manufacturer names often arrive abbreviated or merged (e.g. "klkyocera" probably means "Kyocera AVX"; "linear" means "Linear Technology / Analog Devices"; "fairchil" means "Fairchild Semiconductor / ON Semi"; "ti" means "Texas Instruments"; "altera" is now Intel/Altera; "maxim2" likely means "Maxim Integrated / Analog Devices"). Part numbers may have prefix variants (e.g. "RE0402FRE07150" is almost certainly meant to be Yageo "RC0402FR-07150RL" — Yageo has no RE0402 series, but their RC0402 is the standard 0402 thick-film resistor and the trailing 150 = 150Ω). When you spot a probable typo, say so explicitly in the notes ("Likely intended part number: …") and proceed with the decoded part.',
     '',
-    '3. RECOMMEND a replacement. Set newPartNumber + equivalent + confidence:',
-    '   - If the part is still in production, recommend itself: newPartNumber = the corrected original, confidence = "exact", notes mention "still in production, no change needed".',
-    '   - If the part is obsolete or hard to find, recommend a current spec-equivalent from the same vendor or a major second source. confidence = "exact" if the replacement is a confirmed drop-in (same pinout, same electricals), "spec-based" if it matches the key specs but warrants a verification step.',
+    '3. DETERMINE PRODUCTION STATUS of the ORIGINAL part. This drives the recommendation. Use Google Search to verify the part\'s lifecycle state from authoritative sources — manufacturer\'s product page, Digi-Key/Mouser stock + lifecycle indicator, vendor\'s PCN/EOL announcements, IHS/SiliconExpert listings if surfaced.',
+    '   - "active"   = currently produced, broadly stocked at authorized distributors. No PCN/EOL announcement.',
+    '   - "eol"      = manufacturer has issued an End-of-Life or Last-Time-Buy notice but the part may still be buyable for a limited window.',
+    '   - "obsolete" = no longer produced and not generally stocked at authorized distributors.',
+    '   - "unknown"  = could not determine status with confidence (search returned ambiguous or no results).',
+    '   Also note for older Altera, Linear Tech, Maxim, Fairchild, IDT parts: the brand merged (Intel/Altera, ADI/Linear, ADI/Maxim, ON/Fairchild, Renesas/IDT) and the original PN may be obsolete even if a renamed equivalent is current. Reflect that reality in componentStatus + notes.',
+    '',
+    '4. RECOMMEND a replacement BASED ON STATUS. Set newPartNumber + equivalent + confidence:',
+    '   - If componentStatus = "active": recommend itself. newPartNumber = the corrected original. confidence = "exact". Notes should say "currently in production, no change needed".',
+    '   - If componentStatus = "eol": recommend the manufacturer-suggested replacement if one was announced; otherwise a current drop-in from the same vendor family. Notes should mention the EOL notice and any LTB date you saw.',
+    '   - If componentStatus = "obsolete": recommend a current spec-equivalent from a major vendor. confidence = "exact" if pin/spec compatible drop-in, "spec-based" otherwise.',
+    '   - If componentStatus = "unknown": still try to recommend a spec-equivalent. confidence = "spec-based". Notes should call out that production status couldn\'t be verified and what the engineer should check.',
+    '',
+    '   Domain rules:',
     '   - For RF/microwave passives (Kyocera AVX U-series, Murata GJM/GQM, Johanson, ATC, etc.), prioritize C0G/NP0 dielectric, Q factor, and ESR matching.',
     '   - For 1%/0.1% precision resistors and bulk capacitors, package size + tolerance + voltage rating + temperature coefficient matter most.',
+    '   - For ICs, the replacement must match: function family, package, pinout, key parametrics (Vcc range, current, speed grade).',
     '',
-    '4. PROVIDE alternatives. Up to 2 additional second-source options from different vendors when reasonable. Format each as "Manufacturer PartNumber — short descriptor".',
+    '5. PROVIDE alternatives. Up to 2 additional second-source options from different vendors when reasonable. Format each as "Manufacturer PartNumber — short descriptor".',
     '',
-    'Use Google Search to verify production status and find datasheet/distributor links. Trust live search over your training data when they disagree. Do not invent URLs — only include sourceUrl if search returned a real one for the recommended part.',
+    'Use Google Search throughout. Trust live search over your training data when they disagree. Do not invent URLs — only include sourceUrl if search returned a real one for the recommended part.',
     '',
     'When you genuinely cannot help:',
     '- Set confidence="none" and leave equivalent / newPartNumber empty.',
-    '- BUT still fill identification (with what you could decode) and notes (with what to verify, e.g. "Verify part marking against datasheet — this code does not match standard Kyocera AVX nomenclature; possible OEM private-label code or marketing PN").',
+    '- BUT still fill identification (with what you could decode), componentStatus (best guess or "unknown"), and notes (with what to verify, e.g. "Verify part marking against datasheet — this code does not match standard Kyocera AVX nomenclature; possible OEM private-label code or marketing PN").',
     '- Returning an empty result is the worst outcome. Always provide SOMETHING actionable.',
     '',
     'Return ONLY the JSON object specified by the output format.'
@@ -375,6 +395,11 @@ interface ResLike {
 }
 
 interface ApiResponse {
+  // Lifecycle status of the ORIGINAL input part. Populated even when no
+  // replacement is recommended, so the engineer always knows whether the
+  // part they have is something they can keep ordering. null only on
+  // pre-status-feature cached entries or hard error responses.
+  componentStatus: 'active' | 'eol' | 'obsolete' | 'unknown' | null;
   equivalent: string | null;
   newPartNumber: string | null;
   confidence: 'exact' | 'spec-based' | null;
@@ -388,6 +413,7 @@ interface ApiResponse {
 const EMPTY_RESPONSE = (
   extra: Partial<ApiResponse> = {}
 ): ApiResponse => ({
+  componentStatus: null,
   equivalent: null,
   newPartNumber: null,
   confidence: null,
@@ -666,6 +692,33 @@ export default async function handler(req: ReqLike, res: ResLike) {
       ? rawConfidence
       : null;
 
+  // Tolerant normalization for componentStatus — accept the canonical
+  // enum, plus a handful of synonyms the model occasionally produces
+  // (e.g. "in production", "discontinued", "nrnd"). Anything we can't
+  // map cleanly defaults to "unknown" so the column is never empty.
+  const rawStatus = String(parsed?.componentStatus || '').toLowerCase().trim();
+  let componentStatus: 'active' | 'eol' | 'obsolete' | 'unknown' = 'unknown';
+  if (rawStatus === 'active' || rawStatus === 'in production' || rawStatus === 'production') {
+    componentStatus = 'active';
+  } else if (
+    rawStatus === 'eol' ||
+    rawStatus === 'end of life' ||
+    rawStatus === 'end-of-life' ||
+    rawStatus === 'last time buy' ||
+    rawStatus === 'ltb' ||
+    rawStatus === 'nrnd' ||
+    rawStatus === 'not recommended for new designs'
+  ) {
+    componentStatus = 'eol';
+  } else if (
+    rawStatus === 'obsolete' ||
+    rawStatus === 'discontinued' ||
+    rawStatus === 'eos' ||
+    rawStatus === 'end of supply'
+  ) {
+    componentStatus = 'obsolete';
+  }
+
   const trim = (v: any): string =>
     typeof v === 'string' ? v.trim() : '';
 
@@ -706,6 +759,7 @@ export default async function handler(req: ReqLike, res: ResLike) {
   const sourceUrl = rawSourceUrl.startsWith('http') ? rawSourceUrl : null;
 
   const responseBody: ApiResponse = {
+    componentStatus,
     equivalent: equivalent || null,
     newPartNumber,
     // Confidence only meaningful when we're recommending a part. A pure

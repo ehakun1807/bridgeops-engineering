@@ -170,6 +170,7 @@ const BOMAnalyzerTool: React.FC<BOMAnalyzerToolProps> = () => {
         rowIndex: row.rowIndex,
         manufacturer: row.manufacturer,
         partNumber: row.partNumber,
+        componentStatus: null,
         equivalent: null,
         newPartNumber: null,
         confidence: null,
@@ -224,12 +225,25 @@ const BOMAnalyzerTool: React.FC<BOMAnalyzerToolProps> = () => {
 
           const data = await response.json();
 
+          // Tolerant guard for componentStatus — the API normalizes
+          // synonyms server-side, but if anything unexpected comes back we
+          // fall through to null so the badge just doesn't render.
+          const incomingStatus = data?.componentStatus;
+          const componentStatus =
+            incomingStatus === 'active' ||
+            incomingStatus === 'eol' ||
+            incomingStatus === 'obsolete' ||
+            incomingStatus === 'unknown'
+              ? incomingStatus
+              : null;
+
           setAnalysisResults(prev => {
             const updated = [...prev];
             const index = updated.findIndex(r => r.rowIndex === row.rowIndex);
             if (index !== -1) {
               updated[index] = {
                 ...updated[index],
+                componentStatus,
                 equivalent: data.equivalent || null,
                 newPartNumber: data.newPartNumber || null,
                 confidence: data.confidence || null,
@@ -483,7 +497,8 @@ const BOMAnalyzerTool: React.FC<BOMAnalyzerToolProps> = () => {
                     <tr>
                       <th className="px-3 py-2 text-left font-black text-slate-900">Manufacturer</th>
                       <th className="px-3 py-2 text-left font-black text-slate-900">Part Number</th>
-                      <th className="px-3 py-2 text-left font-black text-slate-900">Status</th>
+                      <th className="px-3 py-2 text-left font-black text-slate-900">Lookup</th>
+                      <th className="px-3 py-2 text-left font-black text-slate-900">Component Status</th>
                       <th className="px-3 py-2 text-left font-black text-slate-900">Equivalent</th>
                       <th className="px-3 py-2 text-left font-black text-slate-900">New Part #</th>
                       <th className="px-3 py-2 text-left font-black text-slate-900">Confidence</th>
@@ -530,6 +545,36 @@ const BOMAnalyzerTool: React.FC<BOMAnalyzerToolProps> = () => {
                         );
                       }
 
+                      // Component Status badge — colored by lifecycle stage so
+                      // an obsolete row jumps out at a glance even on a long
+                      // BOM. Active=green, EOL=amber, Obsolete=red, Unknown=gray.
+                      let componentStatusBadge: React.ReactNode = '—';
+                      if (result.componentStatus === 'active') {
+                        componentStatusBadge = (
+                          <span className="inline-block bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-[11px] font-semibold">
+                            Active
+                          </span>
+                        );
+                      } else if (result.componentStatus === 'eol') {
+                        componentStatusBadge = (
+                          <span className="inline-block bg-amber-100 text-amber-700 px-2 py-1 rounded text-[11px] font-semibold">
+                            EOL
+                          </span>
+                        );
+                      } else if (result.componentStatus === 'obsolete') {
+                        componentStatusBadge = (
+                          <span className="inline-block bg-red-100 text-red-700 px-2 py-1 rounded text-[11px] font-semibold">
+                            Obsolete
+                          </span>
+                        );
+                      } else if (result.componentStatus === 'unknown') {
+                        componentStatusBadge = (
+                          <span className="inline-block bg-slate-100 text-slate-700 px-2 py-1 rounded text-[11px] font-semibold">
+                            Unknown
+                          </span>
+                        );
+                      }
+
                       return (
                         <tr key={result.rowIndex} className={`border-b border-slate-200 transition-colors ${rowBgColor} align-top`}>
                           <td className="px-3 py-2 text-slate-900">{result.manufacturer}</td>
@@ -540,6 +585,7 @@ const BOMAnalyzerTool: React.FC<BOMAnalyzerToolProps> = () => {
                               <span className="text-slate-600">{statusText}</span>
                             </div>
                           </td>
+                          <td className="px-3 py-2">{componentStatusBadge}</td>
                           <td className="px-3 py-2 text-slate-900">{result.equivalent || '—'}</td>
                           <td className="px-3 py-2 text-slate-900">{result.newPartNumber || '—'}</td>
                           <td className="px-3 py-2">{confidenceBadge}</td>
