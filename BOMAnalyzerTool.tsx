@@ -21,6 +21,17 @@ const BOMAnalyzerTool: React.FC<BOMAnalyzerToolProps> = () => {
     'application/vnd.ms-excel',
     'text/csv'
   ];
+  // Formats that aren't natively parseable but have a clean export-to-xlsx
+  // path. We catch them on validation and tell the user exactly what to do
+  // instead of a generic "invalid file type" error.
+  const exportableFormats: Record<string, string> = {
+    '.numbers':
+      "Apple Numbers files aren't natively supported. Open the file in Numbers, then File → Export To → Excel… and upload the resulting .xlsx.",
+    '.gsheet':
+      "Google Sheets shortcut files aren't supported. Open the sheet at sheets.google.com, then File → Download → Microsoft Excel (.xlsx) and upload that.",
+    '.ods':
+      'OpenDocument spreadsheets (.ods) are not supported. Open in LibreOffice / Numbers / Excel and Save As .xlsx, then upload that.'
+  };
 
   const validateFile = (file: File): boolean => {
     // Check file extension
@@ -28,7 +39,19 @@ const BOMAnalyzerTool: React.FC<BOMAnalyzerToolProps> = () => {
     const hasValidExtension = acceptedFormats.some((format) => fileName.endsWith(format));
 
     if (!hasValidExtension) {
-      setError(`Invalid file type. Accepted formats: ${acceptedFormats.join(', ')}`);
+      // If they tried a known-but-exportable format, give them the exact
+      // recipe instead of a generic rejection.
+      const exportableHint = Object.entries(exportableFormats).find(([ext]) =>
+        fileName.endsWith(ext)
+      );
+      if (exportableHint) {
+        setError(exportableHint[1]);
+      } else {
+        setError(
+          `Invalid file type. Accepted formats: ${acceptedFormats.join(', ')}. ` +
+            'For Apple Numbers or Google Sheets, export to .xlsx or .csv first.'
+        );
+      }
       return false;
     }
 
@@ -300,7 +323,8 @@ const BOMAnalyzerTool: React.FC<BOMAnalyzerToolProps> = () => {
           Upload BOM File
         </h3>
         <p className="text-[12px] text-slate-500">
-          Upload an XLSX, XLS, or CSV file containing your bill of materials
+          Upload an XLSX, XLS, or CSV file containing your bill of materials.
+          Numbers and Google Sheets users: export to .xlsx first.
         </p>
       </div>
 
@@ -345,9 +369,22 @@ const BOMAnalyzerTool: React.FC<BOMAnalyzerToolProps> = () => {
             />
           </div>
 
-          {/* Supported formats info */}
-          <div className="mt-4 p-3 bg-slate-100 rounded text-[11px] text-slate-600">
-            <strong>Supported formats:</strong> {acceptedFormats.join(', ')} (max 10MB)
+          {/* Supported formats info — tells users up front how to handle
+              Numbers and Google Sheets without making them discover the
+              "wrong format" error first. */}
+          <div className="mt-4 p-3 bg-slate-100 rounded text-[11px] text-slate-600 leading-relaxed">
+            <p>
+              <strong>Supported formats:</strong> {acceptedFormats.join(', ')} (max 10MB)
+            </p>
+            <p className="mt-1.5">
+              <strong>Apple Numbers:</strong> File → Export To → Excel… and upload the .xlsx.
+            </p>
+            <p className="mt-1">
+              <strong>Google Sheets:</strong> File → Download → Microsoft Excel (.xlsx) and upload that.
+            </p>
+            <p className="mt-1.5 text-slate-500">
+              File must have exactly 2 columns: <em>Manufacturer</em> and <em>Part Number</em>.
+            </p>
           </div>
 
           {/* Error message */}
