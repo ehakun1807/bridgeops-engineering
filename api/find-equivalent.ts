@@ -37,7 +37,16 @@
 // ---------------------------------------------------------------------------
 
 import crypto from 'node:crypto';
-import { getCachedEquivalent, setCachedEquivalent } from '../utils/cacheManager';
+
+// NOTE: This endpoint deliberately does NOT import the Firestore-based
+// cacheManager. That module pulls in the Firebase Web SDK which initializes
+// browser-oriented modules at import time and can crash a Vercel Node
+// serverless function with a generic 500 (no parseable response body), which
+// surfaces as "API error (500)" on the client. Cache writes were also already
+// silently rejected by Firestore security rules from this unauthenticated
+// server context, so the cache was effectively a no-op anyway. If we ever
+// want server-side caching, the right move is the Firebase Admin SDK with a
+// service-account credential — not the Web SDK.
 
 const FIREBASE_PROJECT_ID = 'gen-lang-client-0703668573';
 const ADMIN_EMAIL = 'ehakun1807@gmail.com';
@@ -321,28 +330,10 @@ export default async function handler(req: ReqLike, res: ResLike) {
     );
   }
 
-  // ------------------------------------------------------------------------
-  // Cache check first. The cache stores prior results keyed by manufacturer
-  // + partNumber (normalized), so a re-run on the same BOM doesn't burn
-  // Gemini quota or wait.
-  // ------------------------------------------------------------------------
-  try {
-    const cached = await getCachedEquivalent(rawMfg, rawPart);
-    if (cached) {
-      return res.status(200).json({
-        equivalent: cached.equivalent || null,
-        newPartNumber: cached.newPartNumber || null,
-        confidence: cached.confidence || null,
-        source: 'gemini',
-        sourceUrl: cached.sourceUrl || null,
-        notes: cached.notes || null,
-        cached: true
-      } as ApiResponse);
-    }
-  } catch (cacheErr) {
-    // Cache failures should never break the lookup — log and continue.
-    console.warn('Cache read failed:', cacheErr);
-  }
+  // No server-side cache (see import comment above). Every request goes
+  // straight to Gemini. Re-running the same BOM costs N Gemini calls
+  // again — acceptable while the user-facing tool is still being shaped.
+
 
   // ------------------------------------------------------------------------
   // Gemini call. Mirrors the retry+fallback strategy from /api/ai-coach:
@@ -578,23 +569,10 @@ export default async function handler(req: ReqLike, res: ResLike) {
     cached: false
   };
 
-  // Cache only confident recommendations. Pure identifications get
-  // recomputed fresh each time — they're cheap and grounded search may
-  // produce a recommendation on retry.
-  if (hasRecommendation && confidence) {
-    try {
-      await setCachedEquivalent(rawMfg, rawPart, {
-        equivalent: equivalent!,
-        newPartNumber: rawNewPart,
-        confidence,
-        source: 'gemini',
-        sourceUrl: sourceUrl || '',
-        notes: notes || ''
-      });
-    } catch (cacheErr) {
-      console.warn('Cache write failed:', cacheErr);
-    }
-  }
+  // No server-side cache write (see import comment at top of file). If we
+  // want caching back, the right path is a Firebase Admin SDK helper with
+  // a service-account credential — not the Web SDK that originally lived
+  // here.
 
   return res.status(200).json(responseBody);
 }
