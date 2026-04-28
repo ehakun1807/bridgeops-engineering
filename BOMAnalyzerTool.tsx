@@ -1,5 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { Upload, X, File } from 'lucide-react';
+import { Upload, X, File, Loader2, CheckCircle2, AlertTriangle, Download, Sparkles } from 'lucide-react';
+import { parseBomsFromXlsx, validateBomRows, type BomRow } from './utils/bomAnalyzer';
+import { generateResultsXlsx, downloadXlsx, type AnalysisResult } from './utils/xlsxGenerator';
 
 interface BOMAnalyzerToolProps {}
 
@@ -8,6 +10,9 @@ const BOMAnalyzerTool: React.FC<BOMAnalyzerToolProps> = () => {
   const [dragActive, setDragActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [analysisResults, setAnalysisResults] = useState<AnalysisResult[]>([]);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState(0);
 
   const acceptedFormats = ['.xlsx', '.xls', '.csv'];
   const acceptedMimeTypes = [
@@ -89,6 +94,151 @@ const BOMAnalyzerTool: React.FC<BOMAnalyzerToolProps> = () => {
     const sizes = ['Bytes', 'KB', 'MB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+  };
+
+  const handleAnalyze = async () => {
+    if (!selectedFile) return;
+
+    setIsAnalyzing(true);
+    setError(null);
+    setAnalysisProgress(0);
+    setAnalysisResults([]);
+
+    try {
+      // Parse XLSX file
+      const bomRows = await parseBomsFromXlsx(selectedFile);
+
+      // Validate BOM rows
+      const validation = validateBomRows(bomRows);
+      if (validation.errors.length > 0) {
+        setError(`Validation failed: ${validation.errors.map(e => `Row ${e.rowIndex}: ${e.reason}`).join('; ')}`);
+        setIsAnalyzing(false);
+        return;
+      }
+
+      const validRows = validation.valid;
+
+      // Initialize results with "searching" status
+      const initialResults: AnalysisResult[] = validRows.map(row => ({
+        rowIndex: row.rowIndex,
+        manufacturer: row.manufacturer,
+        partNumber: row.partNumber,
+        equivalent: null,
+        newPartNumber: null,
+        confidence: null,
+        status: 'error' // Will be updated as we get responses
+      }));
+
+      setAnalysisResults(initialResults);
+
+      // Process with rate limiting (5-10 concurrent requests)
+      const concurrencyLimit = 8;
+      let completed = 0;
+
+      const processRows = async (rows: BomRow[]) => {
+        const queue = [...rows];
+        const inProgress: Promise<void>[] = [];
+
+        while (queue.length > 0 || inProgress.length > 0) {
+          // Add new requests up to concurrency limit
+          while (inProgress.length < concurrencyLimit && queue.length > 0) {
+            const row = queue.shift();
+            if (!row) break;
+
+            const request = (async () => {
+              try {
+                const response = await fetch('/api/find-equivalent', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    manufacturer: row.manufacturer,
+                    partNumber: row.partNumber
+                  })
+                });
+
+                if (!response.ok) {
+                  throw new Error(`API error: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+
+                // Update results state with new response
+                setAnalysisResults(prev => {
+                  const updated = [...prev];
+                  const index = updated.findIndex(r => r.rowIndex === row.rowIndex);
+                  if (index !== -1) {
+                    updated[index] = {
+                      ...updated[index],
+                      equivalent: data.equivalent || null,
+                      newPartNumber: data.newPartNumber || null,
+                      confidence: data.confidence || null,
+                      status: data.equivalent ? 'found' : 'not-found'
+                    };
+                  }
+                  return updated;
+                });
+              } catch (err) {
+                // Handle errors gracefully
+                setAnalysisResults(prev => {
+                  const updated = [...prev];
+                  const index = updated.findIndex(r => r.rowIndex === row.rowIndex);
+                  if (index !== -1) {
+                    updated[index] = {
+                      ...updated[index],
+                      status: 'error'
+                    };
+                  }
+                  return updated;
+                });
+              }
+
+              completed++;
+              setAnalysisProgress(completed);
+            })();
+
+            inProgress.push(request);
+          }
+
+          // Wait for at least one request to complete
+          if (inProgress.length > 0) {
+            await Promise.race(inProgress);
+            inProgress.splice(
+              inProgress.findIndex(p => Promise.resolve(p) === Promise.resolve(p)),
+              1
+            );
+          }
+        }
+      };
+
+      await processRows(validRows);
+      setIsAnalyzing(false);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(errorMessage);
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleDownloadResults = async () => {
+    if (analysisResults.length === 0 || !selectedFile) return;
+
+    try {
+      // Parse BOM rows again for reference
+      const bomRows = await parseBomsFromXlsx(selectedFile);
+
+      // Generate XLSX
+      const blob = await generateResultsXlsx(bomRows, analysisResults);
+
+      // Create filename with timestamp
+      const timestamp = new Date().toISOString().slice(0, 10);
+      const filename = `BOM_Analysis_${timestamp}.xlsx`;
+
+      // Download
+      downloadXlsx(blob, filename);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(errorMessage);
+    }
   };
 
   return (
@@ -183,18 +333,151 @@ const BOMAnalyzerTool: React.FC<BOMAnalyzerToolProps> = () => {
             </div>
           </div>
 
-          {/* Placeholder for future Analyze button */}
+          {/* Analyze button */}
           <div className="mt-6 pt-6 border-t border-slate-200">
-            <p className="text-[11px] text-slate-500 italic mb-4">
-              Analysis feature coming soon. Your file is ready to upload and analyze.
-            </p>
-            {/* Future Analyze button would go here */}
-            {/* <button
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded transition-colors"
+            <button
+              onClick={handleAnalyze}
+              disabled={isAnalyzing}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded transition-colors flex items-center justify-center gap-2"
             >
-              Analyze BOM
-            </button> */}
+              {isAnalyzing ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Analyzing...
+                </>
+              ) : (
+                <>
+                  <Sparkles size={16} />
+                  Analyze BOM
+                </>
+              )}
+            </button>
           </div>
+
+          {/* Error message for analysis */}
+          {error && analysisResults.length === 0 && (
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded text-[12px] text-red-600">
+              {error}
+            </div>
+          )}
+
+          {/* Analysis results table */}
+          {analysisResults.length > 0 && (
+            <div className="mt-6 pt-6 border-t border-slate-200">
+              <div className="mb-4">
+                <p className="text-sm font-black uppercase tracking-tight text-slate-900 mb-2">
+                  Analysis Results
+                </p>
+                <div className="flex items-center justify-between text-[12px] text-slate-600 mb-3">
+                  <span>
+                    Progress: {analysisProgress}/{analysisResults.length} completed
+                  </span>
+                  {isAnalyzing && (
+                    <span className="flex items-center gap-1">
+                      <Loader2 size={14} className="animate-spin" />
+                      Analyzing...
+                    </span>
+                  )}
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                  <div
+                    className="bg-blue-600 h-full transition-all duration-300"
+                    style={{ width: `${(analysisProgress / analysisResults.length) * 100}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Results table */}
+              <div className="overflow-x-auto border border-slate-200 rounded-lg">
+                <table className="w-full text-[12px]">
+                  <thead className="bg-slate-100 border-b border-slate-200">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-black text-slate-900">Manufacturer Name</th>
+                      <th className="px-3 py-2 text-left font-black text-slate-900">Manufacturer Part Number</th>
+                      <th className="px-3 py-2 text-left font-black text-slate-900">Status</th>
+                      <th className="px-3 py-2 text-left font-black text-slate-900">Equivalent Component</th>
+                      <th className="px-3 py-2 text-left font-black text-slate-900">New Part Number</th>
+                      <th className="px-3 py-2 text-left font-black text-slate-900">Confidence</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {analysisResults.map((result) => {
+                      let statusIcon = null;
+                      let statusText = '';
+                      let rowBgColor = '';
+
+                      if (result.status === 'error') {
+                        statusIcon = <AlertTriangle size={14} className="text-orange-500" />;
+                        statusText = '⚠️ Error';
+                        rowBgColor = 'bg-orange-50 hover:bg-orange-100';
+                      } else if (result.status === 'found') {
+                        statusIcon = <CheckCircle2 size={14} className="text-emerald-500" />;
+                        statusText = '✅ Found';
+                        rowBgColor = 'bg-emerald-50 hover:bg-emerald-100';
+                      } else if (result.status === 'not-found') {
+                        statusIcon = <AlertTriangle size={14} className="text-red-500" />;
+                        statusText = '❌ Not found';
+                        rowBgColor = 'bg-red-50 hover:bg-red-100';
+                      } else {
+                        statusIcon = <Loader2 size={14} className="animate-spin text-blue-500" />;
+                        statusText = '🔄 Searching';
+                        rowBgColor = 'bg-blue-50 hover:bg-blue-100';
+                      }
+
+                      let confidenceBadge = null;
+                      if (result.confidence === 'exact') {
+                        confidenceBadge = (
+                          <span className="inline-block bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-[11px] font-semibold">
+                            Exact Match
+                          </span>
+                        );
+                      } else if (result.confidence === 'spec-based') {
+                        confidenceBadge = (
+                          <span className="inline-block bg-amber-100 text-amber-700 px-2 py-1 rounded text-[11px] font-semibold">
+                            Spec-Based
+                          </span>
+                        );
+                      }
+
+                      return (
+                        <tr key={result.rowIndex} className={`border-b border-slate-200 transition-colors ${rowBgColor}`}>
+                          <td className="px-3 py-2 text-slate-900 truncate">{result.manufacturer}</td>
+                          <td className="px-3 py-2 text-slate-900 truncate">{result.partNumber}</td>
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-1">
+                              {statusIcon}
+                              <span className="text-slate-600">{statusText}</span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2 text-slate-900 truncate">{result.equivalent || '-'}</td>
+                          <td className="px-3 py-2 text-slate-900 truncate">{result.newPartNumber || '-'}</td>
+                          <td className="px-3 py-2">{confidenceBadge}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Download button */}
+              {!isAnalyzing && (
+                <button
+                  onClick={handleDownloadResults}
+                  className="mt-4 flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded transition-colors"
+                >
+                  <Download size={14} />
+                  Download Results
+                </button>
+              )}
+
+              {/* Error message for download */}
+              {error && analysisResults.length > 0 && (
+                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded text-[12px] text-red-600">
+                  {error}
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>
