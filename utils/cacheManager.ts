@@ -2,14 +2,26 @@ import { db } from '../firebase';
 import { collection, doc, getDoc, setDoc, deleteDoc, getDocs, serverTimestamp } from 'firebase/firestore';
 
 /**
- * Represents a cached component equivalent entry
+ * Represents a cached component equivalent entry.
+ *
+ * `source` originally enumerated the distributor a result came from
+ * (`'digikey' | 'mouser'`) when this codebase scraped distributor HTML.
+ * The lookup has since moved to grounded Gemini, so `'gemini'` is now
+ * the live producer; the older values stay in the union for backward
+ * compatibility with any historical cache rows still inside the 30-day
+ * TTL window — they'll age out on their own.
+ *
+ * `notes` is optional and carries 1-2 sentences of model-generated context
+ * (what the part is, why the proposed replacement is appropriate, or — when
+ * a part couldn't be identified — what to verify). Missing on legacy rows.
  */
 export interface CacheEntry {
   equivalent: string;
   newPartNumber: string;
   confidence: 'exact' | 'spec-based';
-  source: 'digikey' | 'mouser';
+  source: 'gemini' | 'digikey' | 'mouser';
   sourceUrl: string;
+  notes?: string;
 }
 
 /**

@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Upload, X, File, Loader2, CheckCircle2, AlertTriangle, Download, Sparkles } from 'lucide-react';
+import { auth } from './firebase.ts';
 import { parseBomsFromXlsx, validateBomRows, type BomRow } from './utils/bomAnalyzer';
 import { generateResultsXlsx, downloadXlsx, type AnalysisResult } from './utils/xlsxGenerator';
 
@@ -105,6 +106,29 @@ const BOMAnalyzerTool: React.FC<BOMAnalyzerToolProps> = () => {
     setAnalysisResults([]);
 
     try {
+      // The endpoint is admin-gated and requires a valid Firebase ID token.
+      // Surface the auth requirement up front so the user gets a clear
+      // message instead of N rows of "Error" once requests start firing.
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        setError(
+          'You need to be signed in to analyze BOMs. Please sign in and try again.'
+        );
+        setIsAnalyzing(false);
+        return;
+      }
+
+      let idToken: string;
+      try {
+        idToken = await currentUser.getIdToken(false);
+      } catch (tokenErr) {
+        setError(
+          'Could not retrieve your authentication token. Please sign out and back in.'
+        );
+        setIsAnalyzing(false);
+        return;
+      }
+
       // Parse XLSX file
       const bomRows = await parseBomsFromXlsx(selectedFile);
 
@@ -126,91 +150,119 @@ const BOMAnalyzerTool: React.FC<BOMAnalyzerToolProps> = () => {
         equivalent: null,
         newPartNumber: null,
         confidence: null,
-        status: 'error' // Will be updated as we get responses
+        sourceUrl: null,
+        notes: null,
+        status: 'searching'
       }));
 
       setAnalysisResults(initialResults);
 
-      // Process with rate limiting (5-10 concurrent requests)
-      const concurrencyLimit = 8;
+      // Concurrency: keep modest because the endpoint calls Gemini per row,
+      // and Gemini's per-key rate limits punish bursts. 4 in-flight is a
+      // reasonable balance between throughput and 429-avoidance.
+      const concurrencyLimit = 4;
       let completed = 0;
 
-      const processRows = async (rows: BomRow[]) => {
-        const queue = [...rows];
-        const inProgress: Promise<void>[] = [];
+      const processRow = async (row: BomRow) => {
+        try {
+          const response = await fetch('/api/find-equivalent', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${idToken}`
+            },
+            body: JSON.stringify({
+              manufacturer: row.manufacturer,
+              partNumber: row.partNumber
+            })
+          });
 
-        while (queue.length > 0 || inProgress.length > 0) {
-          // Add new requests up to concurrency limit
-          while (inProgress.length < concurrencyLimit && queue.length > 0) {
-            const row = queue.shift();
-            if (!row) break;
-
-            const request = (async () => {
-              try {
-                const response = await fetch('/api/find-equivalent', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    manufacturer: row.manufacturer,
-                    partNumber: row.partNumber
-                  })
-                });
-
-                if (!response.ok) {
-                  throw new Error(`API error: ${response.statusText}`);
-                }
-
-                const data = await response.json();
-
-                // Update results state with new response
-                setAnalysisResults(prev => {
-                  const updated = [...prev];
-                  const index = updated.findIndex(r => r.rowIndex === row.rowIndex);
-                  if (index !== -1) {
-                    updated[index] = {
-                      ...updated[index],
-                      equivalent: data.equivalent || null,
-                      newPartNumber: data.newPartNumber || null,
-                      confidence: data.confidence || null,
-                      status: data.equivalent ? 'found' : 'not-found'
-                    };
-                  }
-                  return updated;
-                });
-              } catch (err) {
-                // Handle errors gracefully
-                setAnalysisResults(prev => {
-                  const updated = [...prev];
-                  const index = updated.findIndex(r => r.rowIndex === row.rowIndex);
-                  if (index !== -1) {
-                    updated[index] = {
-                      ...updated[index],
-                      status: 'error'
-                    };
-                  }
-                  return updated;
-                });
-              }
-
-              completed++;
-              setAnalysisProgress(completed);
-            })();
-
-            inProgress.push(request);
-          }
-
-          // Wait for at least one request to complete
-          if (inProgress.length > 0) {
-            await Promise.race(inProgress);
-            inProgress.splice(
-              inProgress.findIndex(p => Promise.resolve(p) === Promise.resolve(p)),
-              1
+          // Auth failures are global — once we get a 401/403 every other
+          // row will fail the same way. Bubble them up so the user sees a
+          // single, actionable error message.
+          if (response.status === 401 || response.status === 403) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(
+              `Auth failed (${response.status}): ${
+                data?.error ||
+                'this tool is admin-only. Sign in with the admin account to continue.'
+              }`
             );
           }
+
+          // 4xx other than auth = bad row data. 5xx / 502 = upstream model
+          // issue. Either way, treat as a per-row error and keep going.
+          if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(
+              data?.error || `API error (${response.status}): ${response.statusText}`
+            );
+          }
+
+          const data = await response.json();
+
+          setAnalysisResults(prev => {
+            const updated = [...prev];
+            const index = updated.findIndex(r => r.rowIndex === row.rowIndex);
+            if (index !== -1) {
+              updated[index] = {
+                ...updated[index],
+                equivalent: data.equivalent || null,
+                newPartNumber: data.newPartNumber || null,
+                confidence: data.confidence || null,
+                sourceUrl: data.sourceUrl || null,
+                notes: data.notes || null,
+                status: data.equivalent ? 'found' : 'not-found'
+              };
+            }
+            return updated;
+          });
+        } catch (err) {
+          // Auth failures: surface globally and stop. Per-row failures:
+          // log and mark the row as errored, keep processing the rest.
+          const message = err instanceof Error ? err.message : String(err);
+          if (message.startsWith('Auth failed')) {
+            throw err;
+          }
+          setAnalysisResults(prev => {
+            const updated = [...prev];
+            const index = updated.findIndex(r => r.rowIndex === row.rowIndex);
+            if (index !== -1) {
+              updated[index] = {
+                ...updated[index],
+                notes: message.slice(0, 200),
+                status: 'error'
+              };
+            }
+            return updated;
+          });
+        } finally {
+          completed++;
+          setAnalysisProgress(completed);
         }
       };
 
-      await processRows(validRows);
+      // Simple concurrency-limited queue. The previous implementation had a
+      // bug — it used `Promise.race` then tried to remove the resolved
+      // promise via `findIndex(p => Promise.resolve(p) === Promise.resolve(p))`,
+      // which always finds index 0 regardless of which promise actually
+      // resolved. So one slow request would wedge the queue at the wrong
+      // slot. We replace it with N parallel workers consuming a shared
+      // queue — simpler and correct.
+      const queue = [...validRows];
+      const workers: Promise<void>[] = [];
+      for (let i = 0; i < Math.min(concurrencyLimit, queue.length); i++) {
+        workers.push(
+          (async () => {
+            while (queue.length > 0) {
+              const next = queue.shift();
+              if (!next) break;
+              await processRow(next);
+            }
+          })()
+        );
+      }
+      await Promise.all(workers);
       setIsAnalyzing(false);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
@@ -392,12 +444,14 @@ const BOMAnalyzerTool: React.FC<BOMAnalyzerToolProps> = () => {
                 <table className="w-full text-[12px]">
                   <thead className="bg-slate-100 border-b border-slate-200">
                     <tr>
-                      <th className="px-3 py-2 text-left font-black text-slate-900">Manufacturer Name</th>
-                      <th className="px-3 py-2 text-left font-black text-slate-900">Manufacturer Part Number</th>
+                      <th className="px-3 py-2 text-left font-black text-slate-900">Manufacturer</th>
+                      <th className="px-3 py-2 text-left font-black text-slate-900">Part Number</th>
                       <th className="px-3 py-2 text-left font-black text-slate-900">Status</th>
-                      <th className="px-3 py-2 text-left font-black text-slate-900">Equivalent Component</th>
-                      <th className="px-3 py-2 text-left font-black text-slate-900">New Part Number</th>
+                      <th className="px-3 py-2 text-left font-black text-slate-900">Equivalent</th>
+                      <th className="px-3 py-2 text-left font-black text-slate-900">New Part #</th>
                       <th className="px-3 py-2 text-left font-black text-slate-900">Confidence</th>
+                      <th className="px-3 py-2 text-left font-black text-slate-900">Notes</th>
+                      <th className="px-3 py-2 text-left font-black text-slate-900">Source</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -408,19 +462,19 @@ const BOMAnalyzerTool: React.FC<BOMAnalyzerToolProps> = () => {
 
                       if (result.status === 'error') {
                         statusIcon = <AlertTriangle size={14} className="text-orange-500" />;
-                        statusText = '⚠️ Error';
+                        statusText = 'Error';
                         rowBgColor = 'bg-orange-50 hover:bg-orange-100';
                       } else if (result.status === 'found') {
                         statusIcon = <CheckCircle2 size={14} className="text-emerald-500" />;
-                        statusText = '✅ Found';
+                        statusText = 'Found';
                         rowBgColor = 'bg-emerald-50 hover:bg-emerald-100';
                       } else if (result.status === 'not-found') {
                         statusIcon = <AlertTriangle size={14} className="text-red-500" />;
-                        statusText = '❌ Not found';
+                        statusText = 'Not found';
                         rowBgColor = 'bg-red-50 hover:bg-red-100';
                       } else {
                         statusIcon = <Loader2 size={14} className="animate-spin text-blue-500" />;
-                        statusText = '🔄 Searching';
+                        statusText = 'Searching';
                         rowBgColor = 'bg-blue-50 hover:bg-blue-100';
                       }
 
@@ -440,18 +494,39 @@ const BOMAnalyzerTool: React.FC<BOMAnalyzerToolProps> = () => {
                       }
 
                       return (
-                        <tr key={result.rowIndex} className={`border-b border-slate-200 transition-colors ${rowBgColor}`}>
-                          <td className="px-3 py-2 text-slate-900 truncate">{result.manufacturer}</td>
-                          <td className="px-3 py-2 text-slate-900 truncate">{result.partNumber}</td>
+                        <tr key={result.rowIndex} className={`border-b border-slate-200 transition-colors ${rowBgColor} align-top`}>
+                          <td className="px-3 py-2 text-slate-900">{result.manufacturer}</td>
+                          <td className="px-3 py-2 text-slate-900">{result.partNumber}</td>
                           <td className="px-3 py-2">
                             <div className="flex items-center gap-1">
                               {statusIcon}
                               <span className="text-slate-600">{statusText}</span>
                             </div>
                           </td>
-                          <td className="px-3 py-2 text-slate-900 truncate">{result.equivalent || '-'}</td>
-                          <td className="px-3 py-2 text-slate-900 truncate">{result.newPartNumber || '-'}</td>
+                          <td className="px-3 py-2 text-slate-900">{result.equivalent || '—'}</td>
+                          <td className="px-3 py-2 text-slate-900">{result.newPartNumber || '—'}</td>
                           <td className="px-3 py-2">{confidenceBadge}</td>
+                          <td className="px-3 py-2 text-slate-700 max-w-[28ch]">
+                            {result.notes ? (
+                              <span className="leading-snug">{result.notes}</span>
+                            ) : (
+                              '—'
+                            )}
+                          </td>
+                          <td className="px-3 py-2">
+                            {result.sourceUrl ? (
+                              <a
+                                href={result.sourceUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:text-blue-800 underline break-all"
+                              >
+                                Open
+                              </a>
+                            ) : (
+                              '—'
+                            )}
+                          </td>
                         </tr>
                       );
                     })}

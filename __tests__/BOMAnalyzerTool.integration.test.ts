@@ -1,8 +1,24 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import BOMAnalyzerTool from '@/BOMAnalyzerTool';
 import * as XLSX from 'xlsx';
+
+// The component now requires a signed-in admin user (Bearer token sent on
+// every /api/find-equivalent request). Mock the Firebase module the
+// component imports so `auth.currentUser.getIdToken()` resolves to a fake
+// token in jsdom without needing real Firebase auth state.
+jest.mock('@/firebase.ts', () => ({
+  auth: {
+    currentUser: {
+      getIdToken: jest.fn().mockResolvedValue('fake-test-id-token')
+    }
+  },
+  db: {}
+}));
+
+// Import after the mock so the component sees the mocked module.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const BOMAnalyzerTool = require('@/BOMAnalyzerTool').default as React.FC;
 
 // Helper function to create an XLSX file for testing with arrayBuffer polyfill
 function createXlsxFile(

@@ -8,7 +8,17 @@ export interface AnalysisResult {
   equivalent: string | null;
   newPartNumber: string | null;
   confidence: 'exact' | 'spec-based' | null;
-  status: 'found' | 'not-found' | 'error';
+  // Datasheet or distributor product-page URL surfaced by Gemini's grounded
+  // search. Optional — null when no live source was found, or for legacy
+  // result rows from before this field was added.
+  sourceUrl?: string | null;
+  // Free-text 1-2 sentence context: what the part is, why this replacement
+  // is appropriate, or — for not-found rows — what the engineer should
+  // verify. Optional for the same legacy reason as sourceUrl.
+  notes?: string | null;
+  // 'searching' = request in flight (UI-only, transient).
+  // 'found' / 'not-found' / 'error' = terminal states.
+  status: 'searching' | 'found' | 'not-found' | 'error';
 }
 
 /**
@@ -24,7 +34,9 @@ export async function generateResultsXlsx(bomRows: BomRow[], results: AnalysisRe
     'Manufacturer Part Number',
     'Equivalent Component',
     'New Part Number',
-    'Confidence'
+    'Confidence',
+    'Notes',
+    'Source URL'
   ];
 
   // Create data rows by matching bomRows with results
@@ -38,15 +50,32 @@ export async function generateResultsXlsx(bomRows: BomRow[], results: AnalysisRe
         result.confidence === 'exact' ? 'Exact Match' :
         result.confidence === 'spec-based' ? 'Spec-Based Match' : '';
 
-      const equivalentComponent = result.equivalent === null ? 'Not found' : result.equivalent;
+      // Equivalent column shows a status word for not-found / error / still
+      // searching so the downloaded sheet is self-explanatory even outside
+      // the app's UI context.
+      let equivalentComponent: string;
+      if (result.equivalent) {
+        equivalentComponent = result.equivalent;
+      } else if (result.status === 'error') {
+        equivalentComponent = 'Lookup error';
+      } else if (result.status === 'searching') {
+        equivalentComponent = 'In progress';
+      } else {
+        equivalentComponent = 'Not found';
+      }
+
       const newPartNumber = result.newPartNumber === null ? '' : result.newPartNumber;
+      const notes = result.notes || '';
+      const sourceUrl = result.sourceUrl || '';
 
       dataRows.push([
         result.manufacturer,
         result.partNumber,
         equivalentComponent,
         newPartNumber,
-        confidenceText
+        confidenceText,
+        notes,
+        sourceUrl
       ]);
     }
   }
@@ -59,9 +88,11 @@ export async function generateResultsXlsx(bomRows: BomRow[], results: AnalysisRe
   worksheet['!cols'] = [
     { wch: 25 }, // Manufacturer Name
     { wch: 25 }, // Manufacturer Part Number
-    { wch: 30 }, // Equivalent Component
+    { wch: 35 }, // Equivalent Component
     { wch: 25 }, // New Part Number
-    { wch: 20 }  // Confidence
+    { wch: 18 }, // Confidence
+    { wch: 60 }, // Notes
+    { wch: 50 }  // Source URL
   ];
 
   // Append sheet to workbook
