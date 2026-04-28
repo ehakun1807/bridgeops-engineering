@@ -38,18 +38,65 @@
 
 import crypto from 'node:crypto';
 
-// NOTE: This endpoint deliberately does NOT import the Firestore-based
-// cacheManager. That module pulls in the Firebase Web SDK which initializes
-// browser-oriented modules at import time and can crash a Vercel Node
-// serverless function with a generic 500 (no parseable response body), which
-// surfaces as "API error (500)" on the client. Cache writes were also already
-// silently rejected by Firestore security rules from this unauthenticated
-// server context, so the cache was effectively a no-op anyway. If we ever
-// want server-side caching, the right move is the Firebase Admin SDK with a
-// service-account credential — not the Web SDK.
+// NOTE: We deliberately don't import any Firebase Web SDK code here. That
+// SDK initializes browser-oriented modules at import time and can crash a
+// Vercel Node serverless function with a generic 500 (no parseable response
+// body) — which is exactly the regression that took out an earlier version
+// of this endpoint.
+//
+// In place of the Firestore cache we use a simple in-memory Map at module
+// scope (see CACHE below). It persists across requests on the same Vercel
+// function instance (typically 5-15 min) and gets blown away on cold start.
+// That's fine for the dominant use case: running the same BOM twice in
+// quick succession while iterating, or repeating an analysis after a
+// transient Gemini hiccup. For multi-day caching across instances the right
+// move is Firebase Admin SDK with a service-account credential — not added
+// here because current usage doesn't justify the setup overhead.
 
 const FIREBASE_PROJECT_ID = 'gen-lang-client-0703668573';
 const ADMIN_EMAIL = 'ehakun1807@gmail.com';
+
+// ---------------------------------------------------------------------------
+// In-memory cache (per function instance).
+//
+// Keyed on normalized manufacturer + part number; entries TTL after 30
+// minutes of wall-clock time so we don't serve genuinely stale data even
+// if a function instance lives unusually long. Capped at 500 entries with
+// FIFO-ish eviction (oldest insertion wins on overflow) to bound memory.
+// ---------------------------------------------------------------------------
+
+interface CacheEntry {
+  expires: number;
+  payload: Omit<ApiResponse, 'cached' | 'error'>;
+}
+
+const CACHE: Map<string, CacheEntry> = new Map();
+const CACHE_TTL_MS = 30 * 60 * 1000;
+const CACHE_MAX_ENTRIES = 500;
+
+function cacheKey(manufacturer: string, partNumber: string): string {
+  return `${manufacturer.toLowerCase().trim()}|${partNumber.toLowerCase().trim()}`;
+}
+
+function cacheGet(key: string): CacheEntry['payload'] | null {
+  const entry = CACHE.get(key);
+  if (!entry) return null;
+  if (entry.expires < Date.now()) {
+    CACHE.delete(key);
+    return null;
+  }
+  return entry.payload;
+}
+
+function cacheSet(key: string, payload: CacheEntry['payload']): void {
+  if (CACHE.size >= CACHE_MAX_ENTRIES) {
+    // Drop the oldest entry. Map iteration order is insertion order, so
+    // the first key is the oldest.
+    const firstKey = CACHE.keys().next().value;
+    if (firstKey !== undefined) CACHE.delete(firstKey);
+  }
+  CACHE.set(key, { expires: Date.now() + CACHE_TTL_MS, payload });
+}
 
 const PUBLIC_KEYS_URL =
   'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com';
@@ -330,9 +377,13 @@ export default async function handler(req: ReqLike, res: ResLike) {
     );
   }
 
-  // No server-side cache (see import comment above). Every request goes
-  // straight to Gemini. Re-running the same BOM costs N Gemini calls
-  // again — acceptable while the user-facing tool is still being shaped.
+  // Cache lookup. A hit short-circuits the Gemini call entirely, so
+  // re-running the same BOM right after a tweak doesn't burn quota.
+  const key = cacheKey(rawMfg, rawPart);
+  const cached = cacheGet(key);
+  if (cached) {
+    return res.status(200).json({ ...cached, cached: true } as ApiResponse);
+  }
 
 
   // ------------------------------------------------------------------------
@@ -569,10 +620,13 @@ export default async function handler(req: ReqLike, res: ResLike) {
     cached: false
   };
 
-  // No server-side cache write (see import comment at top of file). If we
-  // want caching back, the right path is a Firebase Admin SDK helper with
-  // a service-account credential — not the Web SDK that originally lived
-  // here.
+  // Cache the response so the next request for the same part returns
+  // instantly. We deliberately cache identifications (descriptive notes
+  // even without a recommendation) too — that's still useful output and
+  // re-running the same Gemini call won't usefully add to it.
+  const { cached: _ignoredCached, error: _ignoredError, ...payloadForCache } =
+    responseBody;
+  cacheSet(key, payloadForCache);
 
   return res.status(200).json(responseBody);
 }

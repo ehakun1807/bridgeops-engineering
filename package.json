@@ -16,7 +16,6 @@
   "dependencies": {
     "@google/genai": "^1.43.0",
     "@tailwindcss/vite": "^4.2.1",
-    "cheerio": "^1.2.0",
     "firebase": "^12.12.0",
     "framer-motion": "^12.34.3",
     "html2pdf.js": "^0.14.0",
@@ -30,7 +29,7 @@
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.1.5",
-    "@testing-library/react": "^15.0.0",
+    "@testing-library/react": "^16.0.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.19.17",
     "@vitejs/plugin-react": "^5.0.0",
