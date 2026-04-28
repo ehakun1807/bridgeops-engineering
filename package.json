@@ -29,6 +29,8 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.1.5",
+    "@testing-library/react": "^15.0.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.19.17",
     "@vitejs/plugin-react": "^5.0.0",
