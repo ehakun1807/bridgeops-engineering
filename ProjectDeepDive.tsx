@@ -13,7 +13,6 @@ import {
   ArrowLeft,
   Archive,
   CheckCircle2,
-  Cpu,
   Loader2,
   Save,
   AlertTriangle,
@@ -62,7 +61,6 @@ import AIAnalysisPanel from './AIAnalysisPanel.tsx';
 import ScoreHistoryPanel from './ScoreHistoryPanel.tsx';
 import ScopeEditor from './ScopeEditor.tsx';
 import CoachPanel from './CoachPanel.tsx';
-import AdvancedToolsModal from './AdvancedToolsModal.tsx';
 import StandardsPicker from './StandardsPicker.tsx';
 import {
   fetchCoachAdvice,
@@ -572,7 +570,6 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [closeConfirm, setCloseConfirm] = useState<'completed' | 'cancelled' | null>(null);
   const [downloadingSummary, setDownloadingSummary] = useState(false);
-  const [advancedToolsOpen, setAdvancedToolsOpen] = useState(false);
 
   // Which parent parameter bucket is currently visible.
   const [activeGroupId, setActiveGroupId] = useState<string>(RAMP_GROUPS[0].id);
@@ -1388,14 +1385,6 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
               Download Summary
             </button>
             <button
-              onClick={() => setAdvancedToolsOpen(true)}
-              disabled={saving}
-              className="text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-blue-600 transition-colors flex items-center gap-1 disabled:opacity-50"
-              title="Access advanced analysis tools"
-            >
-              <Cpu size={12} /> Tools
-            </button>
-            <button
               onClick={() => setCloseConfirm('cancelled')}
               disabled={saving}
               className="text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-red-600 transition-colors flex items-center gap-1 disabled:opacity-50"
@@ -1869,7 +1858,6 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
         )}
       </AnimatePresence>
 
-      <AdvancedToolsModal isOpen={advancedToolsOpen} onClose={() => setAdvancedToolsOpen(false)} />
     </div>
   );
 };
