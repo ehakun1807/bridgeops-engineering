@@ -42,7 +42,8 @@ import {
   Rocket,
   GraduationCap,
   ChevronDown,
-  Trash2
+  Trash2,
+  Wrench
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ProjectDeepDive, {
@@ -56,6 +57,7 @@ import ProjectDeepDive, {
 } from './ProjectDeepDive';
 import PortfolioHeatmap from './PortfolioHeatmap.tsx';
 import AuthModal from './AuthModal.tsx';
+import AdvancedToolsModal from './AdvancedToolsModal.tsx';
 import BridgeOpsAcademy from './BridgeOpsAcademy.tsx';
 import { scoreBand, scoreForProject, defaultMetricValues } from './rampGroups';
 import {
@@ -127,6 +129,10 @@ const Dashboard: React.FC = () => {
   // This keeps the dropdown stateful while still supporting niche industries
   // that aren't in the canonical list.
   const [showAddProject, setShowAddProject] = useState(false);
+  // Top-level Tools modal — surfaces BOM Analyzer / Quote Compare without
+  // needing to dive into a project first. Same modal as the per-project
+  // entry in ProjectDeepDive's footer.
+  const [showTools, setShowTools] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectProductChoice, setNewProjectProductChoice] = useState<string>(
     PRODUCT_SEGMENTS[0]
@@ -405,6 +411,16 @@ const Dashboard: React.FC = () => {
               New Project
             </span>
           </button>
+          <button
+            onClick={() => setShowTools(true)}
+            className="bg-white border border-slate-200 text-slate-900 px-6 py-3 rounded-sm shadow-sm flex items-center hover:border-slate-900 hover:text-blue-600 transition-all"
+            title="BOM Analyzer, Quote Compare, and other utilities"
+          >
+            <Wrench size={16} className="mr-2" />
+            <span className="text-[10px] font-black uppercase tracking-widest">
+              Tools
+            </span>
+          </button>
           <div className="bg-white border border-slate-200 px-6 py-3 rounded-sm shadow-sm flex items-center">
             <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">
@@ -413,6 +429,9 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Top-level Tools modal — same component used inside ProjectDeepDive */}
+      <AdvancedToolsModal isOpen={showTools} onClose={() => setShowTools(false)} />
 
       {/* Tabs */}
       <div className="flex border-b border-slate-200 mb-10 overflow-x-auto">

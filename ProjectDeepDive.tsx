@@ -1393,7 +1393,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
               className="text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-blue-600 transition-colors flex items-center gap-1 disabled:opacity-50"
               title="Access advanced analysis tools"
             >
-              <Cpu size={12} /> Advanced Tool
+              <Cpu size={12} /> Tools
             </button>
             <button
               onClick={() => setCloseConfirm('cancelled')}
