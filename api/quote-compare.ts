@@ -203,7 +203,7 @@ const JSON_OUTPUT_INSTRUCTION = [
   '  "verdict": "attractive" | "fair" | "expensive" | "unknown",',
   '  "marketLow":  number,    // low end of estimated market unit price, same currency as quote (0 if unknown)',
   '  "marketHigh": number,    // high end of estimated market unit price, same currency (0 if unknown)',
-  '  "reasoning":  string,    // 2-3 sentences with the drivers and benchmarks',
+  '  "reasoning":  string,    // 2-3 sentences MAX (under 400 chars total) — drivers and benchmarks only, no preamble',
   '  "sources":    string[]   // up to 3 grounding URLs (empty array if none)',
   '}',
   '',
@@ -306,9 +306,11 @@ function buildPrompt(input: NormalizedInput): string {
     '   - "expensive"  = quoted unit price is above the high end of the range',
     '   - "unknown"    = you could not anchor a range with reasonable confidence',
     '',
-    '5. PROVIDE 2-3 sentences of reasoning that name the drivers (material, qty,',
-    '   region, lead time) and any benchmarks you found. If you used search results,',
-    '   put up to 3 URLs in the sources array. Do not invent URLs.',
+    '5. PROVIDE 2-3 sentences of reasoning (under 400 characters total — be',
+    '   terse) that name the drivers (material, qty, region, lead time) and any',
+    '   benchmarks you found. No preamble like "Based on my search…". If you',
+    '   used search results, put up to 3 URLs in the sources array. Do not',
+    '   invent URLs.',
     '',
     '6. If the description is too vague to anchor a range (e.g. just "custom part")',
     '   set verdict="unknown", marketLow=0, marketHigh=0, and use reasoning to tell',
@@ -505,7 +507,11 @@ export default async function handler(req: ReqLike, res: ResLike) {
       contents: [{ role: 'user', parts: [{ text: usedPrompt }] }],
       generationConfig: {
         temperature: 0.2,
-        maxOutputTokens: 4096
+        // Grounded responses for pricing burn a lot of tokens during the
+        // search/reasoning phase before the JSON ever lands. 4096 was tight
+        // enough that real queries hit MAX_TOKENS mid-JSON. 8192 gives plenty
+        // of headroom for the search trace + a 2-3 sentence answer.
+        maxOutputTokens: 8192
       }
     };
     if (useGrounding) {
