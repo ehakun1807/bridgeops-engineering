@@ -259,6 +259,36 @@ function extractJsonObject(raw: string): string {
 
 function buildPrompt(input: NormalizedInput): string {
   const totalPrice = input.unitPrice * input.quantity;
+  const attachments = input.attachments || [];
+  const inlineCount = attachments.filter((a) => a.kind === 'inline').length;
+  const textAtts = attachments.filter(
+    (a): a is TextAttachment => a.kind === 'text'
+  );
+
+  const attachmentsBlock =
+    attachments.length === 0
+      ? ''
+      : [
+          '',
+          'ATTACHMENTS — the buyer uploaded supplementary files for context.',
+          inlineCount > 0
+            ? `${inlineCount} binary file(s) (PDF / image) are attached as multimodal inline_data — read them directly: they may include the original supplier quote, drawings, photos of the part, or PCB renderings. Pull pricing, materials, dimensions, finishes, and quantities from those files when available, and prefer numbers from the attached quote document over the form fields if they conflict.`
+            : '',
+          textAtts.length > 0
+            ? 'The following text/CAD files are inlined below. Use them as context — STEP files give CAD geometry hints (units, axis system, primitive count → complexity), Gerber/drill files describe PCB stackup and feature density, etc.'
+            : '',
+          ...textAtts.map((t) => {
+            return [
+              '',
+              `--- BEGIN ${t.name} (${t.mimeType}) ---`,
+              t.data,
+              `--- END ${t.name} ---`
+            ].join('\n');
+          })
+        ]
+          .filter(Boolean)
+          .join('\n');
+
   const lines = [
     'You are a senior procurement / sourcing engineer with 20 years of experience',
     'pricing custom-manufactured parts and services across Israel, China, the EU,',
@@ -320,6 +350,7 @@ function buildPrompt(input: NormalizedInput): string {
     'quote. If the quote is in ILS, return ILS numbers. If USD, return USD numbers.',
     'Never mix currencies in one response.',
     '',
+    attachmentsBlock,
     'Return ONLY the JSON object specified by the output format.'
   ];
   return lines.filter(Boolean).join('\n');
@@ -339,6 +370,27 @@ interface ResLike {
   json(data: any): ResLike;
 }
 
+interface InlineAttachment {
+  // Kind === 'inline' — sent to Gemini as inline_data (PDF / image).
+  kind: 'inline';
+  name: string;
+  mimeType: string;
+  // base64 (no data: prefix)
+  data: string;
+}
+
+interface TextAttachment {
+  // Kind === 'text' — file content embedded into the prompt as plain text.
+  // Used for STEP, Gerber, drill, csv, etc. — formats Gemini can't read
+  // natively but that are textual and useful for context.
+  kind: 'text';
+  name: string;
+  mimeType: string;
+  data: string;
+}
+
+type Attachment = InlineAttachment | TextAttachment;
+
 interface NormalizedInput {
   category: string;
   description: string;
@@ -348,6 +400,94 @@ interface NormalizedInput {
   region?: string;
   leadTimeDays?: number;
   extraNotes?: string;
+  attachments?: Attachment[];
+}
+
+// Mirrors the client-side cap. Vercel's body limit is ~4.5MB; base64 inflates
+// raw bytes by ~33%, so we keep total raw at 5MB so the JSON stays comfortably
+// under the limit.
+const MAX_FILE_BYTES = 5 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 5 * 1024 * 1024;
+const MAX_TEXT_CHARS = 60_000;
+const ALLOWED_INLINE_MIME = new Set([
+  'application/pdf',
+  'image/png',
+  'image/jpeg',
+  'image/jpg',
+  'image/webp'
+]);
+
+function approxBytesFromBase64(b64: string): number {
+  // base64 length × 0.75 minus padding. Cheap estimate; precise enough for
+  // the size cap we enforce.
+  const padding = b64.endsWith('==') ? 2 : b64.endsWith('=') ? 1 : 0;
+  return Math.floor((b64.length * 3) / 4) - padding;
+}
+
+function normalizeAttachments(raw: unknown): {
+  attachments: Attachment[];
+  errors: string[];
+} {
+  const errors: string[] = [];
+  if (!Array.isArray(raw)) return { attachments: [], errors };
+
+  const result: Attachment[] = [];
+  let totalBytes = 0;
+
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const a = item as Record<string, unknown>;
+    const name = typeof a.name === 'string' ? a.name.slice(0, 200) : '';
+    const kind = a.kind;
+    const mimeType =
+      typeof a.mimeType === 'string' ? a.mimeType.toLowerCase() : '';
+    const data = typeof a.data === 'string' ? a.data : '';
+    if (!name || !data) {
+      errors.push(`attachment missing name or data`);
+      continue;
+    }
+
+    if (kind === 'inline') {
+      if (!ALLOWED_INLINE_MIME.has(mimeType)) {
+        errors.push(`${name}: mime ${mimeType} not allowed for inline`);
+        continue;
+      }
+      const bytes = approxBytesFromBase64(data);
+      if (bytes > MAX_FILE_BYTES) {
+        errors.push(`${name}: exceeds per-file limit`);
+        continue;
+      }
+      if (totalBytes + bytes > MAX_TOTAL_BYTES) {
+        errors.push(`${name}: would exceed total cap`);
+        continue;
+      }
+      totalBytes += bytes;
+      result.push({ kind: 'inline', name, mimeType, data });
+    } else if (kind === 'text') {
+      // Hard-cap text length to bound prompt size regardless of what the
+      // client sent — the client already truncates, but we don't trust it.
+      const text =
+        data.length > MAX_TEXT_CHARS
+          ? data.slice(0, MAX_TEXT_CHARS) +
+            `\n\n[TRUNCATED — sent first ${MAX_TEXT_CHARS} chars]`
+          : data;
+      const bytes = Buffer.byteLength(text, 'utf8');
+      if (bytes > MAX_FILE_BYTES) {
+        errors.push(`${name}: exceeds per-file limit`);
+        continue;
+      }
+      if (totalBytes + bytes > MAX_TOTAL_BYTES) {
+        errors.push(`${name}: would exceed total cap`);
+        continue;
+      }
+      totalBytes += bytes;
+      result.push({ kind: 'text', name, mimeType: mimeType || 'text/plain', data: text });
+    } else {
+      errors.push(`${name}: unknown kind`);
+    }
+  }
+
+  return { attachments: result, errors };
 }
 
 interface ApiResponse {
@@ -435,6 +575,12 @@ export default async function handler(req: ReqLike, res: ResLike) {
   const extraNotes =
     typeof body?.extraNotes === 'string' ? body.extraNotes.trim() : undefined;
 
+  const attachmentResult = normalizeAttachments(body?.attachments);
+  if (attachmentResult.errors.length > 0) {
+    console.warn('quote-compare attachment validation:', attachmentResult.errors);
+  }
+  const attachments = attachmentResult.attachments;
+
   if (!category || !description) {
     return res.status(400).json(
       EMPTY_RESPONSE({
@@ -468,11 +614,15 @@ export default async function handler(req: ReqLike, res: ResLike) {
     currency: currencyRaw,
     region,
     leadTimeDays,
-    extraNotes
+    extraNotes,
+    attachments: attachments.length > 0 ? attachments : undefined
   };
 
+  // Skip cache when attachments are present — different files = different
+  // context, and our cache key doesn't (and shouldn't) hash file content.
+  // The whole point of attaching a file is for THIS run's analysis.
   const key = cacheKey(input);
-  const cached = cacheGet(key);
+  const cached = attachments.length === 0 ? cacheGet(key) : null;
   if (cached) {
     return res.status(200).json({ ...cached, cached: true } as ApiResponse);
   }
@@ -503,8 +653,20 @@ export default async function handler(req: ReqLike, res: ResLike) {
     const usedPrompt = useGrounding
       ? `${prompt}\n\n${JSON_OUTPUT_INSTRUCTION}`
       : prompt;
+    // Build the parts array: text prompt first, then any binary attachments
+    // as inline_data so Gemini reads them multimodally. Text-class
+    // attachments are already folded into the prompt by buildPrompt(), so
+    // they don't appear here as separate parts.
+    const parts: any[] = [{ text: usedPrompt }];
+    for (const att of input.attachments || []) {
+      if (att.kind === 'inline') {
+        parts.push({
+          inline_data: { mime_type: att.mimeType, data: att.data }
+        });
+      }
+    }
     const requestBody: any = {
-      contents: [{ role: 'user', parts: [{ text: usedPrompt }] }],
+      contents: [{ role: 'user', parts }],
       generationConfig: {
         temperature: 0.2,
         // Grounded responses for pricing burn a lot of tokens during the
@@ -696,9 +858,15 @@ export default async function handler(req: ReqLike, res: ResLike) {
     cached: false
   };
 
-  const { cached: _ignoredCached, error: _ignoredError, ...payloadForCache } =
-    responseBody;
-  cacheSet(key, payloadForCache);
+  // Only cache attachment-free runs. The cache key doesn't (and shouldn't)
+  // hash file content, so caching with attachments would risk reusing one
+  // file's analysis for a later identical-form-field run that has different
+  // files attached. The form-only flow is the cacheable path.
+  if (attachments.length === 0) {
+    const { cached: _ignoredCached, error: _ignoredError, ...payloadForCache } =
+      responseBody;
+    cacheSet(key, payloadForCache);
+  }
 
   return res.status(200).json(responseBody);
 }

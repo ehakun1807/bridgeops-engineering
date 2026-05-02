@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   Loader2,
   Sparkles,
@@ -6,7 +6,13 @@ import {
   AlertTriangle,
   TrendingUp,
   TrendingDown,
-  HelpCircle
+  HelpCircle,
+  Upload,
+  Paperclip,
+  X,
+  FileText,
+  FileImage,
+  FileCode2
 } from 'lucide-react';
 import { auth } from './firebase.ts';
 
@@ -14,6 +20,96 @@ interface QuoteCompareToolProps {}
 
 type Verdict = 'attractive' | 'fair' | 'expensive' | 'unknown';
 type PriceMode = 'unit' | 'total';
+
+// Attachment types — must match the server's expected shape in
+// /api/quote-compare. `inline` files are base64-encoded binaries that go
+// to Gemini as inline_data parts (PDFs, images). `text` files are read as
+// plain text and folded into the prompt (CAD/Gerber/drill text formats).
+type AttachmentKind = 'inline' | 'text';
+
+interface PreparedAttachment {
+  id: string;
+  name: string;
+  size: number;
+  kind: AttachmentKind;
+  mimeType: string;
+  // For inline: raw base64 (no data: prefix). For text: the file's text.
+  data: string;
+}
+
+// Gemini multimodal supports these binary types directly.
+const INLINE_MIME_TYPES = new Set([
+  'application/pdf',
+  'image/png',
+  'image/jpeg',
+  'image/jpg',
+  'image/webp'
+]);
+
+// Text-class formats we handle by reading content and pasting it into the
+// prompt. Covered: STEP/STP CAD, Gerber + Excellon drill, generic text.
+const TEXT_EXTENSIONS = new Set([
+  '.stp', '.step',
+  '.gbrjob', '.gbr', '.ger',
+  '.gtl', '.gbl', '.gts', '.gbs', '.gto', '.gbo', '.gko',
+  '.drl', '.xln', '.tap', '.nc',
+  '.txt', '.csv', '.tsv', '.json', '.log', '.md'
+]);
+
+// Per-file and total caps. Vercel's serverless body limit is ~4.5MB; base64
+// inflates by ~33%, so 8MB raw total → ~10.7MB JSON which is too big. We
+// keep total raw at 5MB to stay safely under the limit while accommodating
+// a typical quote PDF (~1-2MB) plus a STEP file (~1-3MB).
+const MAX_FILE_BYTES = 5 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 5 * 1024 * 1024;
+// Cap text content per file when included in the prompt — STEP files can
+// be huge but the first ~60KB carries enough header / structure for the
+// model to reason about complexity. Beyond that we'd just burn tokens.
+const MAX_TEXT_CHARS = 60_000;
+
+function getExtension(name: string): string {
+  const idx = name.lastIndexOf('.');
+  return idx >= 0 ? name.slice(idx).toLowerCase() : '';
+}
+
+function attachmentIcon(att: PreparedAttachment): React.ReactNode {
+  if (att.mimeType.startsWith('image/'))
+    return <FileImage size={16} className="text-blue-600" />;
+  if (att.mimeType === 'application/pdf')
+    return <FileText size={16} className="text-red-600" />;
+  if (att.kind === 'text') return <FileCode2 size={16} className="text-emerald-600" />;
+  return <Paperclip size={16} className="text-slate-500" />;
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function readAsText(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error || new Error('read failed'));
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.readAsText(file);
+  });
+}
+
+function readAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error || new Error('read failed'));
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      // readAsDataURL returns "data:<mime>;base64,<data>". Strip the prefix
+      // — server expects pure base64.
+      const comma = result.indexOf(',');
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 interface ApiResponse {
   verdict: Verdict;
@@ -92,6 +188,153 @@ const QuoteCompareTool: React.FC<QuoteCompareToolProps> = () => {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ApiResponse | null>(null);
 
+  // Attachments state
+  const [attachments, setAttachments] = useState<PreparedAttachment[]>([]);
+  const [isReadingFile, setIsReadingFile] = useState<boolean>(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [dragActive, setDragActive] = useState<boolean>(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const totalAttachedBytes = useMemo(
+    () => attachments.reduce((sum, a) => sum + a.size, 0),
+    [attachments]
+  );
+
+  // Process a list of files dropped/picked. Skips unsupported types with a
+  // visible reason, and short-circuits if any single file or the running
+  // total exceeds the size cap so the user gets a clear error before we
+  // burn time reading.
+  const handleFiles = async (files: FileList | File[]) => {
+    setUploadError(null);
+    setIsReadingFile(true);
+
+    const incoming = Array.from(files);
+    const skipped: string[] = [];
+    let runningTotal = totalAttachedBytes;
+
+    const newOnes: PreparedAttachment[] = [];
+
+    for (const file of incoming) {
+      const ext = getExtension(file.name);
+      const mime = (file.type || '').toLowerCase();
+
+      // ZIP not yet supported — surface a specific message instead of a
+      // generic "unsupported" so the user knows the recipe.
+      if (
+        ext === '.zip' ||
+        mime === 'application/zip' ||
+        mime === 'application/x-zip-compressed'
+      ) {
+        skipped.push(
+          `${file.name}: ZIP not yet supported — extract and upload individual files`
+        );
+        continue;
+      }
+
+      let kind: AttachmentKind | null = null;
+      let mimeForRequest = mime;
+      if (INLINE_MIME_TYPES.has(mime)) {
+        kind = 'inline';
+      } else if (TEXT_EXTENSIONS.has(ext)) {
+        kind = 'text';
+        mimeForRequest = 'text/plain';
+      } else if (mime.startsWith('image/')) {
+        // Image variants we don't list explicitly (gif/heic/etc) — Gemini
+        // tolerates png/jpeg/webp. Reject others up front.
+        skipped.push(
+          `${file.name}: image type ${mime} not supported — use PNG, JPEG, or WEBP`
+        );
+        continue;
+      } else {
+        skipped.push(
+          `${file.name}: unsupported type — use PDF, image, or text/CAD format`
+        );
+        continue;
+      }
+
+      if (file.size > MAX_FILE_BYTES) {
+        skipped.push(
+          `${file.name}: ${formatFileSize(file.size)} exceeds per-file limit ${formatFileSize(MAX_FILE_BYTES)}`
+        );
+        continue;
+      }
+      if (runningTotal + file.size > MAX_TOTAL_BYTES) {
+        skipped.push(
+          `${file.name}: would exceed total ${formatFileSize(MAX_TOTAL_BYTES)} cap`
+        );
+        continue;
+      }
+
+      try {
+        let data: string;
+        if (kind === 'inline') {
+          data = await readAsBase64(file);
+        } else {
+          const text = await readAsText(file);
+          // Truncate very large text files; STEP/Gerber easily exceed token
+          // budgets if we send them whole.
+          data =
+            text.length > MAX_TEXT_CHARS
+              ? text.slice(0, MAX_TEXT_CHARS) +
+                `\n\n[TRUNCATED — file is ${text.length} chars, sent first ${MAX_TEXT_CHARS}]`
+              : text;
+        }
+        const id = `${file.name}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        newOnes.push({
+          id,
+          name: file.name,
+          size: file.size,
+          kind,
+          mimeType: mimeForRequest || 'application/octet-stream',
+          data
+        });
+        runningTotal += file.size;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        skipped.push(`${file.name}: ${msg}`);
+      }
+    }
+
+    if (newOnes.length > 0) {
+      setAttachments((prev) => [...prev, ...newOnes]);
+    }
+    if (skipped.length > 0) {
+      setUploadError(skipped.join('\n'));
+    }
+    setIsReadingFile(false);
+  };
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.currentTarget.files && e.currentTarget.files.length > 0) {
+      void handleFiles(e.currentTarget.files);
+    }
+    // Allow re-uploading the same file by clearing the input value.
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleDrag = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true);
+    } else if (e.type === 'dragleave') {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      void handleFiles(e.dataTransfer.files);
+    }
+  };
+
+  const removeAttachment = (id: string) => {
+    setAttachments((prev) => prev.filter((a) => a.id !== id));
+  };
+
   // Derived: per-unit price when user gave a total, validated.
   const unitPriceComputed = useMemo<number | null>(() => {
     const qty = Number(quantity);
@@ -142,6 +385,17 @@ const QuoteCompareTool: React.FC<QuoteCompareToolProps> = () => {
     const leadNum = Number(leadTimeDays);
     if (Number.isFinite(leadNum) && leadNum > 0) payload.leadTimeDays = leadNum;
     if (extraNotes.trim()) payload.extraNotes = extraNotes.trim();
+
+    if (attachments.length > 0) {
+      // Wire attachments through to the API. The server validates again —
+      // this is convenience-shaping only, not a security boundary.
+      payload.attachments = attachments.map((a) => ({
+        name: a.name,
+        kind: a.kind,
+        mimeType: a.mimeType,
+        data: a.data
+      }));
+    }
 
     setIsLoading(true);
     try {
@@ -437,6 +691,92 @@ const QuoteCompareTool: React.FC<QuoteCompareToolProps> = () => {
             className="w-full border border-slate-300 rounded px-3 py-2 text-[13px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
           />
         </div>
+      </div>
+
+      {/* Attachments — optional supplementary context for the model */}
+      <div className="mt-6">
+        <div className="flex items-center justify-between mb-2">
+          <label className="block text-[11px] font-black uppercase tracking-widest text-slate-700">
+            Attachments (optional)
+          </label>
+          <span className="text-[10px] uppercase tracking-widest text-slate-400">
+            {formatFileSize(totalAttachedBytes)} / {formatFileSize(MAX_TOTAL_BYTES)}
+          </span>
+        </div>
+        <div
+          onDragEnter={handleDrag}
+          onDragLeave={handleDrag}
+          onDragOver={handleDrag}
+          onDrop={handleDrop}
+          onClick={() => fileInputRef.current?.click()}
+          className={`border-2 border-dashed rounded-lg p-4 text-center transition-all cursor-pointer ${
+            dragActive
+              ? 'border-blue-400 bg-blue-50'
+              : 'border-slate-300 hover:border-slate-400 bg-slate-50'
+          }`}
+        >
+          <Upload
+            size={20}
+            className={`mx-auto mb-1 ${dragActive ? 'text-blue-600' : 'text-slate-400'}`}
+          />
+          <p className="text-[12px] text-slate-700">
+            {isReadingFile
+              ? 'Reading file…'
+              : 'Drop quote PDF, photos, STEP, or Gerber files — or click to browse'}
+          </p>
+          <p className="text-[10px] text-slate-400 mt-1">
+            PDF · PNG/JPG/WEBP · STEP · GBR/GTL/GBL/etc · DRL · TXT/CSV · max{' '}
+            {formatFileSize(MAX_FILE_BYTES)} per file
+          </p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            onChange={handleFileInput}
+            className="hidden"
+            aria-label="Attach files for context"
+            // We deliberately don't set `accept` — extension/MIME is varied
+            // (Gerbers don't have standard MIMEs) and an over-restrictive
+            // accept list silently hides files the user is trying to pick.
+            // We validate types after selection in handleFiles().
+          />
+        </div>
+
+        {/* Per-file errors / skips from the last batch */}
+        {uploadError && (
+          <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-[11px] text-amber-800 whitespace-pre-line">
+            {uploadError}
+          </div>
+        )}
+
+        {/* Selected file chips */}
+        {attachments.length > 0 && (
+          <ul className="mt-3 space-y-1.5">
+            {attachments.map((att) => (
+              <li
+                key={att.id}
+                className="flex items-center gap-2 px-2.5 py-1.5 bg-white border border-slate-200 rounded text-[12px]"
+              >
+                {attachmentIcon(att)}
+                <span className="flex-1 min-w-0 truncate text-slate-800">
+                  {att.name}
+                </span>
+                <span className="text-[10px] uppercase tracking-widest text-slate-400 whitespace-nowrap">
+                  {att.kind === 'inline' ? 'binary' : 'text'} ·{' '}
+                  {formatFileSize(att.size)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removeAttachment(att.id)}
+                  className="p-0.5 hover:bg-slate-100 rounded"
+                  aria-label={`Remove ${att.name}`}
+                >
+                  <X size={14} className="text-slate-500" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {/* Submit button */}
