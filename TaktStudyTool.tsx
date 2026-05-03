@@ -802,17 +802,87 @@ const StudyForm: React.FC<StudyFormProps> = ({ initial, onCancel, onSave, readOn
             onChange={setDemand}
             disabled={formLocked}
           />
-          <div className="bg-slate-900 text-white px-3 py-3">
-            <p className="text-[9px] font-black uppercase tracking-widest text-white/60 mb-1">
-              Takt time
-            </p>
-            <p className="text-xl font-black tabular-nums leading-none">
-              {formatSeconds(taktSec)}
-            </p>
-            <p className="text-[10px] text-white/60 mt-1">
-              {taktSec > 0 ? `${taktSec.toFixed(1)} sec/unit` : 'Set inputs above'}
-            </p>
-          </div>
+          {(() => {
+            // Live takt panel — adapts as steps come in. Without steps it
+            // shows takt only (the demand drumbeat is independent of how you
+            // build the part). Once steps exist, surfaces capacity verdict +
+            // headroom so the observer sees the gap forming live, not just
+            // after Complete. Bottleneck stays on the Steps header so the
+            // two readouts sit close together visually.
+            const verdict = capacityVerdict(bottleneckStandardSec, taktSec);
+            const hasSteps = steps.length > 0 && bottleneckStandardSec > 0;
+            const headroomPct =
+              hasSteps && taktSec > 0
+                ? Math.round((1 - bottleneckStandardSec / taktSec) * 1000) / 10
+                : null;
+            // Verdict band tints the top of the panel; the body stays
+            // slate-900 to preserve brand identity. Yellow = neutral, used
+            // when there's no signal yet so the panel doesn't scream green.
+            const bandColor =
+              !hasSteps || taktSec <= 0
+                ? 'bg-slate-700'
+                : verdict === 'green'
+                  ? 'bg-emerald-600'
+                  : verdict === 'yellow'
+                    ? 'bg-amber-500'
+                    : 'bg-red-600';
+            const verdictLabel =
+              !hasSteps || taktSec <= 0
+                ? 'Awaiting steps'
+                : verdict === 'green'
+                  ? 'Capacity OK'
+                  : verdict === 'yellow'
+                    ? 'Tight'
+                    : 'Capacity short';
+            return (
+              <div className="bg-slate-900 text-white overflow-hidden">
+                <div
+                  className={`${bandColor} px-3 py-1 transition-colors flex items-center justify-between`}
+                >
+                  <span className="text-[9px] font-black uppercase tracking-widest text-white">
+                    Takt time
+                  </span>
+                  <span className="text-[9px] font-black uppercase tracking-widest text-white/90">
+                    {verdictLabel}
+                  </span>
+                </div>
+                <div className="px-3 py-2.5 space-y-1">
+                  <p className="text-xl font-black tabular-nums leading-none">
+                    {formatSeconds(taktSec)}
+                  </p>
+                  <p className="text-[10px] text-white/60">
+                    {taktSec > 0
+                      ? `${taktSec.toFixed(1)} sec/unit`
+                      : 'Set inputs above'}
+                  </p>
+                  {hasSteps && taktSec > 0 && (
+                    <div className="pt-2 mt-2 border-t border-white/15 space-y-0.5">
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="text-white/70">Bottleneck</span>
+                        <span className="font-bold tabular-nums">
+                          {formatSeconds(bottleneckStandardSec)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="text-white/70">Headroom</span>
+                        <span
+                          className={`font-bold tabular-nums ${
+                            headroomPct !== null && headroomPct < 0
+                              ? 'text-red-300'
+                              : ''
+                          }`}
+                        >
+                          {headroomPct !== null
+                            ? `${headroomPct > 0 ? '+' : ''}${headroomPct.toFixed(1)}%`
+                            : '—'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
 
