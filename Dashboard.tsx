@@ -129,7 +129,7 @@ const Dashboard: React.FC = () => {
   // This keeps the dropdown stateful while still supporting niche industries
   // that aren't in the canonical list.
   const [showAddProject, setShowAddProject] = useState(false);
-  // Top-level Tools modal — surfaces AltBOM / Quote Compare without
+  // Top-level Tools modal — surfaces Alt BOM / Quote Compare without
   // needing to dive into a project first. Same modal as the per-project
   // entry in ProjectDeepDive's footer.
   const [showTools, setShowTools] = useState(false);
@@ -414,7 +414,7 @@ const Dashboard: React.FC = () => {
           <button
             onClick={() => setShowTools(true)}
             className="bg-white border border-slate-200 text-slate-900 px-6 py-3 rounded-sm shadow-sm flex items-center hover:border-slate-900 hover:text-blue-600 transition-all"
-            title="AltBOM, Quote Compare, and other utilities"
+            title="Alt BOM, Quote Compare, and other utilities"
           >
             <Wrench size={16} className="mr-2" />
             <span className="text-[10px] font-black uppercase tracking-widest">

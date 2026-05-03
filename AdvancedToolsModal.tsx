@@ -32,7 +32,7 @@ const AdvancedToolsModal: React.FC<AdvancedToolsModalProps> = ({ isOpen, onClose
             )}
             <h2 style={{ fontSize: '20px', fontWeight: 900, textTransform: 'uppercase', margin: 0, color: '#0f172a' }}>
               {selectedTool === 'bom-analyzer'
-                ? 'AltBOM'
+                ? 'Alt BOM'
                 : selectedTool === 'quote-compare'
                   ? 'Quote Compare'
                   : 'Tools'}
@@ -59,7 +59,7 @@ const AdvancedToolsModal: React.FC<AdvancedToolsModalProps> = ({ isOpen, onClose
             >
               <Cpu size={48} color="#64748b" />
               <div>
-                <h3 style={{ fontSize: '14px', fontWeight: 900, textTransform: 'uppercase', margin: 0, marginBottom: '4px', color: '#0f172a' }}>AltBOM</h3>
+                <h3 style={{ fontSize: '14px', fontWeight: 900, textTransform: 'uppercase', margin: 0, marginBottom: '4px', color: '#0f172a' }}>Alt BOM</h3>
                 <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>Find a qualified second-source alternate for every line on your BOM</p>
               </div>
             </div>
