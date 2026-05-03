@@ -1453,8 +1453,11 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
         currentGate={currentGate || null}
       />
 
-      {/* Tab strip — general-info + 4 parameter buckets + AI analysis + studies + history */}
-      <div className="mb-6 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2">
+      {/* Primary tab strip — General Info + the 4 score buckets. These are
+          where the user actually does work, so they get the full card chrome
+          and live % readouts. Utility tabs (AI Analysis / Studies / History)
+          live in the secondary strip below. */}
+      <div className="mb-2 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
         {/* General Info tab — always first */}
         {(() => {
           const isActive = activeGroupId === GENERAL_INFO_TAB_ID;
@@ -1540,127 +1543,69 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
           );
         })}
 
-        {/* AI Analysis tab — secondary/utility style (analysis tool, not a score bucket) */}
-        {(() => {
-          const isActive = activeGroupId === AI_ANALYSIS_TAB_ID;
-          return (
-            <button
-              key={AI_ANALYSIS_TAB_ID}
-              type="button"
-              onClick={() => setActiveGroupId(AI_ANALYSIS_TAB_ID)}
-              aria-pressed={isActive}
-              className={`relative text-left px-4 py-4 border-2 transition-all overflow-hidden ${
-                isActive
-                  ? 'bg-gradient-to-r from-slate-900 to-blue-950 text-white border-transparent shadow-xl'
-                  : 'bg-transparent text-slate-500 border-dashed border-slate-300 hover:bg-white hover:text-slate-700 hover:border-slate-400'
-              }`}
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <Sparkles
-                  size={14}
-                  className={isActive ? 'text-blue-300' : 'text-blue-400'}
-                />
-                <h4
-                  className={`text-[11px] font-black uppercase tracking-tight leading-tight truncate ${
-                    isActive ? 'text-white' : 'text-slate-600'
-                  }`}
-                >
-                  AI Analysis
-                </h4>
-              </div>
-              {isActive && (
-                <motion.span
-                  layoutId="deepdive-tab-underline"
-                  className="absolute bottom-0 left-0 right-0 h-[3px] bg-white/80"
-                />
-              )}
-            </button>
-          );
-        })()}
+      </div>
 
-        {/* Studies tab — secondary/utility style (time-study workspace, not a score bucket) */}
+      {/* Secondary strip — utility tabs (views over the work, not the work
+          itself). Lighter chrome, smaller pill buttons, separate underline
+          indicator so the active highlight doesn't morph between primary
+          and secondary rows when switching context. */}
+      <div className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-1 border-b border-slate-200 px-1">
         {(() => {
-          const isActive = activeGroupId === STUDIES_TAB_ID;
-          return (
-            <button
-              key={STUDIES_TAB_ID}
-              type="button"
-              onClick={() => setActiveGroupId(STUDIES_TAB_ID)}
-              aria-pressed={isActive}
-              className={`relative text-left px-4 py-4 border-2 transition-all overflow-hidden ${
-                isActive
-                  ? 'bg-slate-900 text-white border-transparent shadow-xl'
-                  : 'bg-transparent text-slate-500 border-dashed border-slate-300 hover:bg-white hover:text-slate-700 hover:border-slate-400'
-              }`}
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <Timer
-                  size={14}
-                  className={isActive ? 'text-white' : 'text-slate-400'}
+          const utilityTabs: Array<{
+            id: string;
+            label: string;
+            icon: React.ComponentType<{ size?: number; className?: string }>;
+            iconActiveClass: string;
+            count?: number;
+          }> = [
+            { id: AI_ANALYSIS_TAB_ID, label: 'AI Analysis', icon: Sparkles, iconActiveClass: 'text-blue-600' },
+            { id: STUDIES_TAB_ID, label: 'Studies', icon: Timer, iconActiveClass: 'text-emerald-600' },
+            {
+              id: HISTORY_TAB_ID,
+              label: 'History',
+              icon: LineChartIcon,
+              iconActiveClass: 'text-slate-900',
+              count: scoreHistory.length || undefined
+            }
+          ];
+          return utilityTabs.map((tab) => {
+            const isActive = activeGroupId === tab.id;
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveGroupId(tab.id)}
+                aria-pressed={isActive}
+                className={`relative flex items-center gap-1.5 px-1 py-2 text-[11px] font-black uppercase tracking-widest transition-colors ${
+                  isActive
+                    ? 'text-slate-900'
+                    : 'text-slate-400 hover:text-slate-700'
+                }`}
+              >
+                <Icon
+                  size={12}
+                  className={isActive ? tab.iconActiveClass : 'text-slate-400'}
                 />
-                <h4
-                  className={`text-[11px] font-black uppercase tracking-tight leading-tight truncate ${
-                    isActive ? 'text-white' : 'text-slate-600'
-                  }`}
-                >
-                  Studies
-                </h4>
-              </div>
-              {isActive && (
-                <motion.span
-                  layoutId="deepdive-tab-underline"
-                  className="absolute bottom-0 left-0 right-0 h-[3px] bg-white/80"
-                />
-              )}
-            </button>
-          );
-        })()}
-
-        {/* History tab — secondary/utility style (derived view, not a score bucket) */}
-        {(() => {
-          const isActive = activeGroupId === HISTORY_TAB_ID;
-          return (
-            <button
-              key={HISTORY_TAB_ID}
-              type="button"
-              onClick={() => setActiveGroupId(HISTORY_TAB_ID)}
-              aria-pressed={isActive}
-              className={`relative text-left px-4 py-4 border-2 transition-all overflow-hidden ${
-                isActive
-                  ? 'bg-slate-900 text-white border-transparent shadow-xl'
-                  : 'bg-transparent text-slate-500 border-dashed border-slate-300 hover:bg-white hover:text-slate-700 hover:border-slate-400'
-              }`}
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <LineChartIcon
-                  size={14}
-                  className={isActive ? 'text-white' : 'text-slate-400'}
-                />
-                <h4
-                  className={`text-[11px] font-black uppercase tracking-tight leading-tight truncate ${
-                    isActive ? 'text-white' : 'text-slate-600'
-                  }`}
-                >
-                  History
-                </h4>
-                {scoreHistory.length > 0 && (
+                {tab.label}
+                {tab.count !== undefined && (
                   <span
-                    className={`ml-auto text-[10px] font-black tabular-nums ${
-                      isActive ? 'text-white/80' : 'text-slate-400'
+                    className={`ml-0.5 text-[10px] tabular-nums ${
+                      isActive ? 'text-slate-500' : 'text-slate-300'
                     }`}
                   >
-                    {scoreHistory.length}
+                    ({tab.count})
                   </span>
                 )}
-              </div>
-              {isActive && (
-                <motion.span
-                  layoutId="deepdive-tab-underline"
-                  className="absolute bottom-0 left-0 right-0 h-[3px] bg-white/80"
-                />
-              )}
-            </button>
-          );
+                {isActive && (
+                  <motion.span
+                    layoutId="deepdive-utility-underline"
+                    className="absolute -bottom-px left-0 right-0 h-[2px] bg-slate-900"
+                  />
+                )}
+              </button>
+            );
+          });
         })()}
       </div>
 
