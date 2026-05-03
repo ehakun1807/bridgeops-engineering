@@ -168,10 +168,12 @@ export interface ValidationOpts {
   cvThreshold?: number;       // CV above this is a warning — default 0.25
 }
 
-// Returns the list of validation gaps that prevent (or merely warn against)
-// marking the study completed. Empty list (or list with only warnings) =
-// pass. Caller decides whether to block on warns; current UI only blocks
-// on level === 'block'.
+// Returns the list of validation gaps surfaced when the user clicks
+// Complete. All gaps are advisory — the UI never blocks completion based
+// on observation count or missing inputs (the user explicitly asked to
+// allow Complete after a single cycle). 'block' is reserved for a future
+// hard-stop condition we don't have yet; current callers can still check
+// blockingGaps() and find it empty under normal use.
 export function validateStudyForCompletion(
   steps: ValidationStep[],
   taktSec: number,
@@ -184,15 +186,17 @@ export function validateStudyForCompletion(
 
   if (taktSec <= 0) {
     gaps.push({
-      level: 'block',
-      message: 'Set shift, breaks, and demand so a takt time can be calculated.'
+      level: 'warn',
+      message:
+        'Takt inputs are blank — capacity verdict will read "yellow / not enough info" until shift, breaks, and demand are set.'
     });
   }
 
   if (!steps || steps.length === 0) {
     gaps.push({
-      level: 'block',
-      message: 'Add at least one assembly step before completing.'
+      level: 'warn',
+      message:
+        'No assembly steps captured — completing now records the takt inputs only.'
     });
     return gaps;
   }
@@ -201,8 +205,8 @@ export function validateStudyForCompletion(
     const label = (s.name && s.name.trim()) || `Step ${i + 1}`;
     if (s.observations.length < minObs) {
       gaps.push({
-        level: 'block',
-        message: `${label}: needs ≥ ${minObs} cycle observations (currently ${s.observations.length}).`
+        level: 'warn',
+        message: `${label}: only ${s.observations.length} cycle${s.observations.length === 1 ? '' : 's'} — ≥ ${minObs} recommended for a defensible mean.`
       });
     } else if (s.observations.length < warnObs) {
       gaps.push({

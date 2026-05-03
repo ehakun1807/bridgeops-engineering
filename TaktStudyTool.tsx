@@ -888,7 +888,7 @@ const StudyForm: React.FC<StudyFormProps> = ({ initial, onCancel, onSave, readOn
       {/* Validation gaps banner — shown after a Complete attempt. Block-level
           gaps prevent the lock; warnings are advisory and don't block but
           remain visible until the next Complete pass. */}
-      {gaps.length > 0 && status !== 'completed' && (
+      {gaps.length > 0 && status !== 'completed' && blockingGaps(gaps).length > 0 && (
         <div className="space-y-1 border border-amber-200 bg-amber-50 px-3 py-3">
           <p className="text-[10px] font-black uppercase tracking-widest text-amber-900 mb-1 flex items-center gap-1.5">
             <AlertTriangle size={12} /> Cannot complete yet — fix the issues

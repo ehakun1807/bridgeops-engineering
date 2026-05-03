@@ -246,22 +246,38 @@ describe('taktMath', () => {
       observations: Array.from({ length: n }, () => 10) // CV = 0
     });
 
-    it('blocks when takt is 0', () => {
+    // After the "allow Complete after 1 run" change: nothing in this validator
+    // returns a 'block' anymore. Everything is advisory so the user can finish
+    // the study and get a verdict, even with sparse data.
+    it('warns (not blocks) when takt is 0', () => {
       const gaps = validateStudyForCompletion([tightStep(10)], 0);
-      expect(gaps.some((g) => g.level === 'block' && /takt/i.test(g.message))).toBe(true);
+      expect(blockingGaps(gaps).length).toBe(0);
+      expect(gaps.some((g) => g.level === 'warn' && /takt/i.test(g.message))).toBe(true);
     });
 
-    it('blocks when there are no steps', () => {
+    it('warns (not blocks) when there are no steps', () => {
       const gaps = validateStudyForCompletion([], 100);
-      expect(gaps.some((g) => g.level === 'block' && /step/i.test(g.message))).toBe(true);
+      expect(blockingGaps(gaps).length).toBe(0);
+      expect(gaps.some((g) => g.level === 'warn' && /step/i.test(g.message))).toBe(true);
     });
 
-    it('blocks when a step has < min observations', () => {
+    it('warns (not blocks) when a step has < min observations', () => {
       const gaps = validateStudyForCompletion(
         [{ name: 'Pick part', observations: [10, 10] }],
         100
       );
-      expect(blockingGaps(gaps).length).toBeGreaterThan(0);
+      expect(blockingGaps(gaps).length).toBe(0);
+      expect(gaps.some((g) => g.level === 'warn' && /recommended/i.test(g.message))).toBe(true);
+    });
+
+    it('still warns even with a single observation', () => {
+      const gaps = validateStudyForCompletion(
+        [{ name: 'Pick part', observations: [10] }],
+        100
+      );
+      // 1 cycle should not block but should suggest more.
+      expect(blockingGaps(gaps).length).toBe(0);
+      expect(gaps.some((g) => g.level === 'warn' && /1 cycle/.test(g.message))).toBe(true);
     });
 
     it('warns (does not block) when between min and warn thresholds', () => {
