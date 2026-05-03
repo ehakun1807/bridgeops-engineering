@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { X, Cpu, ArrowLeft, Receipt } from 'lucide-react';
+import { X, Cpu, ArrowLeft, Receipt, FileSearch } from 'lucide-react';
 import BOMAnalyzerTool from './BOMAnalyzerTool.tsx';
 import QuoteCompareTool from './QuoteCompareTool.tsx';
+import DocGuardTool from './DocGuardTool.tsx';
 
 interface AdvancedToolsModalProps {
   isOpen: boolean;
@@ -35,7 +36,9 @@ const AdvancedToolsModal: React.FC<AdvancedToolsModalProps> = ({ isOpen, onClose
                 ? 'Alt BOM'
                 : selectedTool === 'quote-compare'
                   ? 'Quote Compare'
-                  : 'Tools'}
+                  : selectedTool === 'doc-guard'
+                    ? 'DocGuard'
+                    : 'Tools'}
             </h2>
           </div>
           <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '28px', color: '#64748b', padding: 0, lineHeight: 1 }}>
@@ -82,11 +85,32 @@ const AdvancedToolsModal: React.FC<AdvancedToolsModalProps> = ({ isOpen, onClose
                 <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>Benchmark a supplier quote against current market pricing</p>
               </div>
             </div>
+
+            <div
+              onClick={() => setSelectedTool('doc-guard')}
+              style={{ padding: '24px', border: '2px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', marginBottom: '12px', display: 'flex', gap: '16px', alignItems: 'center', transition: 'all 0.2s', backgroundColor: '#fafafa' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = '#0f172a';
+                e.currentTarget.style.backgroundColor = '#f0f0f0';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = '#e2e8f0';
+                e.currentTarget.style.backgroundColor = '#fafafa';
+              }}
+            >
+              <FileSearch size={48} color="#64748b" />
+              <div>
+                <h3 style={{ fontSize: '14px', fontWeight: 900, textTransform: 'uppercase', margin: 0, marginBottom: '4px', color: '#0f172a' }}>DocGuard</h3>
+                <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>Audit a manufacturing PDF for grammar, GMP, assembly logic, and image clarity</p>
+              </div>
+            </div>
           </div>
         ) : selectedTool === 'bom-analyzer' ? (
           <BOMAnalyzerTool />
         ) : selectedTool === 'quote-compare' ? (
           <QuoteCompareTool />
+        ) : selectedTool === 'doc-guard' ? (
+          <DocGuardTool />
         ) : null}
       </div>
     </div>

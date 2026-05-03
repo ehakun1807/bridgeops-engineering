@@ -112,6 +112,23 @@ service cloud.firestore {
              (!('steps' in data) || (data.steps is list && data.steps.size() <= 200));
     }
 
+    // DocGuard audits — one doc per PDF audit run. Project-agnostic for v1
+    // (matches Alt BOM placement in AdvancedToolsModal). Embedded findings
+    // and summary shapes are enforced client-side by docGuardClient
+    // normalizers; same rationale as taktStudies — the embedded model will
+    // evolve and brittle rule-side validation slows iteration.
+    function isValidDocGuardAudit(data) {
+      return data.keys().hasAll(['userId', 'fileName', 'findings', 'summary', 'createdAtMs']) &&
+             data.userId == request.auth.uid &&
+             data.fileName is string && data.fileName.size() > 0 && data.fileName.size() <= 300 &&
+             data.findings is list && data.findings.size() <= 100 &&
+             data.summary is map &&
+             data.createdAtMs is number &&
+             (!('fileSizeBytes' in data) || data.fileSizeBytes is number) &&
+             (!('generatedAtMs' in data) || data.generatedAtMs is number) &&
+             (!('projectId' in data) || data.projectId is string);
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -160,6 +177,16 @@ service cloud.firestore {
       allow list: if isAuthenticated();
       allow create: if isAuthenticated() && isValidTaktStudy(request.resource.data);
       allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidTaktStudy(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    match /docGuardAudits/{auditId} {
+      // Same get + list split — client passes userId filter on list queries.
+      allow get: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidDocGuardAudit(request.resource.data);
+      // Audits are immutable historical records. Edit = re-run.
+      allow update: if false;
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
