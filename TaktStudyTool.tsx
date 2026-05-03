@@ -1307,7 +1307,10 @@ const StepRow: React.FC<StepRowProps> = ({
                 className="w-full border border-slate-200 px-3 py-2 text-sm tabular-nums focus:outline-none focus:border-slate-900 disabled:bg-slate-50"
               />
             </Field>
-            <Field label="Type">
+            <Field
+              label="Type"
+              hint="Lean classification — hover each for examples"
+            >
               <div className="flex border border-slate-200">
                 {(['va', 'nva', 'wait'] as TaktStepVA[]).map((v) => {
                   const isActive = step.vaType === v;
@@ -1317,6 +1320,16 @@ const StepRow: React.FC<StepRowProps> = ({
                       : v === 'nva'
                         ? 'bg-amber-500'
                         : 'bg-slate-400';
+                  // Native title= tooltip. Multi-line via \n renders on most
+                  // browsers; falls back to single-line otherwise. Examples
+                  // are intentionally concrete so a first-time user doesn't
+                  // have to guess what to pick.
+                  const tooltip =
+                    v === 'va'
+                      ? 'Value-Add\nWork the customer pays for — physically transforms the product or gets it closer to done.\nExamples: tightening screws, soldering joints, applying coating, programming firmware.'
+                      : v === 'nva'
+                        ? 'Non-Value-Add\nNecessary work that doesn’t transform the product. Customer wouldn’t pay for it if they had a choice, but you can’t skip it.\nExamples: inspection, moving parts between stations, packaging, paperwork, setup / changeover, deburring.'
+                        : 'Wait / idle\nOperator (or the part) is doing nothing — pure waste.\nExamples: waiting for machine cycle, kit delivery, QC sign-off, material at the station.';
                   return (
                     <button
                       key={v}
@@ -1328,13 +1341,8 @@ const StepRow: React.FC<StepRowProps> = ({
                           ? `${baseColor} text-white`
                           : 'bg-white text-slate-500 hover:bg-slate-100'
                       }`}
-                      title={
-                        v === 'va'
-                          ? 'Value-Add'
-                          : v === 'nva'
-                            ? 'Non-Value-Add'
-                            : 'Wait / idle'
-                      }
+                      title={tooltip}
+                      aria-label={tooltip}
                     >
                       {v.toUpperCase()}
                     </button>
