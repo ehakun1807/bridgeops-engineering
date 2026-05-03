@@ -96,6 +96,22 @@ service cloud.firestore {
              data.status in ['active', 'archived'];
     }
 
+    // Time / takt studies — one doc per study, scoped to a project. Steps
+    // and takt inputs are stored as a list and map respectively; their
+    // internal shape is enforced by the client (validating embedded shapes
+    // here is brittle as the model evolves through Phase 2/3).
+    function isValidTaktStudy(data) {
+      return data.keys().hasAll(['userId', 'projectId', 'status']) &&
+             data.userId == request.auth.uid &&
+             data.projectId is string && data.projectId.size() > 0 &&
+             data.status in ['draft', 'completed'] &&
+             (!('productTitle' in data) || (data.productTitle is string && data.productTitle.size() <= 200)) &&
+             (!('comment' in data) || (data.comment is string && data.comment.size() <= 200)) &&
+             (!('name' in data) || data.name is string) &&
+             (!('takt' in data) || data.takt is map) &&
+             (!('steps' in data) || (data.steps is list && data.steps.size() <= 200));
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -134,6 +150,16 @@ service cloud.firestore {
       allow list: if isAuthenticated();
       allow create: if isAuthenticated() && isValidTask(request.resource.data);
       allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidTask(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    match /taktStudies/{studyId} {
+      // Same get + list split as projects/scores — client-side userId
+      // filter on list queries enforces per-user isolation.
+      allow get: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidTaktStudy(request.resource.data);
+      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidTaktStudy(request.resource.data);
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 

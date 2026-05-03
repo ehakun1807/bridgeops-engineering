@@ -38,7 +38,8 @@ import {
   CheckSquare,
   X,
   FileWarning,
-  RotateCcw
+  RotateCcw,
+  Timer
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db, auth } from './firebase.ts';
@@ -59,6 +60,7 @@ import {
 import { getTemplate, TOTAL_ITEM_COUNT } from './templates';
 import AIAnalysisPanel from './AIAnalysisPanel.tsx';
 import ScoreHistoryPanel from './ScoreHistoryPanel.tsx';
+import TaktStudyTool from './TaktStudyTool.tsx';
 import ScopeEditor from './ScopeEditor.tsx';
 import CoachPanel from './CoachPanel.tsx';
 import StandardsPicker from './StandardsPicker.tsx';
@@ -243,6 +245,21 @@ export interface DeepDiveProject {
   scoreHistory?: ScoreSnapshot[];
   // AI Analysis cache — last Gemini result, so reopens don't re-bill
   aiAnalysis?: AIAnalysis;
+  // Snapshot of the latest completed time-study (Studies tab → Complete).
+  // Mirrored from the taktStudies collection so the project header can
+  // show capacity readiness without an extra read. Drafts never write
+  // here; Reopen/Delete leave it alone (the snapshot is point-in-time).
+  taktSummary?: ProjectTaktSummary;
+}
+
+export interface ProjectTaktSummary {
+  studyId: string;
+  studyName: string;
+  taktSec: number;
+  bottleneckSec: number;
+  balanceLoss: number;       // 0..1 — see lineBalanceLoss in taktMath
+  capacity: 'green' | 'yellow' | 'red';
+  completedAtMs: number;
 }
 
 const NOTE_MAX = 200;
@@ -250,6 +267,7 @@ const GENERAL_INFO_MAX = 400;
 const ATTACHMENT_NAME_MAX = 80;
 const GENERAL_INFO_TAB_ID = '__general_info__';
 const AI_ANALYSIS_TAB_ID = '__ai_analysis__';
+const STUDIES_TAB_ID = '__studies__';
 const HISTORY_TAB_ID = '__history__';
 const INFO_STATUS_OPTIONS: InfoStatus[] = ['TBD', 'In Process', 'Completed', 'Cancelled'];
 const GATE_OPTIONS: ProductGate[] = ['CR', 'PDR', 'CDR', 'TRR', 'PRR', 'MP'];
@@ -1329,6 +1347,23 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
                   {project.closeReason === 'cancelled' ? 'Cancelled' : 'Completed'}
                 </span>
               )}
+              {/* Capacity verdict from the latest completed time-study.
+                  Mirrors project.taktSummary written by TaktStudyTool on
+                  Complete. Hidden until at least one study completes. */}
+              {project.taktSummary && (
+                <span
+                  className={`px-3 py-1 text-white ${
+                    project.taktSummary.capacity === 'green'
+                      ? 'bg-emerald-600'
+                      : project.taktSummary.capacity === 'yellow'
+                        ? 'bg-amber-500'
+                        : 'bg-red-600'
+                  }`}
+                  title={`Last takt study: ${project.taktSummary.studyName} · takt ${project.taktSummary.taktSec.toFixed(1)}s · bottleneck ${project.taktSummary.bottleneckSec.toFixed(1)}s`}
+                >
+                  Capacity {project.taktSummary.capacity.toUpperCase()}
+                </span>
+              )}
             </div>
           </div>
           <div className="md:col-span-4 flex md:justify-end">
@@ -1418,8 +1453,8 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
         currentGate={currentGate || null}
       />
 
-      {/* Tab strip — general-info + 4 parameter buckets + AI analysis + history */}
-      <div className="mb-6 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
+      {/* Tab strip — general-info + 4 parameter buckets + AI analysis + studies + history */}
+      <div className="mb-6 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2">
         {/* General Info tab — always first */}
         {(() => {
           const isActive = activeGroupId === GENERAL_INFO_TAB_ID;
@@ -1543,6 +1578,44 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
           );
         })()}
 
+        {/* Studies tab — secondary/utility style (time-study workspace, not a score bucket) */}
+        {(() => {
+          const isActive = activeGroupId === STUDIES_TAB_ID;
+          return (
+            <button
+              key={STUDIES_TAB_ID}
+              type="button"
+              onClick={() => setActiveGroupId(STUDIES_TAB_ID)}
+              aria-pressed={isActive}
+              className={`relative text-left px-4 py-4 border-2 transition-all overflow-hidden ${
+                isActive
+                  ? 'bg-slate-900 text-white border-transparent shadow-xl'
+                  : 'bg-transparent text-slate-500 border-dashed border-slate-300 hover:bg-white hover:text-slate-700 hover:border-slate-400'
+              }`}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <Timer
+                  size={14}
+                  className={isActive ? 'text-white' : 'text-slate-400'}
+                />
+                <h4
+                  className={`text-[11px] font-black uppercase tracking-tight leading-tight truncate ${
+                    isActive ? 'text-white' : 'text-slate-600'
+                  }`}
+                >
+                  Studies
+                </h4>
+              </div>
+              {isActive && (
+                <motion.span
+                  layoutId="deepdive-tab-underline"
+                  className="absolute bottom-0 left-0 right-0 h-[3px] bg-white/80"
+                />
+              )}
+            </button>
+          );
+        })()}
+
         {/* History tab — secondary/utility style (derived view, not a score bucket) */}
         {(() => {
           const isActive = activeGroupId === HISTORY_TAB_ID;
@@ -1620,6 +1693,20 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
               }}
               cached={aiAnalysis}
               onAnalyzed={persistAiAnalysis}
+              readOnly={readOnly}
+            />
+          </motion.div>
+        ) : activeGroupId === STUDIES_TAB_ID ? (
+          <motion.div
+            key={STUDIES_TAB_ID}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <TaktStudyTool
+              projectId={project.id}
+              productType={productType || project.productType || ''}
               readOnly={readOnly}
             />
           </motion.div>
