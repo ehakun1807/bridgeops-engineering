@@ -19,6 +19,7 @@ import {
   doc,
   serverTimestamp
 } from 'firebase/firestore';
+import { upload } from '@vercel/blob/client';
 import { auth, db } from './firebase.ts';
 import type {
   Finding,
@@ -41,35 +42,47 @@ export interface SavedAudit extends AuditResponse {
   createdAtMs: number; // mirror of serverTimestamp for sorting before snapshot resolves
 }
 
-/** Convert a File to base64 (no data: prefix). */
-export function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(reader.error);
-    reader.onload = () => {
-      const result = reader.result as string;
-      // Strip "data:application/pdf;base64," prefix.
-      const idx = result.indexOf('base64,');
-      resolve(idx >= 0 ? result.slice(idx + 7) : result);
-    };
-    reader.readAsDataURL(file);
-  });
-}
-
-/** Audit a PDF via the serverless function. */
+/**
+ * Audit a PDF via the serverless function.
+ *
+ * Two-hop upload:
+ *   1. Upload the PDF directly to Vercel Blob (bypasses the 4.5MB Vercel
+ *      function body limit). The token is issued by /api/docguard-upload-token,
+ *      which checks our admin auth.
+ *   2. Send only the Blob URL to /api/docguard, which fetches it server-side,
+ *      forwards to Gemini, and deletes the blob when it's done.
+ */
 export async function auditPdf(file: File): Promise<AuditResponse> {
   const user = auth.currentUser;
   if (!user) throw new Error('Not signed in.');
   const idToken = await user.getIdToken(false);
-  const pdfBase64 = await fileToBase64(file);
 
+  // Step 1 — direct browser-to-Blob upload. The @vercel/blob/client `upload`
+  // helper POSTs to our token route first, then PUTs the file to Blob.
+  let blob: { url: string };
+  try {
+    blob = await upload(file.name, file, {
+      access: 'public',
+      handleUploadUrl: '/api/docguard-upload-token',
+      contentType: 'application/pdf',
+      // Forward the Firebase ID token so the token route can verify our
+      // admin gate before issuing an upload token.
+      clientPayload: idToken
+    });
+  } catch (err) {
+    throw new Error(
+      `Upload failed: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+
+  // Step 2 — kick off the audit against the uploaded blob.
   const res = await fetch('/api/docguard', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${idToken}`
     },
-    body: JSON.stringify({ pdfBase64, fileName: file.name })
+    body: JSON.stringify({ blobUrl: blob.url, fileName: file.name })
   });
 
   if (!res.ok) {

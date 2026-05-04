@@ -6,11 +6,20 @@
 // Returns a structured list of short findings the front-end overlays as
 // sticky-note annotations on the original PDF (via pdf-lib).
 //
+// Upload pipeline:
+//   1. Client uploads the PDF directly to Vercel Blob (bypassing Vercel's
+//      4.5MB function body limit). It hits /api/docguard-upload-token to
+//      get a short-lived upload token.
+//   2. Client POSTs { blobUrl, fileName } to this endpoint.
+//   3. We fetch the blob, base64-encode it server-side, send to Gemini.
+//   4. We delete the blob (success or failure) before returning.
+//
 // Security: same Firebase ID-token + admin-email gate as /api/ai-analyze.
 // Runtime: Vercel Node (default).
 // ---------------------------------------------------------------------------
 
 import crypto from 'node:crypto';
+import { del } from '@vercel/blob';
 
 const FIREBASE_PROJECT_ID = 'gen-lang-client-0703668573';
 const ADMIN_EMAIL = 'ehakun1807@gmail.com';
@@ -18,8 +27,8 @@ const ADMIN_EMAIL = 'ehakun1807@gmail.com';
 const PUBLIC_KEYS_URL =
   'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com';
 
-// Hard cap on inline PDF size. Gemini's inline_data limit is ~20MB request
-// body; we leave headroom for the JSON envelope + base64 expansion.
+// Hard cap on PDF size. Gemini's inline_data limit is ~20MB request body;
+// we leave headroom for the JSON envelope + base64 expansion.
 const MAX_PDF_BYTES = 15 * 1024 * 1024;
 
 let cachedCerts: { fetchedAt: number; certs: Record<string, string> } | null =
@@ -81,6 +90,21 @@ async function verifyFirebaseToken(idToken: string): Promise<FirebasePayload> {
   if (payload.aud !== FIREBASE_PROJECT_ID) throw new Error('bad aud');
 
   return payload;
+}
+
+/**
+ * Best-effort blob cleanup — never throws so it can run in finally blocks.
+ * BLOB_READ_WRITE_TOKEN is auto-injected when a Blob store is linked to
+ * the Vercel project; if it's not present we just no-op (e.g. local dev
+ * without a Blob store linked).
+ */
+async function safeDelete(blobUrl: string): Promise<void> {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return;
+  try {
+    await del(blobUrl);
+  } catch (err: any) {
+    console.warn('blob delete failed (non-fatal):', err?.message);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -185,15 +209,6 @@ interface ResLike {
   json(data: any): ResLike;
 }
 
-export const config = {
-  // Allow larger request bodies for inline PDF base64.
-  api: {
-    bodyParser: {
-      sizeLimit: '25mb'
-    }
-  }
-};
-
 export default async function handler(req: ReqLike, res: ResLike) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'method not allowed' });
@@ -227,92 +242,119 @@ export default async function handler(req: ReqLike, res: ResLike) {
     return res.status(500).json({ error: 'server not configured' });
   }
 
-  const pdfBase64 = req.body?.pdfBase64 as string | undefined;
+  const blobUrl = req.body?.blobUrl as string | undefined;
   const fileName = (req.body?.fileName as string | undefined) || 'document.pdf';
-  if (!pdfBase64 || typeof pdfBase64 !== 'string') {
-    return res.status(400).json({ error: 'missing pdfBase64' });
+  if (!blobUrl || typeof blobUrl !== 'string') {
+    return res.status(400).json({ error: 'missing blobUrl' });
   }
-  // Quick size sanity check (base64 is ~4/3 of raw byte size).
-  const approxBytes = Math.floor((pdfBase64.length * 3) / 4);
-  if (approxBytes > MAX_PDF_BYTES) {
-    return res.status(413).json({
-      error: `PDF too large (~${Math.round(approxBytes / 1024 / 1024)}MB). Max ${MAX_PDF_BYTES / 1024 / 1024}MB.`
-    });
+  // Defense-in-depth: only accept URLs from Vercel Blob's public domain so
+  // a stray client can't ask us to fetch arbitrary URLs.
+  if (!/^https:\/\/[a-z0-9-]+\.public\.blob\.vercel-storage\.com\//.test(blobUrl)) {
+    return res.status(400).json({ error: 'invalid blobUrl host' });
   }
 
-  let geminiRes: Response;
+  // Fetch the PDF from Blob, encode to base64 in memory, then forward to
+  // Gemini. We do best-effort cleanup of the blob in a finally block so
+  // failures don't leak storage.
+  let pdfBase64: string;
   try {
-    geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                { text: SYSTEM_PROMPT },
-                {
-                  inlineData: {
-                    mimeType: 'application/pdf',
-                    data: pdfBase64
-                  }
-                },
-                {
-                  text: `File name: ${fileName}\n\nPlease audit this PDF and return findings per the schema.`
-                }
-              ]
-            }
-          ],
-          generationConfig: {
-            responseMimeType: 'application/json',
-            responseSchema: RESPONSE_SCHEMA,
-            temperature: 0.4,
-            maxOutputTokens: 8192
-          }
-        })
-      }
-    );
+    const blobRes = await fetch(blobUrl);
+    if (!blobRes.ok) {
+      await safeDelete(blobUrl);
+      return res.status(502).json({ error: `could not fetch blob (${blobRes.status})` });
+    }
+    const arr = await blobRes.arrayBuffer();
+    if (arr.byteLength > MAX_PDF_BYTES) {
+      await safeDelete(blobUrl);
+      return res.status(413).json({
+        error: `PDF too large (~${Math.round(arr.byteLength / 1024 / 1024)}MB). Max ${MAX_PDF_BYTES / 1024 / 1024}MB.`
+      });
+    }
+    pdfBase64 = Buffer.from(arr).toString('base64');
   } catch (err: any) {
-    console.error('Gemini fetch failed:', err);
-    return res.status(502).json({ error: 'ai service unreachable' });
+    console.error('Blob fetch failed:', err?.message);
+    await safeDelete(blobUrl);
+    return res.status(502).json({ error: 'blob fetch failed' });
   }
 
-  if (!geminiRes.ok) {
-    const txt = await geminiRes.text().catch(() => '');
-    console.error('Gemini error:', geminiRes.status, txt);
-    // Surface upstream message so the browser shows something actionable
-    // instead of "ai service error". Truncated for safety.
-    return res.status(502).json({
-      error: `ai service error (${geminiRes.status}): ${txt.slice(0, 300) || 'no body'}`
-    });
-  }
-
-  const data: any = await geminiRes.json();
-  const textOut = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  const finishReason = data?.candidates?.[0]?.finishReason;
-  if (!textOut) {
-    console.error('Empty Gemini response:', JSON.stringify(data).slice(0, 500));
-    return res.status(502).json({ error: 'empty ai response' });
-  }
-
+  // Single try/finally wraps the Gemini call + parse so we ALWAYS delete
+  // the blob, even on early returns.
   let parsed: any;
   try {
-    parsed = JSON.parse(textOut);
-  } catch (err) {
-    console.error(
-      'Failed to parse Gemini JSON. finishReason=',
-      finishReason,
-      'text=',
-      textOut.slice(0, 800)
-    );
-    if (finishReason === 'MAX_TOKENS') {
-      return res
-        .status(502)
-        .json({ error: 'ai response too long — try a shorter doc' });
+    let geminiRes: Response;
+    try {
+      geminiRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: 'user',
+                parts: [
+                  { text: SYSTEM_PROMPT },
+                  {
+                    inlineData: {
+                      mimeType: 'application/pdf',
+                      data: pdfBase64
+                    }
+                  },
+                  {
+                    text: `File name: ${fileName}\n\nPlease audit this PDF and return findings per the schema.`
+                  }
+                ]
+              }
+            ],
+            generationConfig: {
+              responseMimeType: 'application/json',
+              responseSchema: RESPONSE_SCHEMA,
+              temperature: 0.4,
+              maxOutputTokens: 8192
+            }
+          })
+        }
+      );
+    } catch (err: any) {
+      console.error('Gemini fetch failed:', err);
+      return res.status(502).json({ error: 'ai service unreachable' });
     }
-    return res.status(502).json({ error: 'ai returned invalid json' });
+
+    if (!geminiRes.ok) {
+      const txt = await geminiRes.text().catch(() => '');
+      console.error('Gemini error:', geminiRes.status, txt);
+      return res.status(502).json({
+        error: `ai service error (${geminiRes.status}): ${txt.slice(0, 300) || 'no body'}`
+      });
+    }
+
+    const data: any = await geminiRes.json();
+    const textOut = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const finishReason = data?.candidates?.[0]?.finishReason;
+    if (!textOut) {
+      console.error('Empty Gemini response:', JSON.stringify(data).slice(0, 500));
+      return res.status(502).json({ error: 'empty ai response' });
+    }
+
+    try {
+      parsed = JSON.parse(textOut);
+    } catch (err) {
+      console.error(
+        'Failed to parse Gemini JSON. finishReason=',
+        finishReason,
+        'text=',
+        textOut.slice(0, 800)
+      );
+      if (finishReason === 'MAX_TOKENS') {
+        return res
+          .status(502)
+          .json({ error: 'ai response too long — try a shorter doc' });
+      }
+      return res.status(502).json({ error: 'ai returned invalid json' });
+    }
+  } finally {
+    // Best-effort cleanup. Don't let a failed delete block the response.
+    await safeDelete(blobUrl);
   }
 
   // Normalize + clamp on the way out so the client always gets a clean shape.
