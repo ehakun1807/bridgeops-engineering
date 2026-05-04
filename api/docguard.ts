@@ -254,8 +254,8 @@ export default async function handler(req: ReqLike, res: ResLike) {
               parts: [
                 { text: SYSTEM_PROMPT },
                 {
-                  inline_data: {
-                    mime_type: 'application/pdf',
+                  inlineData: {
+                    mimeType: 'application/pdf',
                     data: pdfBase64
                   }
                 },
@@ -282,7 +282,11 @@ export default async function handler(req: ReqLike, res: ResLike) {
   if (!geminiRes.ok) {
     const txt = await geminiRes.text().catch(() => '');
     console.error('Gemini error:', geminiRes.status, txt);
-    return res.status(502).json({ error: 'ai service error' });
+    // Surface upstream message so the browser shows something actionable
+    // instead of "ai service error". Truncated for safety.
+    return res.status(502).json({
+      error: `ai service error (${geminiRes.status}): ${txt.slice(0, 300) || 'no body'}`
+    });
   }
 
   const data: any = await geminiRes.json();
