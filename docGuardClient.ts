@@ -87,7 +87,7 @@ export async function auditPdf(file: File): Promise<AuditResponse> {
 
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(data?.error || `DocGuard request failed (${res.status})`);
+    throw new Error(data?.error || `Doc Guard request failed (${res.status})`);
   }
   return (await res.json()) as AuditResponse;
 }

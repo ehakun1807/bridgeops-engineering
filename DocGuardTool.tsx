@@ -97,7 +97,7 @@ function downloadBlob(bytes: Uint8Array, fileName: string) {
 function annotatedFileName(original: string): string {
   const dot = original.lastIndexOf('.');
   const stem = dot > 0 ? original.slice(0, dot) : original;
-  return `${stem}__docguard.pdf`;
+  return `${stem}__doc_guard.pdf`;
 }
 
 const DocGuardTool: React.FC = () => {
@@ -180,7 +180,7 @@ const DocGuardTool: React.FC = () => {
   async function handleAudit() {
     if (!selectedFile) return;
     if (!auth.currentUser) {
-      setError('Sign in to use DocGuard.');
+      setError('Sign in to use Doc Guard.');
       return;
     }
 
@@ -243,7 +243,7 @@ const DocGuardTool: React.FC = () => {
       <div className="mb-4">
         <p className="text-[13px] text-slate-600 leading-relaxed">
           Upload a manufacturing PDF (SOP, work instruction, assembly procedure).
-          DocGuard audits grammar, step numbering, GMP structure, assembly
+          Doc Guard audits grammar, step numbering, GMP structure, assembly
           logic, and image clarity, then returns short, actionable comments —
           plus an annotated PDF you can hand to the author.
         </p>

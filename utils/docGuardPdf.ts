@@ -92,7 +92,7 @@ function drawSidebar(
   });
 
   // Header.
-  page.drawText(`DocGuard — Page ${pageNum}`, {
+  page.drawText(`Doc Guard — Page ${pageNum}`, {
     x: innerX,
     y: cursorY,
     size: HEADER_FONT_SIZE,
@@ -176,7 +176,7 @@ function appendSummaryPage(
   let y = PAGE_H - MARGIN;
 
   // Title.
-  page.drawText('DocGuard Audit Summary', {
+  page.drawText('Doc Guard Audit Summary', {
     x: MARGIN,
     y,
     size: 20,

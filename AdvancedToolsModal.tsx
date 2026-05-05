@@ -37,7 +37,7 @@ const AdvancedToolsModal: React.FC<AdvancedToolsModalProps> = ({ isOpen, onClose
                 : selectedTool === 'quote-compare'
                   ? 'Quote Compare'
                   : selectedTool === 'doc-guard'
-                    ? 'DocGuard'
+                    ? 'Doc Guard'
                     : 'Tools'}
             </h2>
           </div>
@@ -100,7 +100,7 @@ const AdvancedToolsModal: React.FC<AdvancedToolsModalProps> = ({ isOpen, onClose
             >
               <FileSearch size={48} color="#64748b" />
               <div>
-                <h3 style={{ fontSize: '14px', fontWeight: 900, textTransform: 'uppercase', margin: 0, marginBottom: '4px', color: '#0f172a' }}>DocGuard</h3>
+                <h3 style={{ fontSize: '14px', fontWeight: 900, textTransform: 'uppercase', margin: 0, marginBottom: '4px', color: '#0f172a' }}>Doc Guard</h3>
                 <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>Audit a manufacturing PDF for grammar, GMP, assembly logic, and image clarity</p>
               </div>
             </div>
