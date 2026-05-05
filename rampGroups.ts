@@ -552,10 +552,24 @@ export const RAMP_GROUPS: RampGroup[] = [
 
 // --- Scoring utilities -----------------------------------------------------
 
-export const scoreForItem = (item: RampSubItem, value: number): number => {
+// `deliverablePct` is the 0..100 completion of an item's checklist (template +
+// custom). When provided for a value-kind item, the score is a 50/50 blend of
+// the numeric-derived score and the deliverable completion. This lets users
+// add custom deliverables and see the bar move without divorcing the score
+// from the underlying number entirely. Bar-kind items already get their value
+// from deliverables (see ProjectDeepDive's metrics-rewrite useEffect), so
+// blending again would double-count — they ignore deliverablePct here.
+export const scoreForItem = (
+  item: RampSubItem,
+  value: number,
+  deliverablePct?: number
+): number => {
   if (item.kind === 'bar') return Math.max(0, Math.min(100, value || 0));
-  if (item.valueToScore) return item.valueToScore(value);
-  return 0;
+  const base = item.valueToScore ? item.valueToScore(value) : 0;
+  if (typeof deliverablePct === 'number') {
+    return Math.round((base + Math.max(0, Math.min(100, deliverablePct))) / 2);
+  }
+  return base;
 };
 
 // Set membership helper. `disabled` may be undefined (legacy projects) — in
@@ -566,10 +580,15 @@ const isDisabled = (id: string, disabled?: ReadonlyArray<string> | Set<string>):
   return disabled.indexOf(id) >= 0;
 };
 
+// `deliverableScores` is an optional id→percent (0..100) map of per-item
+// deliverable completion. When provided, value-kind items blend their numeric
+// score with their deliverable %. See scoreForItem for the blend rule.
+// Backward-compatible — callers that don't pass it get the legacy behaviour.
 export const scoreForGroup = (
   group: RampGroup,
   values: Record<string, number>,
-  disabledItemIds?: ReadonlyArray<string>
+  disabledItemIds?: ReadonlyArray<string>,
+  deliverableScores?: Record<string, number>
 ): number => {
   const disabledSet = disabledItemIds ? new Set(disabledItemIds) : undefined;
   let total = 0;
@@ -577,7 +596,7 @@ export const scoreForGroup = (
   group.items.forEach((item) => {
     if (isDisabled(item.id, disabledSet)) return;
     const raw = values[item.id] ?? item.defaultValue;
-    const s = scoreForItem(item, raw);
+    const s = scoreForItem(item, raw, deliverableScores?.[item.id]);
     const w = item.weight ?? 1;
     total += s * w;
     weights += w;
@@ -587,7 +606,8 @@ export const scoreForGroup = (
 
 export const scoreForProject = (
   values: Record<string, number>,
-  disabledItemIds?: ReadonlyArray<string>
+  disabledItemIds?: ReadonlyArray<string>,
+  deliverableScores?: Record<string, number>
 ): number => {
   const disabledSet = disabledItemIds ? new Set(disabledItemIds) : undefined;
   let total = 0;
@@ -597,7 +617,7 @@ export const scoreForProject = (
     // would unfairly drag the rollup.
     const anyEnabled = g.items.some((i) => !isDisabled(i.id, disabledSet));
     if (!anyEnabled) return;
-    total += scoreForGroup(g, values, disabledItemIds);
+    total += scoreForGroup(g, values, disabledItemIds, deliverableScores);
     count += 1;
   });
   return count > 0 ? Math.round(total / count) : 0;

@@ -621,9 +621,40 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
     setActiveGroupId(RAMP_GROUPS[0].id);
   }, [project.id]);
 
+  // Stage-gate UI (gate readiness strip + per-deliverable due-by chips/pickers)
+  // is only meaningful for the Full Ramp template. PCBA / Mechanical / Pilot /
+  // Custom projects don't go through the CR→MP gate flow, so we hide the gate
+  // bar and the deliverables-level gate indications for them. Legacy projects
+  // with no templateId default to Full Ramp (the original behavior).
+  const gatesEnabled = useMemo(
+    () => (project.templateId ?? 'full_ramp') === 'full_ramp',
+    [project.templateId]
+  );
+
+  // Per-item deliverable completion percentages (0..100), keyed by sub-item id.
+  // Only populated for value-kind items that own at least one deliverable
+  // (template or custom). Bar-kind items already drive their score directly
+  // from deliverable completion via the metrics-rewrite useEffect below, so
+  // overriding them again would double-count. Passed through to scoreForGroup
+  // / scoreForProject so the rollup tracks the same blended score the user
+  // sees on the row. Add a custom deliverable → this map updates → row score
+  // and group score both shift in lockstep.
+  const deliverableScores = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const g of RAMP_GROUPS) {
+      for (const item of g.items) {
+        if (item.kind !== 'value') continue;
+        const counts = deliverableCountsForItem(item, deliverables[item.id]);
+        if (counts.total === 0) continue;
+        out[item.id] = Math.round((counts.done / counts.total) * 100);
+      }
+    }
+    return out;
+  }, [deliverables]);
+
   const overall = useMemo(
-    () => scoreForProject(metrics, disabledItemIds),
-    [metrics, disabledItemIds]
+    () => scoreForProject(metrics, disabledItemIds, deliverableScores),
+    [metrics, disabledItemIds, deliverableScores]
   );
   const enabledCount = useMemo(
     () => enabledCountForProject(disabledItemIds),
@@ -1160,7 +1191,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
   const buildNextHistory = (): ScoreSnapshot[] => {
     const groupScores: Record<string, number> = {};
     RAMP_GROUPS.forEach((g) => {
-      groupScores[g.id] = scoreForGroup(g, metrics, disabledItemIds);
+      groupScores[g.id] = scoreForGroup(g, metrics, disabledItemIds, deliverableScores);
     });
     const snapshot: ScoreSnapshot = {
       ts: Date.now(),
@@ -1447,11 +1478,15 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
 
       {/* Gate-readiness strip — six pills, one per stage gate, showing
           % of deliverables due-by that gate which are checked. The currently
-          active gate (from General Info) is highlighted. */}
-      <GateReadinessStrip
-        readiness={gateReadiness}
-        currentGate={currentGate || null}
-      />
+          active gate (from General Info) is highlighted. Hidden for non-Full-
+          Ramp templates (PCBA / Mechanical / Pilot / Custom) where the
+          CR→MP gate flow doesn't apply. */}
+      {gatesEnabled && (
+        <GateReadinessStrip
+          readiness={gateReadiness}
+          currentGate={currentGate || null}
+        />
+      )}
 
       {/* Primary tab strip — General Info + the 4 score buckets. These are
           where the user actually does work, so they get the full card chrome
@@ -1498,7 +1533,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
 
         {RAMP_GROUPS.map((group) => {
           const groupAllDisabled = group.items.every((i) => isItemDisabled(i.id));
-          const groupScore = scoreForGroup(group, metrics, disabledItemIds);
+          const groupScore = scoreForGroup(group, metrics, disabledItemIds, deliverableScores);
           const tokens = accentTokens[group.accent];
           const isActive = group.id === activeGroupId;
           return (
@@ -1713,7 +1748,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
           (() => {
             const group = RAMP_GROUPS.find((g) => g.id === activeGroupId) ?? RAMP_GROUPS[0];
             const groupAllDisabled = group.items.every((i) => isItemDisabled(i.id));
-            const groupScore = scoreForGroup(group, metrics, disabledItemIds);
+            const groupScore = scoreForGroup(group, metrics, disabledItemIds, deliverableScores);
             const gBand = scoreBand(groupScore);
             const tokens = accentTokens[group.accent];
 
@@ -1786,6 +1821,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
                         productType={productType}
                         groupTitle={group.title}
                         standards={projectStandards}
+                        gatesEnabled={gatesEnabled}
                       />
                     )
                   )}
@@ -1957,6 +1993,10 @@ const MetricRow: React.FC<{
   productType?: string;
   groupTitle?: string;
   standards?: string[];
+  // When false, hide gate-related UI (due-by chips, gate filter pills, gate
+  // pickers) inside the deliverables checklist. Driven by templateId at the
+  // project level — see `gatesEnabled` in ProjectDeepDive.
+  gatesEnabled?: boolean;
 }> = ({
   item,
   value,
@@ -1981,7 +2021,8 @@ const MetricRow: React.FC<{
   readOnly,
   productType,
   groupTitle,
-  standards
+  standards,
+  gatesEnabled = true
 }) => {
   // For bar-kind items with deliverables, derive the effective value from
   // deliverable completion right here so the score chip and band color stay
@@ -1993,7 +2034,20 @@ const MetricRow: React.FC<{
   const effectiveValue = autoBarMode
     ? Math.round((barCounts!.done / barCounts!.total) * 100)
     : value;
-  const score = scoreForItem(item, effectiveValue);
+  // For value-kind items with deliverables (template or custom), expose the
+  // completion % so scoreForItem can blend it 50/50 with the numeric score.
+  // Adding a custom deliverable shifts both the chip and the slim bar in real
+  // time — same mental model as bar items, but the underlying number isn't
+  // discarded. Bar items aren't blended (their value is already deliverable %).
+  const valueDeliverableCounts =
+    item.kind === 'value' ? deliverableCountsForItem(item, deliverables) : null;
+  const valueDeliverablePct =
+    valueDeliverableCounts && valueDeliverableCounts.total > 0
+      ? Math.round(
+          (valueDeliverableCounts.done / valueDeliverableCounts.total) * 100
+        )
+      : undefined;
+  const score = scoreForItem(item, effectiveValue, valueDeliverablePct);
   const band = scoreBand(score);
   const tooltipText = `${item.tool ? item.tool + ' · ' : ''}${item.question}`;
 
@@ -2195,6 +2249,17 @@ const MetricRow: React.FC<{
               style={{ background: `linear-gradient(90deg, ${band.fill}, ${band.stroke})` }}
             />
           </div>
+          {valueDeliverableCounts && valueDeliverableCounts.total > 0 && (
+            <span
+              className="ml-2 inline-flex items-center gap-1 bg-slate-900 text-white px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest"
+              title={
+                'Score is blended 50/50: numeric reading + deliverable completion. ' +
+                'Add or check off deliverables below to move the bar.'
+              }
+            >
+              {valueDeliverableCounts.done}/{valueDeliverableCounts.total} delivered
+            </span>
+          )}
         </div>
       )}
 
@@ -2240,6 +2305,7 @@ const MetricRow: React.FC<{
           onUnwaiveCustom={onUnwaiveCustom}
           onSetCustomWaiverReason={onSetCustomWaiverReason}
           readOnly={readOnly}
+          gatesEnabled={gatesEnabled}
         />
       )}
 
@@ -2522,6 +2588,12 @@ const DeliverableChecklist: React.FC<{
   onUnwaiveCustom: (customId: string) => void;
   onSetCustomWaiverReason: (customId: string, reason: string) => void;
   readOnly?: boolean;
+  // When false, the gate filter pill bar, per-row due-by chips, the gate
+  // <select> on custom rows, and the gate <select> in the add-custom row are
+  // all hidden. Existing dueBy data on items is preserved on disk — only the
+  // UI is suppressed — so re-enabling (e.g. switching template back) restores
+  // everything as it was. See `gatesEnabled` in ProjectDeepDive.
+  gatesEnabled?: boolean;
 }> = ({
   templates,
   state,
@@ -2538,7 +2610,8 @@ const DeliverableChecklist: React.FC<{
   onWaiveCustom,
   onUnwaiveCustom,
   onSetCustomWaiverReason,
-  readOnly
+  readOnly,
+  gatesEnabled = true
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [draftTitle, setDraftTitle] = useState('');
@@ -2678,45 +2751,48 @@ const DeliverableChecklist: React.FC<{
             className="overflow-hidden"
           >
             <div className="px-3 pb-3 pt-1 space-y-2 border-t border-slate-200">
-              {/* Gate filter pill bar — "All" + one pill per gate, showing count. */}
-              <div className="flex flex-wrap items-center gap-1 pt-2">
-                <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 mr-1">
-                  Due by
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setGateFilter(null)}
-                  className={`px-2 py-0.5 text-[9px] font-black uppercase tracking-widest border rounded-sm transition-colors ${
-                    gateFilter == null
-                      ? 'bg-slate-900 text-white border-slate-900'
-                      : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
-                  }`}
-                >
-                  All
-                </button>
-                {PRODUCT_GATE_ORDER.map((g) => {
-                  const active = gateFilter === g;
-                  const count = gateCounts[g];
-                  return (
-                    <button
-                      key={g}
-                      type="button"
-                      onClick={() => setGateFilter(active ? null : g)}
-                      disabled={count === 0}
-                      className={`px-2 py-0.5 text-[9px] font-black uppercase tracking-widest border rounded-sm transition-colors ${
-                        active
-                          ? 'bg-slate-900 text-white border-slate-900'
-                          : count === 0
-                            ? 'bg-white text-slate-300 border-slate-100 cursor-not-allowed'
-                            : `${GATE_CHIP_STYLES[g]} hover:opacity-80`
-                      }`}
-                      title={GATE_LABELS[g]}
-                    >
-                      {g} · {count}
-                    </button>
-                  );
-                })}
-              </div>
+              {/* Gate filter pill bar — "All" + one pill per gate, showing count.
+                  Suppressed for non-Full-Ramp templates (gatesEnabled=false). */}
+              {gatesEnabled && (
+                <div className="flex flex-wrap items-center gap-1 pt-2">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 mr-1">
+                    Due by
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setGateFilter(null)}
+                    className={`px-2 py-0.5 text-[9px] font-black uppercase tracking-widest border rounded-sm transition-colors ${
+                      gateFilter == null
+                        ? 'bg-slate-900 text-white border-slate-900'
+                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
+                    }`}
+                  >
+                    All
+                  </button>
+                  {PRODUCT_GATE_ORDER.map((g) => {
+                    const active = gateFilter === g;
+                    const count = gateCounts[g];
+                    return (
+                      <button
+                        key={g}
+                        type="button"
+                        onClick={() => setGateFilter(active ? null : g)}
+                        disabled={count === 0}
+                        className={`px-2 py-0.5 text-[9px] font-black uppercase tracking-widest border rounded-sm transition-colors ${
+                          active
+                            ? 'bg-slate-900 text-white border-slate-900'
+                            : count === 0
+                              ? 'bg-white text-slate-300 border-slate-100 cursor-not-allowed'
+                              : `${GATE_CHIP_STYLES[g]} hover:opacity-80`
+                        }`}
+                        title={GATE_LABELS[g]}
+                      >
+                        {g} · {count}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
               {filteredTemplates.length > 0 && (
                 <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mt-2">
@@ -2781,7 +2857,7 @@ const DeliverableChecklist: React.FC<{
                             Waived
                           </span>
                         )}
-                        {tmpl.dueBy && (
+                        {gatesEnabled && tmpl.dueBy && (
                           <span
                             className={`flex-shrink-0 mt-0.5 px-1.5 py-[1px] text-[9px] font-black uppercase tracking-widest border rounded-sm ${GATE_CHIP_STYLES[tmpl.dueBy]}`}
                             title={`Due by ${GATE_LABELS[tmpl.dueBy]}`}
@@ -2999,8 +3075,9 @@ const DeliverableChecklist: React.FC<{
                               </span>
                             )}
                             {/* Gate picker — dropdown styled as a pill. An empty
-                                option means "not assigned to a gate". */}
-                            {!readOnly ? (
+                                option means "not assigned to a gate". Suppressed
+                                entirely for non-Full-Ramp templates. */}
+                            {gatesEnabled && (!readOnly ? (
                               <select
                                 value={c.dueBy || ''}
                                 onChange={(e) =>
@@ -3027,7 +3104,7 @@ const DeliverableChecklist: React.FC<{
                               >
                                 {c.dueBy}
                               </span>
-                            ) : null}
+                            ) : null)}
                             {!readOnly && (
                               <>
                                 {c.waived ? (
@@ -3152,17 +3229,19 @@ const DeliverableChecklist: React.FC<{
                     maxLength={120}
                     className="flex-1 bg-white border border-slate-200 px-2 py-1.5 text-[11px] font-medium text-slate-800 placeholder-slate-400 focus:border-blue-500 outline-none"
                   />
-                  <select
-                    value={draftGate}
-                    onChange={(e) => setDraftGate(e.target.value as ProductGate | '')}
-                    className="bg-white border border-slate-200 px-2 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-700 focus:border-blue-500 outline-none"
-                    aria-label="Due by gate"
-                  >
-                    <option value="">No gate</option>
-                    {PRODUCT_GATE_ORDER.map((g) => (
-                      <option key={g} value={g}>{g}</option>
-                    ))}
-                  </select>
+                  {gatesEnabled && (
+                    <select
+                      value={draftGate}
+                      onChange={(e) => setDraftGate(e.target.value as ProductGate | '')}
+                      className="bg-white border border-slate-200 px-2 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-700 focus:border-blue-500 outline-none"
+                      aria-label="Due by gate"
+                    >
+                      <option value="">No gate</option>
+                      {PRODUCT_GATE_ORDER.map((g) => (
+                        <option key={g} value={g}>{g}</option>
+                      ))}
+                    </select>
+                  )}
                   <button
                     type="button"
                     onClick={handleAdd}
