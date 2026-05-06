@@ -648,18 +648,22 @@ interface DeliverableStateLike {
 }
 
 // Internal — compute (done, total) for one item from its deliverable state.
-// Mirrors deliverableCountsForItem in ProjectDeepDive but reads the duck-typed
-// on-disk shape so this module stays UI-agnostic.
+// Mirrors deliverableCountsForItem in ProjectDeepDive (intentionally identical
+// semantics, including: missing state behaves like an empty checkedIds list,
+// which means an item with template deliverables defined in rampGroups.ts
+// still has total > 0 even before the user has touched the checklist —
+// pre-fix this short-circuited to {0,0} and skipped the blend, so list views
+// rendered numeric-only scores while ProjectDeepDive blended in 0%.)
 function _deliverableCounts(
   item: RampSubItem,
   state?: DeliverableStateLike
 ): { done: number; total: number } {
-  if (!state) return { done: 0, total: 0 };
-  const hidden = new Set(state.hiddenTemplateIds || []);
-  const checked = new Set(state.checkedIds || []);
-  const waived = new Set(state.waivedTemplateIds || []);
+  const s: DeliverableStateLike = state || { checkedIds: [] };
+  const hidden = new Set(s.hiddenTemplateIds || []);
+  const checked = new Set(s.checkedIds || []);
+  const waived = new Set(s.waivedTemplateIds || []);
   const templateItems = (item.deliverables || []).filter((t) => !hidden.has(t.id));
-  const customItems = state.custom || [];
+  const customItems = s.custom || [];
   let done = 0;
   for (const t of templateItems) {
     if (waived.has(t.id) || checked.has(t.id)) done += 1;
