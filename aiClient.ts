@@ -5,7 +5,13 @@
 // ---------------------------------------------------------------------------
 
 import { auth } from './firebase.ts';
-import { RAMP_GROUPS, scoreForGroup, scoreForItem, scoreForProject } from './rampGroups';
+import {
+  RAMP_GROUPS,
+  scoreForGroup,
+  scoreForItem,
+  scoreForProject,
+  deriveDeliverableScores
+} from './rampGroups';
 
 export interface AIAction {
   title: string;
@@ -46,14 +52,32 @@ export interface AnalyzeProjectInput {
   // Project-level applicable standards (e.g. ISO 13485, IEC 62304). Feeds
   // compliance-weighting into the AI risk analysis.
   standards?: string[];
+  // Per-sub-item deliverable state (the on-disk shape from
+  // project.deliverables). Used to blend deliverable completion into
+  // value-kind scores so the AI sees the same numbers as the deep-dive.
+  // Loose duck-typed shape mirrors deriveDeliverableScores in rampGroups.ts.
+  deliverables?: Record<
+    string,
+    {
+      checkedIds?: string[];
+      hiddenTemplateIds?: string[];
+      waivedTemplateIds?: string[];
+      custom?: Array<{ done?: boolean; waived?: boolean }>;
+    }
+  >;
 }
 
 function buildSnapshot(input: AnalyzeProjectInput) {
   const disabled = new Set(input.disabledItemIds || []);
-  const overallScore = scoreForProject(input.metrics, input.disabledItemIds);
+  // Derive once and thread through every rollup so the snapshot the AI sees
+  // matches the blended scores rendered in ProjectDeepDive. Without this the
+  // AI was reasoning about a different (numeric-only) score than the user
+  // saw on the page.
+  const ds = deriveDeliverableScores(input.deliverables);
+  const overallScore = scoreForProject(input.metrics, input.disabledItemIds, ds);
   const groups = RAMP_GROUPS.map((g) => {
     const enabledItems = g.items.filter((i) => !disabled.has(i.id));
-    const score = scoreForGroup(g, input.metrics, input.disabledItemIds);
+    const score = scoreForGroup(g, input.metrics, input.disabledItemIds, ds);
     return {
       title: g.title,
       subtitle: g.subtitle,
@@ -68,7 +92,7 @@ function buildSnapshot(input: AnalyzeProjectInput) {
           tool: item.tool,
           unit: item.unit,
           value,
-          score: scoreForItem(item, value),
+          score: scoreForItem(item, value, ds[item.id]),
           note: input.notes[item.id] || undefined
         };
       })

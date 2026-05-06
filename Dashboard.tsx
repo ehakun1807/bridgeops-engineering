@@ -59,7 +59,7 @@ import PortfolioHeatmap from './PortfolioHeatmap.tsx';
 import AuthModal from './AuthModal.tsx';
 import AdvancedToolsModal from './AdvancedToolsModal.tsx';
 import BridgeOpsAcademy from './BridgeOpsAcademy.tsx';
-import { scoreBand, scoreForProject, defaultMetricValues } from './rampGroups';
+import { scoreBand, scoreForProject, defaultMetricValues, deriveDeliverableScores } from './rampGroups';
 import {
   PROJECT_TEMPLATES,
   DEFAULT_TEMPLATE_ID,
@@ -867,8 +867,13 @@ const ProjectCard: React.FC<{
   // excludes all-disabled groups from the rollup, and without it we'd score
   // against items the user has explicitly taken out of scope.
   const score = useMemo(() => {
-    if (project.metrics)
-      return scoreForProject(project.metrics, project.disabledItemIds);
+    if (project.metrics) {
+      // Match ProjectDeepDive: blend value-item numeric scores with their
+      // deliverable completion. Without this the row score and the deep-dive
+      // header drifted apart for projects with custom deliverables.
+      const ds = deriveDeliverableScores(project.deliverables);
+      return scoreForProject(project.metrics, project.disabledItemIds, ds);
+    }
     if (project.lastScore != null) return Math.round(project.lastScore);
     return 0;
   }, [project]);

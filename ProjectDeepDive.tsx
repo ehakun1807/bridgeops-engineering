@@ -1672,7 +1672,11 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
                 currentGate: currentGate || undefined,
                 gateTargets,
                 disabledItemIds,
-                templateName: getTemplate(project.templateId).name
+                templateName: getTemplate(project.templateId).name,
+                // Thread per-item deliverable state so the AI rollups match
+                // the blended scores shown on the deep-dive (50/50 with
+                // numeric metric value, see deriveDeliverableScores).
+                deliverables
               }}
               cached={aiAnalysis}
               onAnalyzed={persistAiAnalysis}

@@ -623,6 +623,63 @@ export const scoreForProject = (
   return count > 0 ? Math.round(total / count) : 0;
 };
 
+// ---------------------------------------------------------------------------
+// Deliverable-blend helper (shared with Dashboard / PortfolioHeatmap /
+// aiClient).
+//
+// ProjectDeepDive computes per-item deliverable completion from
+// project.deliverables and passes the resulting id→pct map to scoreForGroup
+// and scoreForProject so value-kind items blend their numeric reading with
+// their deliverable progress (50/50, see scoreForItem). Without this map,
+// list views and the AI prompt computed numeric-only scores → the dashboard
+// row didn't match the project header. This helper centralises the
+// derivation so every call site agrees.
+//
+// We deliberately type the input loosely (a minimal duck-typed shape) so
+// rampGroups.ts stays UI-agnostic and doesn't have to import the full
+// SubItemDeliverables / CustomDeliverable types from ProjectDeepDive.
+// ---------------------------------------------------------------------------
+
+interface DeliverableStateLike {
+  checkedIds?: string[];
+  hiddenTemplateIds?: string[];
+  waivedTemplateIds?: string[];
+  custom?: Array<{ done?: boolean; waived?: boolean }>;
+}
+
+export const deriveDeliverableScores = (
+  deliverables?: Record<string, DeliverableStateLike> | null
+): Record<string, number> => {
+  const out: Record<string, number> = {};
+  if (!deliverables) return out;
+  for (const g of RAMP_GROUPS) {
+    for (const item of g.items) {
+      // Bar items already drive their score directly from deliverables via the
+      // metrics-rewrite useEffect in ProjectDeepDive — blending again would
+      // double-count. Only value-kind items participate in the blend.
+      if (item.kind !== 'value') continue;
+      const state = deliverables[item.id];
+      if (!state) continue;
+      const hidden = new Set(state.hiddenTemplateIds || []);
+      const checked = new Set(state.checkedIds || []);
+      const waived = new Set(state.waivedTemplateIds || []);
+      const templateItems = (item.deliverables || []).filter((t) => !hidden.has(t.id));
+      const customItems = state.custom || [];
+      const total = templateItems.length + customItems.length;
+      if (total === 0) continue;
+      let done = 0;
+      for (const t of templateItems) {
+        if (waived.has(t.id) || checked.has(t.id)) done += 1;
+      }
+      for (const c of customItems) {
+        if (c.waived || c.done) done += 1;
+      }
+      out[item.id] = Math.round((done / total) * 100);
+    }
+  }
+  return out;
+};
+
 // How many sub-items in this group are currently enabled.
 export const enabledCountForGroup = (
   group: RampGroup,

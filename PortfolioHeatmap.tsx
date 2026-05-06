@@ -15,7 +15,8 @@ import {
   scoreForGroup,
   scoreForProject,
   scoreBand,
-  enabledCountForGroup
+  enabledCountForGroup,
+  deriveDeliverableScores
 } from './rampGroups';
 import type { ProductGate, SubItemDeliverables } from './ProjectDeepDive';
 import { TOTAL_ITEM_COUNT } from './templates';
@@ -53,8 +54,14 @@ const PortfolioHeatmap: React.FC<PortfolioHeatmapProps> = ({ projects, onSelect 
   // Sort by overall score ascending so weakest projects surface first.
   const sorted = useMemo(() => {
     return [...projects].sort((a, b) => {
-      const sa = a.metrics ? scoreForProject(a.metrics, a.disabledItemIds) : (a.lastScore ?? 0);
-      const sb = b.metrics ? scoreForProject(b.metrics, b.disabledItemIds) : (b.lastScore ?? 0);
+      // Match ProjectDeepDive's blended rollup so the heatmap row order
+      // tracks the same number the user sees inside the project.
+      const sa = a.metrics
+        ? scoreForProject(a.metrics, a.disabledItemIds, deriveDeliverableScores(a.deliverables))
+        : (a.lastScore ?? 0);
+      const sb = b.metrics
+        ? scoreForProject(b.metrics, b.disabledItemIds, deriveDeliverableScores(b.deliverables))
+        : (b.lastScore ?? 0);
       return sa - sb;
     });
   }, [projects]);
@@ -130,8 +137,11 @@ const PortfolioHeatmap: React.FC<PortfolioHeatmapProps> = ({ projects, onSelect 
             {sorted.map((p) => {
               const metrics = p.metrics || {};
               const disabled = p.disabledItemIds;
+              // Single derivation per project — reused for both the overall
+              // rollup and every group-cell call below so they're consistent.
+              const ds = deriveDeliverableScores(p.deliverables);
               const overall = p.metrics
-                ? scoreForProject(metrics, disabled)
+                ? scoreForProject(metrics, disabled, ds)
                 : (p.lastScore ?? 0);
               const overallBand = scoreBand(overall);
               const enabledTotal = TOTAL_ITEM_COUNT - (disabled?.length ?? 0);
@@ -200,7 +210,7 @@ const PortfolioHeatmap: React.FC<PortfolioHeatmapProps> = ({ projects, onSelect 
                         </td>
                       );
                     }
-                    const s = p.metrics ? scoreForGroup(g, metrics, disabled) : 0;
+                    const s = p.metrics ? scoreForGroup(g, metrics, disabled, ds) : 0;
                     const cs = cellStyle(s);
                     return (
                       <td key={g.id} className="px-2 py-2 text-center">
