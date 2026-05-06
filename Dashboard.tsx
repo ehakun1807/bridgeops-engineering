@@ -59,7 +59,13 @@ import PortfolioHeatmap from './PortfolioHeatmap.tsx';
 import AuthModal from './AuthModal.tsx';
 import AdvancedToolsModal from './AdvancedToolsModal.tsx';
 import BridgeOpsAcademy from './BridgeOpsAcademy.tsx';
-import { scoreBand, scoreForProject, defaultMetricValues, deriveDeliverableScores } from './rampGroups';
+import {
+  scoreBand,
+  scoreForProject,
+  defaultMetricValues,
+  deriveDeliverableScores,
+  effectiveMetrics
+} from './rampGroups';
 import {
   PROJECT_TEMPLATES,
   DEFAULT_TEMPLATE_ID,
@@ -868,11 +874,17 @@ const ProjectCard: React.FC<{
   // against items the user has explicitly taken out of scope.
   const score = useMemo(() => {
     if (project.metrics) {
-      // Match ProjectDeepDive: blend value-item numeric scores with their
-      // deliverable completion. Without this the row score and the deep-dive
-      // header drifted apart for projects with custom deliverables.
+      // Match ProjectDeepDive precisely:
+      //   1. effectiveMetrics() rewrites BAR-kind items to their deliverable %
+      //      (mirrors the metrics-rewrite useEffect in ProjectDeepDive — bar
+      //       items don't persist their derived value until the user saves).
+      //   2. deriveDeliverableScores() returns the per-item % for VALUE-kind
+      //      items, which scoreForProject blends 50/50 with the numeric value.
+      // Without (1) bar items used stale persisted values; without (2) value
+      // items skipped the deliverable blend entirely.
+      const liveMetrics = effectiveMetrics(project.metrics, project.deliverables);
       const ds = deriveDeliverableScores(project.deliverables);
-      return scoreForProject(project.metrics, project.disabledItemIds, ds);
+      return scoreForProject(liveMetrics, project.disabledItemIds, ds);
     }
     if (project.lastScore != null) return Math.round(project.lastScore);
     return 0;

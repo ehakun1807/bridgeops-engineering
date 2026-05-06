@@ -10,7 +10,8 @@ import {
   scoreForGroup,
   scoreForItem,
   scoreForProject,
-  deriveDeliverableScores
+  deriveDeliverableScores,
+  effectiveMetrics
 } from './rampGroups';
 
 export interface AIAction {
@@ -69,15 +70,17 @@ export interface AnalyzeProjectInput {
 
 function buildSnapshot(input: AnalyzeProjectInput) {
   const disabled = new Set(input.disabledItemIds || []);
-  // Derive once and thread through every rollup so the snapshot the AI sees
-  // matches the blended scores rendered in ProjectDeepDive. Without this the
-  // AI was reasoning about a different (numeric-only) score than the user
-  // saw on the page.
+  // Match ProjectDeepDive precisely:
+  //   - effectiveMetrics rewrites bar-kind metric values to their live
+  //     deliverable %, mirroring the metrics-rewrite useEffect.
+  //   - deriveDeliverableScores supplies the per-item blend % for value-kind
+  //     items (scoreForItem averages numeric + deliverable 50/50).
+  const liveMetrics = effectiveMetrics(input.metrics, input.deliverables);
   const ds = deriveDeliverableScores(input.deliverables);
-  const overallScore = scoreForProject(input.metrics, input.disabledItemIds, ds);
+  const overallScore = scoreForProject(liveMetrics, input.disabledItemIds, ds);
   const groups = RAMP_GROUPS.map((g) => {
     const enabledItems = g.items.filter((i) => !disabled.has(i.id));
-    const score = scoreForGroup(g, input.metrics, input.disabledItemIds, ds);
+    const score = scoreForGroup(g, liveMetrics, input.disabledItemIds, ds);
     return {
       title: g.title,
       subtitle: g.subtitle,
@@ -85,7 +88,7 @@ function buildSnapshot(input: AnalyzeProjectInput) {
       enabledCount: enabledItems.length,
       totalCount: g.items.length,
       items: enabledItems.map((item) => {
-        const value = input.metrics[item.id] ?? item.defaultValue;
+        const value = liveMetrics[item.id] ?? item.defaultValue;
         return {
           title: item.title,
           question: item.question,

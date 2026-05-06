@@ -647,6 +647,29 @@ interface DeliverableStateLike {
   custom?: Array<{ done?: boolean; waived?: boolean }>;
 }
 
+// Internal — compute (done, total) for one item from its deliverable state.
+// Mirrors deliverableCountsForItem in ProjectDeepDive but reads the duck-typed
+// on-disk shape so this module stays UI-agnostic.
+function _deliverableCounts(
+  item: RampSubItem,
+  state?: DeliverableStateLike
+): { done: number; total: number } {
+  if (!state) return { done: 0, total: 0 };
+  const hidden = new Set(state.hiddenTemplateIds || []);
+  const checked = new Set(state.checkedIds || []);
+  const waived = new Set(state.waivedTemplateIds || []);
+  const templateItems = (item.deliverables || []).filter((t) => !hidden.has(t.id));
+  const customItems = state.custom || [];
+  let done = 0;
+  for (const t of templateItems) {
+    if (waived.has(t.id) || checked.has(t.id)) done += 1;
+  }
+  for (const c of customItems) {
+    if (c.waived || c.done) done += 1;
+  }
+  return { done, total: templateItems.length + customItems.length };
+}
+
 export const deriveDeliverableScores = (
   deliverables?: Record<string, DeliverableStateLike> | null
 ): Record<string, number> => {
@@ -654,27 +677,40 @@ export const deriveDeliverableScores = (
   if (!deliverables) return out;
   for (const g of RAMP_GROUPS) {
     for (const item of g.items) {
-      // Bar items already drive their score directly from deliverables via the
-      // metrics-rewrite useEffect in ProjectDeepDive — blending again would
-      // double-count. Only value-kind items participate in the blend.
+      // Bar items already drive their score directly from deliverables via
+      // effectiveMetrics() (and ProjectDeepDive's metrics-rewrite useEffect) —
+      // blending them again here would double-count. Only value-kind items
+      // participate in the blend.
       if (item.kind !== 'value') continue;
-      const state = deliverables[item.id];
-      if (!state) continue;
-      const hidden = new Set(state.hiddenTemplateIds || []);
-      const checked = new Set(state.checkedIds || []);
-      const waived = new Set(state.waivedTemplateIds || []);
-      const templateItems = (item.deliverables || []).filter((t) => !hidden.has(t.id));
-      const customItems = state.custom || [];
-      const total = templateItems.length + customItems.length;
-      if (total === 0) continue;
-      let done = 0;
-      for (const t of templateItems) {
-        if (waived.has(t.id) || checked.has(t.id)) done += 1;
-      }
-      for (const c of customItems) {
-        if (c.waived || c.done) done += 1;
-      }
-      out[item.id] = Math.round((done / total) * 100);
+      const counts = _deliverableCounts(item, deliverables[item.id]);
+      if (counts.total === 0) continue;
+      out[item.id] = Math.round((counts.done / counts.total) * 100);
+    }
+  }
+  return out;
+};
+
+// Returns a metrics map with bar-kind items overwritten by their live
+// deliverable completion percentage. ProjectDeepDive does this in a useEffect
+// against local React state and persists on save — but Dashboard /
+// PortfolioHeatmap / aiClient read the persisted Firestore value, which can
+// be stale when the user toggled deliverables in the deep-dive without
+// saving (or the project was last saved before deliverables were added).
+//
+// Use this before passing metrics to scoreForGroup / scoreForProject in any
+// list view so the rollup matches what the deep-dive shows.
+export const effectiveMetrics = (
+  metrics: Record<string, number> | undefined,
+  deliverables?: Record<string, DeliverableStateLike> | null
+): Record<string, number> => {
+  const out: Record<string, number> = { ...(metrics || {}) };
+  if (!deliverables) return out;
+  for (const g of RAMP_GROUPS) {
+    for (const item of g.items) {
+      if (item.kind !== 'bar') continue;
+      const counts = _deliverableCounts(item, deliverables[item.id]);
+      if (counts.total === 0) continue;
+      out[item.id] = Math.round((counts.done / counts.total) * 100);
     }
   }
   return out;

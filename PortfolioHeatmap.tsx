@@ -16,7 +16,8 @@ import {
   scoreForProject,
   scoreBand,
   enabledCountForGroup,
-  deriveDeliverableScores
+  deriveDeliverableScores,
+  effectiveMetrics
 } from './rampGroups';
 import type { ProductGate, SubItemDeliverables } from './ProjectDeepDive';
 import { TOTAL_ITEM_COUNT } from './templates';
@@ -54,13 +55,22 @@ const PortfolioHeatmap: React.FC<PortfolioHeatmapProps> = ({ projects, onSelect 
   // Sort by overall score ascending so weakest projects surface first.
   const sorted = useMemo(() => {
     return [...projects].sort((a, b) => {
-      // Match ProjectDeepDive's blended rollup so the heatmap row order
-      // tracks the same number the user sees inside the project.
+      // Match ProjectDeepDive's blended rollup precisely. effectiveMetrics
+      // rewrites bar-kind items to live deliverable %; deriveDeliverableScores
+      // gives value-kind blend overrides. Both are needed.
       const sa = a.metrics
-        ? scoreForProject(a.metrics, a.disabledItemIds, deriveDeliverableScores(a.deliverables))
+        ? scoreForProject(
+            effectiveMetrics(a.metrics, a.deliverables),
+            a.disabledItemIds,
+            deriveDeliverableScores(a.deliverables)
+          )
         : (a.lastScore ?? 0);
       const sb = b.metrics
-        ? scoreForProject(b.metrics, b.disabledItemIds, deriveDeliverableScores(b.deliverables))
+        ? scoreForProject(
+            effectiveMetrics(b.metrics, b.deliverables),
+            b.disabledItemIds,
+            deriveDeliverableScores(b.deliverables)
+          )
         : (b.lastScore ?? 0);
       return sa - sb;
     });
@@ -135,10 +145,11 @@ const PortfolioHeatmap: React.FC<PortfolioHeatmapProps> = ({ projects, onSelect 
           </thead>
           <tbody>
             {sorted.map((p) => {
-              const metrics = p.metrics || {};
+              // Live metrics + deliverable score map, derived once per row
+              // and reused across the overall + every group cell so they're
+              // internally consistent and match ProjectDeepDive.
+              const metrics = p.metrics ? effectiveMetrics(p.metrics, p.deliverables) : {};
               const disabled = p.disabledItemIds;
-              // Single derivation per project — reused for both the overall
-              // rollup and every group-cell call below so they're consistent.
               const ds = deriveDeliverableScores(p.deliverables);
               const overall = p.metrics
                 ? scoreForProject(metrics, disabled, ds)
