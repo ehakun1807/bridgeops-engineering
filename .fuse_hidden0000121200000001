@@ -1,0 +1,26 @@
+[debug] [2026-05-06T08:00:36.799Z] ----------------------------------------------------------------------
+[debug] [2026-05-06T08:00:36.800Z] Command:       /usr/bin/node /sessions/modest-magical-lovelace/mnt/bridgeops-engineering-main/node_modules/.bin/firebase deploy --only firestore:rules --force --project gen-lang-client-0703668573
+[debug] [2026-05-06T08:00:36.800Z] CLI Version:   13.35.1
+[debug] [2026-05-06T08:00:36.800Z] Platform:      linux
+[debug] [2026-05-06T08:00:36.800Z] Node Version:  v22.22.0
+[debug] [2026-05-06T08:00:36.800Z] Time:          Wed May 06 2026 08:00:36 GMT+0000 (Coordinated Universal Time)
+[debug] [2026-05-06T08:00:36.800Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-05-06T08:00:36.804Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
+[debug] [2026-05-06T08:00:36.960Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-05-06T08:00:36.976Z] <<< [apiv2][status] GET https://firebase-public.firebaseio.com/cli.json 403
+[debug] [2026-05-06T08:00:36.977Z] <<< [apiv2][body] GET https://firebase-public.firebaseio.com/cli.json "Connection blocked by network allowlist"
+[warn] ⚠  Unable to fetch the CLI MOTD and remote config. This is not a fatal error, but may indicate an issue with your network connection. 
+[debug] [2026-05-06T08:00:36.977Z] Failed to fetch MOTD FirebaseError: Unable to parse JSON: SyntaxError: Unexpected token 'C', "Connection"... is not valid JSON
+[debug] [2026-05-06T08:00:36.979Z] Error: Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.
+    at GoogleAuth.getApplicationDefaultAsync (/sessions/modest-magical-lovelace/mnt/bridgeops-engineering-main/node_modules/firebase-tools/node_modules/google-auth-library/build/src/auth/googleauth.js:287:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async GoogleAuth._GoogleAuth_determineClient (/sessions/modest-magical-lovelace/mnt/bridgeops-engineering-main/node_modules/firebase-tools/node_modules/google-auth-library/build/src/auth/googleauth.js:834:32)
+    at async GoogleAuth.getClient (/sessions/modest-magical-lovelace/mnt/bridgeops-engineering-main/node_modules/firebase-tools/node_modules/google-auth-library/build/src/auth/googleauth.js:698:20)
+    at async GoogleAuth.getAccessToken (/sessions/modest-magical-lovelace/mnt/bridgeops-engineering-main/node_modules/firebase-tools/node_modules/google-auth-library/build/src/auth/googleauth.js:722:24)
+    at async autoAuth (/sessions/modest-magical-lovelace/mnt/bridgeops-engineering-main/node_modules/firebase-tools/lib/requireAuth.js:26:19)
+    at async requireAuth (/sessions/modest-magical-lovelace/mnt/bridgeops-engineering-main/node_modules/firebase-tools/lib/requireAuth.js:81:20)
+    at async requirePermissions (/sessions/modest-magical-lovelace/mnt/bridgeops-engineering-main/node_modules/firebase-tools/lib/requirePermissions.js:17:5)
+    at async /sessions/modest-magical-lovelace/mnt/bridgeops-engineering-main/node_modules/firebase-tools/lib/command.js:241:17
+[error] 
+[error] Error: Failed to authenticate, have you run firebase login?
