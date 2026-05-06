@@ -103,6 +103,16 @@ export async function analyzeProject(
   const user = auth.currentUser;
   if (!user) throw new Error('Not signed in.');
 
+  // Pre-flight: empty scope (every metric disabled — common for fresh Custom
+  // template projects) has nothing to analyze. Catch it here so the user sees
+  // a clear message instead of a generic 502 from the handler.
+  const snapshot = buildSnapshot(input);
+  if (snapshot.groups.length === 0) {
+    throw new Error(
+      'No metrics in scope. Open the project scope and enable at least one metric before running AI Analysis.'
+    );
+  }
+
   // Force-refresh the token so we never send a just-expired one.
   const idToken = await user.getIdToken(false);
 
@@ -112,12 +122,16 @@ export async function analyzeProject(
       'Content-Type': 'application/json',
       Authorization: `Bearer ${idToken}`
     },
-    body: JSON.stringify({ project: buildSnapshot(input) })
+    body: JSON.stringify({ project: snapshot })
   });
 
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(data?.error || `AI request failed (${res.status})`);
+    // Handler now returns { error, detail? } on 502 with the upstream Gemini
+    // status + body — surface the detail to the user when present.
+    const baseMsg = data?.error || `AI request failed (${res.status})`;
+    const fullMsg = data?.detail ? `${baseMsg} — ${data.detail}` : baseMsg;
+    throw new Error(fullMsg);
   }
   return (await res.json()) as AIAnalysis;
 }

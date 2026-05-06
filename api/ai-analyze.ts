@@ -362,6 +362,17 @@ export default async function handler(req: ReqLike, res: ResLike) {
     return res.status(400).json({ error: 'missing project data' });
   }
 
+  // Custom-template projects start with every metric disabled. The client's
+  // buildSnapshot filters out groups with zero enabled items, which leaves an
+  // empty groups[] for fresh Custom projects. Sending that to Gemini produces
+  // a degenerate prompt with no data — refuse here with a clear message
+  // instead of letting Gemini reject it as a generic 502.
+  if (project.groups.length === 0) {
+    return res.status(400).json({
+      error: 'no metrics in scope — enable at least one metric on the General Info tab before running AI Analysis'
+    });
+  }
+
   const prompt = buildPrompt(project);
 
   let geminiRes: Response;
@@ -390,7 +401,16 @@ export default async function handler(req: ReqLike, res: ResLike) {
   if (!geminiRes.ok) {
     const txt = await geminiRes.text().catch(() => '');
     console.error('Gemini error:', geminiRes.status, txt);
-    return res.status(502).json({ error: 'ai service error' });
+    // Surface the upstream Gemini status + body to the browser so 502s aren't
+    // a black box. Mirrors the pattern in api/docguard.ts and quote-compare.ts.
+    // Strip API keys defensively before forwarding.
+    const safeDetail = (txt || '')
+      .replace(/AIza[0-9A-Za-z_\-]{20,}/g, '[key]')
+      .slice(0, 300);
+    return res.status(502).json({
+      error: `ai service error (${geminiRes.status})`,
+      ...(safeDetail ? { detail: safeDetail } : {})
+    });
   }
 
   const data: any = await geminiRes.json();
