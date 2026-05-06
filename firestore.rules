@@ -112,6 +112,20 @@ service cloud.firestore {
              (!('steps' in data) || (data.steps is list && data.steps.size() <= 200));
     }
 
+    // Meetings — one doc per meeting, scoped to userId + projectId. Always
+    // editable (no draft/completed lifecycle), so update is allowed.
+    function isValidMeeting(data) {
+      return data.keys().hasAll(['userId', 'projectId', 'title', 'kind', 'dateMs']) &&
+             data.userId == request.auth.uid &&
+             data.projectId is string && data.projectId.size() > 0 &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+             data.kind in ['internal', 'external'] &&
+             data.dateMs is number &&
+             (!('attendees' in data) || (data.attendees is string && data.attendees.size() <= 500)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000)) &&
+             (!('actionItems' in data) || (data.actionItems is string && data.actionItems.size() <= 1000));
+    }
+
     // DocGuard audits — one doc per PDF audit run. Project-agnostic for v1
     // (matches Alt BOM placement in AdvancedToolsModal). Embedded findings
     // and summary shapes are enforced client-side by docGuardClient
@@ -177,6 +191,16 @@ service cloud.firestore {
       allow list: if isAuthenticated();
       allow create: if isAuthenticated() && isValidTaktStudy(request.resource.data);
       allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidTaktStudy(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    match /meetings/{meetingId} {
+      // Same get + list split as taktStudies — client passes userId filter
+      // on list queries so per-user isolation is enforced.
+      allow get: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidMeeting(request.resource.data);
+      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidMeeting(request.resource.data);
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 

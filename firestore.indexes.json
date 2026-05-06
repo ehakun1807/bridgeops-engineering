@@ -7,6 +7,15 @@
         { "fieldPath": "userId", "order": "ASCENDING" },
         { "fieldPath": "createdAtMs", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "meetings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "projectId", "order": "ASCENDING" },
+        { "fieldPath": "dateMs", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
