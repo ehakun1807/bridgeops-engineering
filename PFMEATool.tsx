@@ -970,6 +970,7 @@ const RiskCard: React.FC<RiskCardProps> = ({ index, risk, readOnly, onChange, on
           onChange={(n) => onChange({ severity: n })}
           scale={SEVERITY_SCALE}
           readOnly={readOnly}
+          tooltipAlign="right"
         />
         <RiskInput
           label="Potential cause(s)"
@@ -1056,6 +1057,7 @@ const RiskCard: React.FC<RiskCardProps> = ({ index, risk, readOnly, onChange, on
               optional
               onClear={() => onChange({ revisedSeverity: undefined })}
               isSet={typeof risk.revisedSeverity === 'number'}
+              tooltipAlign="right"
             />
             <ScoreSelect
               label="Revised occurrence"
@@ -1135,9 +1137,14 @@ interface ScoreSelectProps {
   optional?: boolean;
   onClear?: () => void;
   isSet?: boolean;
+  // Where the hover tooltip extends. 'left' (default) anchors to the right
+  // edge and grows leftward — works for middle / rightmost columns. 'right'
+  // anchors to the left edge and grows rightward — used for the leftmost
+  // column (Severity) so the tooltip doesn't cover its own score field.
+  tooltipAlign?: 'left' | 'right';
 }
 
-const ScoreSelect: React.FC<ScoreSelectProps> = ({ label, value, onChange, scale, readOnly, optional, onClear, isSet }) => {
+const ScoreSelect: React.FC<ScoreSelectProps> = ({ label, value, onChange, scale, readOnly, optional, onClear, isSet, tooltipAlign = 'left' }) => {
   // Map score → tone for the select chip background. Higher = more red.
   const tone =
     value >= 8 ? 'bg-rose-50 border-rose-300 text-rose-900'
@@ -1153,7 +1160,7 @@ const ScoreSelect: React.FC<ScoreSelectProps> = ({ label, value, onChange, scale
         <div className="group relative inline-flex items-center">
           <Info size={11} className="text-slate-400 hover:text-slate-700 cursor-help" />
           {/* Tooltip — full scale anchors */}
-          <div className="absolute right-0 top-full mt-1 z-30 hidden group-hover:block w-72 bg-slate-900 text-white text-[10px] leading-snug rounded-sm shadow-2xl border border-slate-700 p-2.5">
+          <div className={`absolute ${tooltipAlign === 'right' ? 'left-0' : 'right-0'} top-full mt-1 z-30 hidden group-hover:block w-72 bg-slate-900 text-white text-[10px] leading-snug rounded-sm shadow-2xl border border-slate-700 p-2.5`}>
             <p className="font-black uppercase tracking-widest text-[9px] text-white/70 mb-1.5">
               {label} scale (1 = low → 10 = high)
             </p>
