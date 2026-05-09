@@ -16,7 +16,13 @@ import {
   GraduationCap,
   Map as MapIcon,
   ChevronRight,
-  Compass
+  Compass,
+  Layers,
+  Factory,
+  Coins,
+  FlaskConical,
+  Wrench,
+  Truck
 } from 'lucide-react';
 import type { ProductGate } from './ProjectDeepDive';
 
@@ -329,6 +335,355 @@ const GateMap: React.FC = () => {
 };
 
 // ---------------------------------------------------------------------------
+// DFx Methodology content
+//
+// Six "Design for X" disciplines, mapped across the same six stage gates the
+// Gate Map article introduces. The intent is to give the reader a single
+// page that answers two questions at once:
+//   1) What does each DFx pillar actually mean?
+//   2) When in the program does that pillar do its job?
+// The matrix below is intentionally terse — one line per (DFx × gate) cell —
+// so the whole sweep fits on one screen and stays scannable.
+// ---------------------------------------------------------------------------
+
+interface DFxPillar {
+  id: 'DFA' | 'DFM' | 'DFC' | 'DFT' | 'DFS' | 'DFSC';
+  name: string;
+  fullName: string;
+  oneLiner: string;
+  goal: string;
+  // Gate-by-gate progression — one short phrase per gate, same order as GATES.
+  byGate: Record<ProductGate, string>;
+  icon: React.FC<{ size?: number; className?: string }>;
+  // Color tokens — kept distinct from the gate palette so the two layers
+  // don't visually collide when both appear in the matrix.
+  ring: string;
+  chipBg: string;
+  chipText: string;
+  dotBg: string;
+  rowAccent: string; // left-edge bar on matrix rows
+}
+
+const DFX_PILLARS: DFxPillar[] = [
+  {
+    id: 'DFA',
+    name: 'DFA',
+    fullName: 'Design for Assembly',
+    oneLiner: 'Fewer parts, simpler joins, mistake-proof builds.',
+    goal:
+      'Reduce part count, fasteners, and orientations so the product goes together quickly and correctly the first time.',
+    byGate: {
+      CR: 'Assembly concept — manual vs automated, target part count.',
+      PDR: 'Top-level assembly tree, fastener strategy, top-down stack.',
+      CDR: 'DFA score (Boothroyd-Dewhurst), poka-yoke features locked.',
+      TRR: 'Pilot builds validate assembly sequence; SOPs drafted.',
+      PRR: 'Line balancing, takt time, operator training complete.',
+      MP: 'Yield by station tracked; rework rate trended down.'
+    },
+    icon: Layers,
+    ring: 'ring-sky-300',
+    chipBg: 'bg-sky-50',
+    chipText: 'text-sky-700',
+    dotBg: 'bg-sky-500',
+    rowAccent: 'bg-sky-500'
+  },
+  {
+    id: 'DFM',
+    name: 'DFM',
+    fullName: 'Design for Manufacturing',
+    oneLiner: 'Match the design to the chosen process windows.',
+    goal:
+      'Specify features, tolerances, and materials the process can hold repeatably so first-pass yield and Cpk hit target.',
+    byGate: {
+      CR: 'Process technology choices, manufacturability concept.',
+      PDR: 'Tolerance budget, PFMEA inputs, supplier capability map.',
+      CDR: 'GD&T / CTQ features locked; process FMEA closed.',
+      TRR: 'First articles, capability studies (Cpk), gauge R&R.',
+      PRR: 'PPAP / FAI / IQ-OQ-PQ complete and signed off.',
+      MP: 'SPC running, drift control, continuous-improvement kaizen.'
+    },
+    icon: Factory,
+    ring: 'ring-violet-300',
+    chipBg: 'bg-violet-50',
+    chipText: 'text-violet-700',
+    dotBg: 'bg-violet-500',
+    rowAccent: 'bg-violet-500'
+  },
+  {
+    id: 'DFC',
+    name: 'DFC',
+    fullName: 'Design for Cost',
+    oneLiner: 'Hit the BOM and landed-cost target, by design.',
+    goal:
+      'Use should-cost models and value engineering to converge on the cost target before tooling — not after.',
+    byGate: {
+      CR: 'Should-cost model built; target cost (BOM + labor) set.',
+      PDR: 'Should-cost vs design intent reconciled; VE candidates ID’d.',
+      CDR: 'BOM cost locked; NRE / tooling estimates finalized.',
+      TRR: 'Pilot unit cost actuals compared to target; gaps closed.',
+      PRR: 'Production unit cost validated at volume.',
+      MP: 'Cost-down roadmap; supplier price renegotiation cycles.'
+    },
+    icon: Coins,
+    ring: 'ring-emerald-300',
+    chipBg: 'bg-emerald-50',
+    chipText: 'text-emerald-700',
+    dotBg: 'bg-emerald-500',
+    rowAccent: 'bg-emerald-500'
+  },
+  {
+    id: 'DFT',
+    name: 'DFT',
+    fullName: 'Design for Test',
+    oneLiner: 'Make the product diagnosable on the line and in the field.',
+    goal:
+      'Build in test points, coverage, and observability so faults are isolated quickly without bench rework.',
+    byGate: {
+      CR: 'Test strategy concept (ICT / FCT / boundary scan / JTAG).',
+      PDR: 'Coverage targets set; test points placed in schematics.',
+      CDR: 'Test fixtures designed; test programs / sequences spec’d.',
+      TRR: 'Fixtures debugged; first-pass yield baseline measured.',
+      PRR: 'Production test stations validated; fault coverage %.',
+      MP: 'Diagnostic data feeds, false-failure rate trending.'
+    },
+    icon: FlaskConical,
+    ring: 'ring-amber-300',
+    chipBg: 'bg-amber-50',
+    chipText: 'text-amber-700',
+    dotBg: 'bg-amber-500',
+    rowAccent: 'bg-amber-500'
+  },
+  {
+    id: 'DFS',
+    name: 'DFS',
+    fullName: 'Design for Serviceability',
+    oneLiner: 'Repair, upgrade, and swap fast in the field.',
+    goal:
+      'Plan FRUs, access, common tools, and documentation so MTTR is short and field engineers stay productive.',
+    byGate: {
+      CR: 'Repair-vs-replace strategy; FRU concept.',
+      PDR: 'Modularity decisions; access design; special tools list.',
+      CDR: 'Service manual structure; FRU list locked; MTTR target.',
+      TRR: 'Service procedures dry-run; training materials drafted.',
+      PRR: 'Service network stood up; spares stocked at depots.',
+      MP: 'Field MTTR actuals; RMA root cause; spares burn rate.'
+    },
+    icon: Wrench,
+    ring: 'ring-rose-300',
+    chipBg: 'bg-rose-50',
+    chipText: 'text-rose-700',
+    dotBg: 'bg-rose-500',
+    rowAccent: 'bg-rose-500'
+  },
+  {
+    id: 'DFSC',
+    name: 'DFSC',
+    fullName: 'Design for Supply Chain',
+    oneLiner: 'De-risk sourcing, lead time, and geo exposure up front.',
+    goal:
+      'Choose parts and suppliers with the BOM in mind: lead-time aware, dual-sourced where it matters, geo-hedged.',
+    byGate: {
+      CR: 'Single vs multi-source strategy; geo / political risk view.',
+      PDR: 'AVL draft; long-lead items flagged; second-source plan.',
+      CDR: 'AVL locked; BOM tied to qualified, capacity-checked vendors.',
+      TRR: 'PPAP from key suppliers; safety-stock / buffer plans set.',
+      PRR: 'Volume contracts signed; dual-source qualified for criticals.',
+      MP: 'Supplier scorecards; obsolescence and EOL management.'
+    },
+    icon: Truck,
+    ring: 'ring-cyan-300',
+    chipBg: 'bg-cyan-50',
+    chipText: 'text-cyan-700',
+    dotBg: 'bg-cyan-500',
+    rowAccent: 'bg-cyan-500'
+  }
+];
+
+// Gate accent colors — matched to the GateMap palette so the matrix header
+// reads as the same six gates the reader just learned.
+const GATE_ACCENT: Record<ProductGate, { dot: string; chipBg: string; chipText: string }> = {
+  CR: { dot: 'bg-slate-500', chipBg: 'bg-slate-100', chipText: 'text-slate-700' },
+  PDR: { dot: 'bg-blue-500', chipBg: 'bg-blue-50', chipText: 'text-blue-700' },
+  CDR: { dot: 'bg-indigo-500', chipBg: 'bg-indigo-50', chipText: 'text-indigo-700' },
+  TRR: { dot: 'bg-amber-500', chipBg: 'bg-amber-50', chipText: 'text-amber-700' },
+  PRR: { dot: 'bg-rose-500', chipBg: 'bg-rose-50', chipText: 'text-rose-700' },
+  MP: { dot: 'bg-emerald-500', chipBg: 'bg-emerald-50', chipText: 'text-emerald-700' }
+};
+
+const GATE_ORDER: ProductGate[] = ['CR', 'PDR', 'CDR', 'TRR', 'PRR', 'MP'];
+
+const DFxMethodology: React.FC = () => {
+  return (
+    <div className="space-y-8">
+      {/* Lead paragraph */}
+      <div>
+        <h3 className="text-2xl font-black uppercase tracking-tighter text-slate-900 mb-2">
+          DFx Methodology
+        </h3>
+        <p className="text-sm text-slate-600 leading-relaxed max-w-3xl">
+          <span className="font-semibold text-slate-800">Design for X (DFx)</span> is
+          shorthand for a family of design disciplines that bake
+          manufacturability, cost, test, service, and supply chain into the
+          design from day one — instead of bolting them on after CDR. Six
+          pillars cover most hardware programs:{' '}
+          <span className="font-semibold">DFA, DFM, DFC, DFT, DFS, DFSC</span>.
+          Each one peaks in influence at a specific gate, but all six run in
+          parallel from concept to ramp.
+        </p>
+      </div>
+
+      {/* Six pillar cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {DFX_PILLARS.map((p, i) => {
+          const Icon = p.icon;
+          return (
+            <motion.div
+              key={p.id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, delay: i * 0.03 }}
+              className={`bg-white border border-slate-200 rounded-sm p-5 ring-1 ${p.ring}`}
+            >
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span
+                    className={`flex-shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-full ${p.dotBg} text-white`}
+                  >
+                    <Icon size={14} className="text-white" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-400">
+                      Pillar
+                    </p>
+                    <h4 className="text-sm font-black uppercase tracking-tight text-slate-900 leading-tight">
+                      {p.fullName}
+                    </h4>
+                  </div>
+                </div>
+                <span
+                  className={`flex-shrink-0 px-2 py-0.5 rounded-sm text-[9px] font-black uppercase tracking-widest ${p.chipBg} ${p.chipText}`}
+                >
+                  {p.name}
+                </span>
+              </div>
+              <p className="text-[12px] font-semibold text-slate-700 leading-snug mb-2">
+                {p.oneLiner}
+              </p>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                {p.goal}
+              </p>
+            </motion.div>
+          );
+        })}
+      </div>
+
+      {/* Gate × DFx matrix */}
+      <div>
+        <div className="mb-3">
+          <h3 className="text-lg font-black uppercase tracking-tighter text-slate-900">
+            DFx across the gates
+          </h3>
+          <p className="text-xs text-slate-500 leading-relaxed max-w-3xl mt-1">
+            Each cell shows the dominant DFx activity at that gate. Earlier
+            gates set strategy; later gates close evidence. The whole sweep is
+            collaborative — no pillar waits for another to finish.
+          </p>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-sm overflow-x-auto">
+          <table className="w-full min-w-[860px] text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="sticky left-0 bg-slate-50 px-3 py-2.5 text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 w-[140px] border-r border-slate-200">
+                  Discipline
+                </th>
+                {GATE_ORDER.map((gate, i) => {
+                  const accent = GATE_ACCENT[gate];
+                  return (
+                    <th
+                      key={gate}
+                      className="px-3 py-2.5 align-bottom"
+                    >
+                      <div className="flex flex-col items-start gap-1">
+                        <span className="text-[8px] font-black uppercase tracking-[0.25em] text-slate-400">
+                          Step {i + 1}
+                        </span>
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm text-[9px] font-black uppercase tracking-widest ${accent.chipBg} ${accent.chipText}`}
+                        >
+                          <span className={`w-1.5 h-1.5 rounded-full ${accent.dot}`} />
+                          {gate}
+                        </span>
+                      </div>
+                    </th>
+                  );
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {DFX_PILLARS.map((p, rowIdx) => {
+                const Icon = p.icon;
+                return (
+                  <tr
+                    key={p.id}
+                    className={`${rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'} border-b border-slate-100 last:border-b-0`}
+                  >
+                    <th
+                      scope="row"
+                      className="sticky left-0 bg-inherit px-3 py-3 align-top border-r border-slate-200 w-[140px]"
+                    >
+                      <div className="flex items-start gap-2">
+                        <span className={`flex-shrink-0 w-1 self-stretch rounded-sm ${p.rowAccent}`} />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <Icon size={12} className="text-slate-500 flex-shrink-0" />
+                            <span className="text-[11px] font-black uppercase tracking-widest text-slate-800">
+                              {p.name}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 leading-snug mt-0.5">
+                            {p.fullName}
+                          </p>
+                        </div>
+                      </div>
+                    </th>
+                    {GATE_ORDER.map((gate) => (
+                      <td
+                        key={gate}
+                        className="px-3 py-3 align-top text-[11px] text-slate-600 leading-snug"
+                      >
+                        {p.byGate[gate]}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Practical guidance footnote */}
+      <div className="bg-slate-50 border border-slate-200 rounded-sm p-4">
+        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">
+          How to use this in practice
+        </p>
+        <p className="text-[11px] text-slate-600 leading-relaxed">
+          DFx is not a sequence — all six pillars run in parallel. What
+          changes gate-to-gate is which pillar is doing the heavy lifting.
+          Concept reviews are dominated by DFC and DFSC (cost target + sourcing
+          strategy frame everything that follows). PDR and CDR shift weight to
+          DFA / DFM / DFT as the design matures and gets locked. TRR and PRR
+          are evidence gates — proving the design is buildable, testable,
+          serviceable, and sourceable at the chosen volume. After MP, the same
+          six lenses become operational KPIs.
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
 // Subject registry — each subject is a tile in the sidebar plus a content
 // renderer. Adding a new academy topic means appending to this list.
 // ---------------------------------------------------------------------------
@@ -348,6 +703,13 @@ const SUBJECTS: Subject[] = [
     subtitle: 'The six stage gates, end-to-end',
     icon: MapIcon,
     render: () => <GateMap />
+  },
+  {
+    id: 'dfx-methodology',
+    title: 'DFx Methodology',
+    subtitle: 'DFA / DFM / DFC / DFT / DFS / DFSC across the gates',
+    icon: Layers,
+    render: () => <DFxMethodology />
   }
 ];
 
