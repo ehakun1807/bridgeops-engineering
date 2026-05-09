@@ -16,6 +16,15 @@
         { "fieldPath": "projectId", "order": "ASCENDING" },
         { "fieldPath": "dateMs", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "pfmeas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "projectId", "order": "ASCENDING" },
+        { "fieldPath": "dateMs", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

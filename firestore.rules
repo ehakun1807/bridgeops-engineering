@@ -126,6 +126,22 @@ service cloud.firestore {
              (!('actionItems' in data) || (data.actionItems is string && data.actionItems.size() <= 1000));
     }
 
+    // PFMEAs — one doc per Process FMEA, scoped to userId + projectId.
+    // Always editable (mirrors meetings posture; revised S/O/D after action
+    // close-out is part of the normal flow). Embedded `risks` list shape is
+    // enforced client-side by PFMEATool's sanitiser — same rationale as
+    // taktStudies / docGuardAudits (shape will evolve through v2).
+    function isValidPFMEA(data) {
+      return data.keys().hasAll(['userId', 'projectId', 'title', 'dateMs', 'risks']) &&
+             data.userId == request.auth.uid &&
+             data.projectId is string && data.projectId.size() > 0 &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+             data.dateMs is number &&
+             data.risks is list && data.risks.size() <= 100 &&
+             (!('scope' in data) || (data.scope is string && data.scope.size() <= 500)) &&
+             (!('participants' in data) || (data.participants is string && data.participants.size() <= 500));
+    }
+
     // DocGuard audits — one doc per PDF audit run. Project-agnostic for v1
     // (matches Alt BOM placement in AdvancedToolsModal). Embedded findings
     // and summary shapes are enforced client-side by docGuardClient
@@ -201,6 +217,16 @@ service cloud.firestore {
       allow list: if isAuthenticated();
       allow create: if isAuthenticated() && isValidMeeting(request.resource.data);
       allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidMeeting(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    match /pfmeas/{pfmeaId} {
+      // Same get + list split as meetings — client passes userId filter on
+      // list queries so per-user isolation is enforced.
+      allow get: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidPFMEA(request.resource.data);
+      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidPFMEA(request.resource.data);
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 

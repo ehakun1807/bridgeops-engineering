@@ -39,7 +39,8 @@ import {
   X,
   FileWarning,
   RotateCcw,
-  Timer
+  Timer,
+  ShieldAlert
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db, auth } from './firebase.ts';
@@ -62,6 +63,7 @@ import AIAnalysisPanel from './AIAnalysisPanel.tsx';
 import ScoreHistoryPanel from './ScoreHistoryPanel.tsx';
 import TaktStudyTool from './TaktStudyTool.tsx';
 import MeetingsTool from './MeetingsTool.tsx';
+import PFMEATool from './PFMEATool.tsx';
 import ScopeEditor from './ScopeEditor.tsx';
 import CoachPanel from './CoachPanel.tsx';
 import StandardsPicker from './StandardsPicker.tsx';
@@ -270,6 +272,7 @@ const GENERAL_INFO_TAB_ID = '__general_info__';
 const AI_ANALYSIS_TAB_ID = '__ai_analysis__';
 const STUDIES_TAB_ID = '__studies__';
 const MEETINGS_TAB_ID = '__meetings__';
+const PFMEA_TAB_ID = '__pfmea__';
 const HISTORY_TAB_ID = '__history__';
 const INFO_STATUS_OPTIONS: InfoStatus[] = ['TBD', 'In Process', 'Completed', 'Cancelled'];
 const GATE_OPTIONS: ProductGate[] = ['CR', 'PDR', 'CDR', 'TRR', 'PRR', 'MP'];
@@ -1598,6 +1601,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
             { id: AI_ANALYSIS_TAB_ID, label: 'AI Analysis', icon: Sparkles, iconActiveClass: 'text-blue-600' },
             { id: STUDIES_TAB_ID, label: 'Studies', icon: Timer, iconActiveClass: 'text-emerald-600' },
             { id: MEETINGS_TAB_ID, label: 'Meetings', icon: CalendarIcon, iconActiveClass: 'text-violet-600' },
+            { id: PFMEA_TAB_ID, label: 'PFMEA', icon: ShieldAlert, iconActiveClass: 'text-rose-600' },
             {
               id: HISTORY_TAB_ID,
               label: 'History',
@@ -1706,6 +1710,16 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
           >
             <MeetingsTool projectId={project.id} readOnly={readOnly} />
+          </motion.div>
+        ) : activeGroupId === PFMEA_TAB_ID ? (
+          <motion.div
+            key={PFMEA_TAB_ID}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <PFMEATool projectId={project.id} readOnly={readOnly} />
           </motion.div>
         ) : activeGroupId === HISTORY_TAB_ID ? (
           <motion.div
