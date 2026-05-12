@@ -25,6 +25,15 @@
         { "fieldPath": "projectId", "order": "ASCENDING" },
         { "fieldPath": "dateMs", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "processMaps",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "projectId", "order": "ASCENDING" },
+        { "fieldPath": "updatedAtMs", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

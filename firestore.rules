@@ -142,6 +142,24 @@ service cloud.firestore {
              (!('participants' in data) || (data.participants is string && data.participants.size() <= 500));
     }
 
+    // Process Maps — one doc per manufacturing process map (Visio-style
+    // flowchart). Scoped to userId + projectId. Always editable (mirrors
+    // meetings/pfmeas posture; the diagram is the working surface). The
+    // embedded `steps` list and `manualPositions` map shapes are enforced
+    // client-side by ProcessMapTool's sanitiser — same rationale as
+    // taktStudies / pfmeas (model evolves through v2).
+    function isValidProcessMap(data) {
+      return data.keys().hasAll(['userId', 'projectId', 'title', 'steps', 'updatedAtMs']) &&
+             data.userId == request.auth.uid &&
+             data.projectId is string && data.projectId.size() > 0 &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+             data.updatedAtMs is number &&
+             data.steps is list && data.steps.size() <= 200 &&
+             (!('description' in data) || (data.description is string && data.description.size() <= 500)) &&
+             (!('layoutDirection' in data) || data.layoutDirection in ['TB', 'LR']) &&
+             (!('manualPositions' in data) || data.manualPositions is map);
+    }
+
     // DocGuard audits — one doc per PDF audit run. Project-agnostic for v1
     // (matches Alt BOM placement in AdvancedToolsModal). Embedded findings
     // and summary shapes are enforced client-side by docGuardClient
@@ -227,6 +245,16 @@ service cloud.firestore {
       allow list: if isAuthenticated();
       allow create: if isAuthenticated() && isValidPFMEA(request.resource.data);
       allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidPFMEA(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    match /processMaps/{processMapId} {
+      // Same get + list split as pfmeas — client passes userId filter on
+      // list queries so per-user isolation is enforced.
+      allow get: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidProcessMap(request.resource.data);
+      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidProcessMap(request.resource.data);
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
