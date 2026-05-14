@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect } from 'react';
-import { GoogleGenAI, Type } from "@google/genai";
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion';
 import { db } from './firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -678,13 +677,9 @@ const RampScoreTool: React.FC<RampScoreToolProps> = ({ onNavigate }) => {
     const avg = calculateScore();
     setLoading(true);
     try {
-      const apiKey = process.env.GEMINI_API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY;
-
-      const standardsLine = formData.standards.length > 0
-        ? `Applicable Standards / Regulations: ${formData.standards.join(', ')}. Weigh compliance-readiness against each of these standards when assessing risk and recommendations.`
-        : `Applicable Standards / Regulations: None selected. Flag the absence of explicit compliance targets as a contributing risk factor.`;
-
-      // Build a human-readable parameter snapshot grouped by section.
+      // Build a human-readable parameter snapshot grouped by section. The
+      // server owns the prompt template — we only send structured data so a
+      // hostile caller can't inject arbitrary prompts.
       const lineFor = (p: Parameter) => {
         const raw = formData.params[p.id];
         const s = scoreForParameter(p, raw as any);
@@ -696,81 +691,31 @@ const RampScoreTool: React.FC<RampScoreToolProps> = ({ onNavigate }) => {
       const ops = PARAMETERS.filter(p => p.section === 'operational').map(lineFor).join('; ');
       const supply = PARAMETERS.filter(p => p.section === 'supply').map(lineFor).join('; ');
 
-      const analysisPrompt = `You are a senior NPI / operations engineering advisor producing a written audit for a hardware-startup executive. The tone is authoritative, concrete, and grounded in industry practice (IATF 16949, ISO 13485, AS9100, IEC 61508 etc. where relevant).
+      const apiRes = await fetch('/api/ramp-score-analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyName: formData.companyName,
+          productType: formData.productType,
+          standards: formData.standards,
+          weightedScore: avg,
+          paramSnapshot: { context, operational: ops, supply }
+        })
+      });
 
-Context — assess manufacturing ramp readiness for ${formData.companyName} (${formData.productType}).
-Weighted Readiness Score: ${avg}%
-Product Context: ${context}
-Operational Readiness: ${ops}
-Volume & Supply Base: ${supply}
-${standardsLine}
-
-Produce the following:
-
-(1) riskLevel — one of LOW / MEDIUM / HIGH.
-
-(2) risks — exactly 3 items, each with:
-    - title: a short risk headline (max 10 words), referencing a concrete value from the data (e.g. "Only 10 suppliers — concentration exposure on critical BOM").
-    - detail: 3-5 sentences explaining why this risk matters for *this* company, the likely operational impact during ramp (line-down events, yield loss, schedule slip with rough magnitude), and the specific parameter / standard that makes it a risk. Reference the selected standards where relevant.
-
-(3) recommendations — exactly 3 items, each with:
-    - title: a short actionable headline (max 10 words) using an imperative verb (e.g. "Qualify dual-source alternates for top 10 critical components").
-    - detail: 3-5 sentences giving (a) the concrete first step, (b) expected timeframe / effort, (c) the metric or standard to verify completion, (d) expected risk reduction. Tie each recommendation back to one of the risks above.
-
-(4) analysis — 2-3 sentence executive summary referencing the most material weaknesses and the likely ramp-readiness verdict.`;
-
-      if (apiKey) {
-        const ai = new GoogleGenAI({ apiKey });
-        const response = await ai.models.generateContent({
-          model: "gemini-flash-latest",
-          contents: analysisPrompt,
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                score: { type: Type.NUMBER },
-                riskLevel: { type: Type.STRING },
-                risks: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      title: { type: Type.STRING },
-                      detail: { type: Type.STRING }
-                    },
-                    required: ["title", "detail"]
-                  }
-                },
-                recommendations: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      title: { type: Type.STRING },
-                      detail: { type: Type.STRING }
-                    },
-                    required: ["title", "detail"]
-                  }
-                },
-                analysis: { type: Type.STRING },
-                kpis: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { category: {type: Type.STRING}, metric: {type: Type.STRING}, target: {type: Type.STRING}, description: {type: Type.STRING} } } }
-              },
-              required: ["score", "riskLevel", "risks", "recommendations", "analysis"]
-            }
-          }
-        });
-        const data = JSON.parse(response.text);
-        setResult({
-          ...data,
-          score: avg,
-          risks: normalizeRiskItems(data.risks),
-          recommendations: normalizeRecItems(data.recommendations),
-          kpis: data.kpis || []
-        });
-      } else {
-        throw new Error("No API Key");
+      if (!apiRes.ok) {
+        const errBody = await apiRes.json().catch(() => ({}));
+        throw new Error(errBody?.error || `Snapshot service error (${apiRes.status})`);
       }
+
+      const data = await apiRes.json();
+      setResult({
+        ...data,
+        score: avg,
+        risks: normalizeRiskItems(data.risks),
+        recommendations: normalizeRecItems(data.recommendations),
+        kpis: data.kpis || []
+      });
     } catch (err) {
       // Offline / no-API fallback. Keeps the same { title, detail } shape as
       // the AI path so the rendering code doesn't have to branch.

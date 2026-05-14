@@ -8,7 +8,7 @@
 // persisted to the project document in Firestore (under `project.metrics`).
 // ---------------------------------------------------------------------------
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Archive,
@@ -41,7 +41,8 @@ import {
   RotateCcw,
   Timer,
   ShieldAlert,
-  Workflow
+  Workflow,
+  LayoutGrid
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db, auth } from './firebase.ts';
@@ -276,6 +277,66 @@ const STUDIES_TAB_ID = '__studies__';
 const MEETINGS_TAB_ID = '__meetings__';
 const PFMEA_TAB_ID = '__pfmea__';
 const PROCESS_MAP_TAB_ID = '__process_map__';
+
+// ---------------------------------------------------------------------------
+// Project Tools registry — sub-app surfaces that live inside the deep-dive
+// but feel like separate workspaces (Studies, Meetings, PFMEA, Process Map,
+// future Control Plan / FRACAS / 8D / ECN ...). Surfaced via the "Project
+// Tools" launcher in the secondary tab strip, so the strip itself stays
+// short (AI Analysis · Project Tools · History) regardless of how many
+// tools we add.
+//
+// Adding a new tool = one entry here + matching <AnimatePresence> branch
+// further down. The launcher renders the grid from this list.
+// ---------------------------------------------------------------------------
+interface ProjectToolEntry {
+  id: string;
+  label: string;
+  description: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  iconActiveClass: string;   // text-* for active underline alignment
+  tileBg: string;            // bg-* + border-* for the popover tile icon plate
+  tileIcon: string;          // text-* for the popover tile icon
+}
+
+const PROJECT_TOOLS: ProjectToolEntry[] = [
+  {
+    id: STUDIES_TAB_ID,
+    label: 'Studies',
+    description: 'Multi-cycle time studies, takt, yamazumi & line balance',
+    icon: Timer,
+    iconActiveClass: 'text-emerald-600',
+    tileBg: 'bg-emerald-50 border-emerald-200',
+    tileIcon: 'text-emerald-700'
+  },
+  {
+    id: MEETINGS_TAB_ID,
+    label: 'Meetings',
+    description: 'Project meeting log with action items',
+    icon: CalendarIcon,
+    iconActiveClass: 'text-violet-600',
+    tileBg: 'bg-violet-50 border-violet-200',
+    tileIcon: 'text-violet-700'
+  },
+  {
+    id: PFMEA_TAB_ID,
+    label: 'PFMEA',
+    description: 'Process risk analysis with RPN & Action Priority (AIAG-VDA 2019)',
+    icon: ShieldAlert,
+    iconActiveClass: 'text-rose-600',
+    tileBg: 'bg-rose-50 border-rose-200',
+    tileIcon: 'text-rose-700'
+  },
+  {
+    id: PROCESS_MAP_TAB_ID,
+    label: 'Process Map',
+    description: 'Visio-style manufacturing workflow with auto-layout & export',
+    icon: Workflow,
+    iconActiveClass: 'text-blue-600',
+    tileBg: 'bg-blue-50 border-blue-200',
+    tileIcon: 'text-blue-700'
+  }
+];
 const HISTORY_TAB_ID = '__history__';
 const INFO_STATUS_OPTIONS: InfoStatus[] = ['TBD', 'In Process', 'Completed', 'Cancelled'];
 const GATE_OPTIONS: ProductGate[] = ['CR', 'PDR', 'CDR', 'TRR', 'PRR', 'MP'];
@@ -599,6 +660,28 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
 
   // Which parent parameter bucket is currently visible.
   const [activeGroupId, setActiveGroupId] = useState<string>(RAMP_GROUPS[0].id);
+
+  // Project Tools launcher popover open/closed. Closes on outside click,
+  // Escape, or when a tool is picked.
+  const [toolsMenuOpen, setToolsMenuOpen] = useState(false);
+  const toolsMenuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!toolsMenuOpen) return;
+    const onMouseDown = (e: MouseEvent) => {
+      if (toolsMenuRef.current && !toolsMenuRef.current.contains(e.target as globalThis.Node)) {
+        setToolsMenuOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setToolsMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [toolsMenuOpen]);
 
   // Reseed when the user navigates into a different project. Legacy gate
   // values on the incoming project are migrated before seeding so the UI
@@ -1588,58 +1671,48 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
 
       </div>
 
-      {/* Secondary strip — utility tabs (views over the work, not the work
-          itself). Lighter chrome, smaller pill buttons, separate underline
-          indicator so the active highlight doesn't morph between primary
-          and secondary rows when switching context. */}
+      {/* Secondary strip — three pinned slots: AI Analysis · Project Tools
+          launcher · History. Sub-app surfaces (Studies / Meetings / PFMEA /
+          Process Map / future tools) live behind the launcher so the strip
+          stays short as the toolkit grows. Active tool shows in the
+          launcher label + underline; the launcher click opens a flat grid
+          popover for switching tools. */}
       <div className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-1 border-b border-slate-200 px-1">
         {(() => {
-          const utilityTabs: Array<{
+          const pinnedTabs: Array<{
             id: string;
             label: string;
             icon: React.ComponentType<{ size?: number; className?: string }>;
             iconActiveClass: string;
             count?: number;
           }> = [
-            { id: AI_ANALYSIS_TAB_ID, label: 'AI Analysis', icon: Sparkles, iconActiveClass: 'text-blue-600' },
-            { id: STUDIES_TAB_ID, label: 'Studies', icon: Timer, iconActiveClass: 'text-emerald-600' },
-            { id: MEETINGS_TAB_ID, label: 'Meetings', icon: CalendarIcon, iconActiveClass: 'text-violet-600' },
-            { id: PFMEA_TAB_ID, label: 'PFMEA', icon: ShieldAlert, iconActiveClass: 'text-rose-600' },
-            { id: PROCESS_MAP_TAB_ID, label: 'Process Map', icon: Workflow, iconActiveClass: 'text-blue-600' },
-            {
-              id: HISTORY_TAB_ID,
-              label: 'History',
-              icon: LineChartIcon,
-              iconActiveClass: 'text-slate-900',
-              count: scoreHistory.length || undefined
-            }
+            { id: AI_ANALYSIS_TAB_ID, label: 'AI Analysis', icon: Sparkles, iconActiveClass: 'text-blue-600' }
           ];
-          return utilityTabs.map((tab) => {
+          const historyTab = {
+            id: HISTORY_TAB_ID,
+            label: 'History',
+            icon: LineChartIcon,
+            iconActiveClass: 'text-slate-900' as const,
+            count: scoreHistory.length || undefined
+          };
+
+          const renderPinned = (tab: typeof pinnedTabs[0] | typeof historyTab) => {
             const isActive = activeGroupId === tab.id;
             const Icon = tab.icon;
             return (
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setActiveGroupId(tab.id)}
+                onClick={() => { setActiveGroupId(tab.id); setToolsMenuOpen(false); }}
                 aria-pressed={isActive}
                 className={`relative flex items-center gap-1.5 px-1 py-2 text-[11px] font-black uppercase tracking-widest transition-colors ${
-                  isActive
-                    ? 'text-slate-900'
-                    : 'text-slate-400 hover:text-slate-700'
+                  isActive ? 'text-slate-900' : 'text-slate-400 hover:text-slate-700'
                 }`}
               >
-                <Icon
-                  size={12}
-                  className={isActive ? tab.iconActiveClass : 'text-slate-400'}
-                />
+                <Icon size={12} className={isActive ? tab.iconActiveClass : 'text-slate-400'} />
                 {tab.label}
                 {tab.count !== undefined && (
-                  <span
-                    className={`ml-0.5 text-[10px] tabular-nums ${
-                      isActive ? 'text-slate-500' : 'text-slate-300'
-                    }`}
-                  >
+                  <span className={`ml-0.5 text-[10px] tabular-nums ${isActive ? 'text-slate-500' : 'text-slate-300'}`}>
                     ({tab.count})
                   </span>
                 )}
@@ -1651,7 +1724,103 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
                 )}
               </button>
             );
-          });
+          };
+
+          // Launcher state. Active tool drives the button label + icon so
+          // the user always sees what's open without re-clicking the menu.
+          const activeTool = PROJECT_TOOLS.find((t) => t.id === activeGroupId);
+          const LauncherIcon = activeTool ? activeTool.icon : LayoutGrid;
+          const launcherIsActive = !!activeTool;
+
+          return (
+            <>
+              {pinnedTabs.map(renderPinned)}
+
+              {/* Project Tools launcher */}
+              <div className="relative" ref={toolsMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setToolsMenuOpen((v) => !v)}
+                  aria-haspopup="menu"
+                  aria-expanded={toolsMenuOpen}
+                  className={`relative flex items-center gap-1.5 px-1 py-2 text-[11px] font-black uppercase tracking-widest transition-colors ${
+                    launcherIsActive ? 'text-slate-900' : 'text-slate-400 hover:text-slate-700'
+                  }`}
+                >
+                  <LauncherIcon
+                    size={12}
+                    className={launcherIsActive ? (activeTool!.iconActiveClass) : 'text-slate-400'}
+                  />
+                  {activeTool ? activeTool.label : 'Project Tools'}
+                  <ChevronDown
+                    size={10}
+                    className={`transition-transform ${toolsMenuOpen ? 'rotate-180' : ''} ${launcherIsActive ? 'text-slate-500' : 'text-slate-400'}`}
+                  />
+                  {launcherIsActive && (
+                    <motion.span
+                      layoutId="deepdive-utility-underline"
+                      className="absolute -bottom-px left-0 right-0 h-[2px] bg-slate-900"
+                    />
+                  )}
+                </button>
+
+                <AnimatePresence>
+                  {toolsMenuOpen && (
+                    <motion.div
+                      key="tools-popover"
+                      initial={{ opacity: 0, y: -6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                      transition={{ duration: 0.14 }}
+                      role="menu"
+                      className="absolute z-50 top-full left-0 mt-2 w-[440px] max-w-[calc(100vw-2rem)] bg-white border border-slate-200 shadow-2xl rounded-md overflow-hidden"
+                    >
+                      <div className="px-3 pt-3 pb-1.5 flex items-center justify-between">
+                        <p className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-400">
+                          Project Tools
+                        </p>
+                        <p className="text-[9px] text-slate-400">{PROJECT_TOOLS.length} available</p>
+                      </div>
+                      <div className="px-2 pb-2 grid grid-cols-1 sm:grid-cols-2 gap-1">
+                        {PROJECT_TOOLS.map((tool) => {
+                          const Icon = tool.icon;
+                          const isActive = activeGroupId === tool.id;
+                          return (
+                            <button
+                              key={tool.id}
+                              type="button"
+                              role="menuitem"
+                              onClick={() => {
+                                setActiveGroupId(tool.id);
+                                setToolsMenuOpen(false);
+                              }}
+                              className={`group flex items-start gap-3 px-2.5 py-2.5 text-left rounded transition-colors ${
+                                isActive ? 'bg-slate-100 ring-1 ring-slate-300' : 'hover:bg-slate-50'
+                              }`}
+                            >
+                              <div className={`shrink-0 w-9 h-9 rounded-md border flex items-center justify-center ${tool.tileBg}`}>
+                                <Icon size={16} className={tool.tileIcon} />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-[12px] font-black uppercase tracking-wider text-slate-900 leading-tight">
+                                  {tool.label}
+                                </p>
+                                <p className="text-[11px] text-slate-500 leading-snug mt-0.5">
+                                  {tool.description}
+                                </p>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {renderPinned(historyTab)}
+            </>
+          );
         })()}
       </div>
 

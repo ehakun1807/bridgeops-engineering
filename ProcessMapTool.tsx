@@ -1432,8 +1432,8 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ steps, edges, positions, 
     }));
   }, [edges]);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(rfNodes);
-  const [, setEdges] = useEdgesState(rfEdges);
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node<NodeData>>(rfNodes);
+  const [, setEdges] = useEdgesState<Edge>(rfEdges);
 
   // Sync incoming props → flow state when steps / positions / readOnly shift.
   // Identity dep on the memoised arrays so this only fires on real changes.
@@ -1441,13 +1441,13 @@ const DiagramCanvas: React.FC<DiagramCanvasProps> = ({ steps, edges, positions, 
   useEffect(() => { setEdges(rfEdges); }, [rfEdges, setEdges]);
 
   // Push position changes back up only when a drag ends (avoids flooding
-  // parent state on every pixel of a drag).
-  const handleNodesChange = useCallback((changes: NodeChange[]) => {
+  // parent state on every pixel of a drag). xyflow types NodeChange generic
+  // over the node type, so we have to match the same generic as useNodesState.
+  const handleNodesChange = useCallback((changes: NodeChange<Node<NodeData>>[]) => {
     onNodesChange(changes);
     changes.forEach((c) => {
-      if (c.type === 'position' && (c as any).dragging === false && (c as any).position) {
-        const pos = (c as any).position as { x: number; y: number };
-        onNodePositionChange(c.id, pos);
+      if (c.type === 'position' && c.dragging === false && c.position) {
+        onNodePositionChange(c.id, c.position);
       }
     });
   }, [onNodesChange, onNodePositionChange]);
