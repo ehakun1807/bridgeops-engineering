@@ -37,14 +37,12 @@
 // ---------------------------------------------------------------------------
 
 import crypto from 'node:crypto';
-import { isAllowedEmail } from '../config.ts';
 
 // NOTE: We deliberately don't import any Firebase Web SDK code here. That
 // SDK initializes browser-oriented modules at import time and can crash a
 // Vercel Node serverless function with a generic 500 (no parseable response
 // body) — which is exactly the regression that took out an earlier version
-// of this endpoint. The config.ts import above is safe — it's pure TS with
-// no Firebase / browser deps.
+// of this endpoint.
 //
 // In place of the Firestore cache we use a simple in-memory Map at module
 // scope (see CACHE below). It persists across requests on the same Vercel
@@ -56,6 +54,18 @@ import { isAllowedEmail } from '../config.ts';
 // here because current usage doesn't justify the setup overhead.
 
 const FIREBASE_PROJECT_ID = 'gen-lang-client-0703668573';
+
+// Closed-beta allowlist — KEEP IN SYNC with config.ts + firestore.rules.
+// See note in /api/ai-analyze.ts for why this is inlined rather than imported.
+const ALLOWED_EMAILS = new Set([
+  'ehakun1807@gmail.com',
+  'beta1@bridgeops.local',
+  'beta2@bridgeops.local',
+].map((e) => e.toLowerCase()));
+function isAllowedEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return ALLOWED_EMAILS.has(email.toLowerCase());
+}
 
 // ---------------------------------------------------------------------------
 // In-memory cache (per function instance).

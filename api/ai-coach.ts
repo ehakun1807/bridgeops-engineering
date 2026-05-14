@@ -30,9 +30,20 @@
 // ---------------------------------------------------------------------------
 
 import crypto from 'node:crypto';
-import { isAllowedEmail } from '../config.ts';
 
 const FIREBASE_PROJECT_ID = 'gen-lang-client-0703668573';
+
+// Closed-beta allowlist — KEEP IN SYNC with config.ts + firestore.rules.
+// See note in /api/ai-analyze.ts for why this is inlined rather than imported.
+const ALLOWED_EMAILS = new Set([
+  'ehakun1807@gmail.com',
+  'beta1@bridgeops.local',
+  'beta2@bridgeops.local',
+].map((e) => e.toLowerCase()));
+function isAllowedEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return ALLOWED_EMAILS.has(email.toLowerCase());
+}
 
 const PUBLIC_KEYS_URL =
   'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com';

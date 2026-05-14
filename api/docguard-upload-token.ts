@@ -14,9 +14,20 @@
 
 import crypto from 'node:crypto';
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
-import { isAllowedEmail } from '../config.ts';
 
 const FIREBASE_PROJECT_ID = 'gen-lang-client-0703668573';
+
+// Closed-beta allowlist — KEEP IN SYNC with config.ts + firestore.rules.
+// See note in /api/ai-analyze.ts for why this is inlined rather than imported.
+const ALLOWED_EMAILS = new Set([
+  'ehakun1807@gmail.com',
+  'beta1@bridgeops.local',
+  'beta2@bridgeops.local',
+].map((e) => e.toLowerCase()));
+function isAllowedEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return ALLOWED_EMAILS.has(email.toLowerCase());
+}
 const MAX_PDF_BYTES = 15 * 1024 * 1024;
 
 const PUBLIC_KEYS_URL =

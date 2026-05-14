@@ -15,9 +15,23 @@
 // ---------------------------------------------------------------------------
 
 import crypto from 'node:crypto';
-import { isAllowedEmail } from '../config.ts';
 
 const FIREBASE_PROJECT_ID = 'gen-lang-client-0703668573';
+
+// Closed-beta allowlist — KEEP IN SYNC with config.ts (ALLOWED_EMAILS)
+// and firestore.rules (isAdmin's email-in list). Inlined here rather than
+// imported because Vercel's serverless bundler preserves the `.ts`
+// extension literally in the deployed JS, causing ERR_MODULE_NOT_FOUND
+// at runtime when the function tries to resolve a cross-file TS import.
+const ALLOWED_EMAILS = new Set([
+  'ehakun1807@gmail.com',
+  'beta1@bridgeops.local',
+  'beta2@bridgeops.local',
+].map((e) => e.toLowerCase()));
+function isAllowedEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return ALLOWED_EMAILS.has(email.toLowerCase());
+}
 
 const PUBLIC_KEYS_URL =
   'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com';
