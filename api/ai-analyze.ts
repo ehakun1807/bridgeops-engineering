@@ -15,9 +15,9 @@
 // ---------------------------------------------------------------------------
 
 import crypto from 'node:crypto';
+import { isAllowedEmail } from '../config.ts';
 
 const FIREBASE_PROJECT_ID = 'gen-lang-client-0703668573';
-const ADMIN_EMAIL = 'ehakun1807@gmail.com';
 
 const PUBLIC_KEYS_URL =
   'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com';
@@ -344,10 +344,12 @@ export default async function handler(req: ReqLike, res: ResLike) {
     return res.status(401).json({ error: 'invalid token' });
   }
 
-  if (
-    payload.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase() ||
-    payload.email_verified !== true
-  ) {
+  // Closed-beta gate: allowlist is the only check. email_verified is
+  // intentionally NOT required so manually-provisioned Console users with
+  // fake email domains (e.g. beta1@bridgeops.local) can sign in. The
+  // allowlist itself is the security boundary — re-add the email_verified
+  // check before opening public sign-up.
+  if (!isAllowedEmail(payload.email)) {
     return res.status(403).json({ error: 'forbidden' });
   }
 

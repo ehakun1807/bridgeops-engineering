@@ -59,10 +59,24 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    // Keep this list in sync with ALLOWED_EMAILS in config.ts. Adding a
+    // beta tester = one entry here + one entry in config.ts, then re-deploy
+    // these rules (paste into the Firebase Console per the multi-DB deploy
+    // gotcha — `firebase deploy --only firestore:rules` prints success but
+    // does not actually publish to the named database).
     function isAdmin() {
       return isAuthenticated() &&
         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-         (request.auth.token.email == "ehakun1807@gmail.com" && request.auth.token.email_verified == true));
+         // Closed-beta gate: allowlist only. email_verified intentionally
+         // NOT required so manually-provisioned Console users with fake
+         // email domains (e.g. beta1@bridgeops.local) can read/write.
+         // Re-add `&& request.auth.token.email_verified == true` before
+         // opening public sign-up.
+        (request.auth.token.email in [
+    "ehakun1807@gmail.com",
+    "beta1@bridgeops.local",
+    "beta2@bridgeops.local"
+]));
     }
 
     function isValidUser(data) {

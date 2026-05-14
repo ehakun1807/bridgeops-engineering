@@ -210,6 +210,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
           <Chrome size={18} />
           Continue with Google
         </button>
+        {/* Beta hint — keep email/password as the primary path for the
+            closed-beta colleagues (provisioned fake-domain logins). The
+            Google button still works for admin Google sign-in. */}
+        <p className="mt-2 text-center text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400">
+          Beta testers — use the email + password issued to you above.
+        </p>
 
         <p className="mt-8 text-center text-slate-400 text-[10px] font-bold uppercase tracking-widest leading-relaxed">
           Access is invite-only. Want on the list?

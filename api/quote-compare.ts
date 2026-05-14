@@ -37,9 +37,9 @@
 // ---------------------------------------------------------------------------
 
 import crypto from 'node:crypto';
+import { isAllowedEmail } from '../config.ts';
 
 const FIREBASE_PROJECT_ID = 'gen-lang-client-0703668573';
-const ADMIN_EMAIL = 'ehakun1807@gmail.com';
 
 // ---------------------------------------------------------------------------
 // In-memory per-instance cache. Same shape as /api/find-equivalent — quotes
@@ -541,8 +541,8 @@ export default async function handler(req: ReqLike, res: ResLike) {
   }
 
   if (
-    payload.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase() ||
-    payload.email_verified !== true
+    // Closed-beta gate: allowlist only. See note in /api/ai-analyze.ts.
+    !isAllowedEmail(payload.email)
   ) {
     return res.status(403).json(EMPTY_RESPONSE({ error: 'forbidden' }));
   }

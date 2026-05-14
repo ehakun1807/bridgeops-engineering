@@ -30,9 +30,9 @@
 // ---------------------------------------------------------------------------
 
 import crypto from 'node:crypto';
+import { isAllowedEmail } from '../config.ts';
 
 const FIREBASE_PROJECT_ID = 'gen-lang-client-0703668573';
-const ADMIN_EMAIL = 'ehakun1807@gmail.com';
 
 const PUBLIC_KEYS_URL =
   'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com';
@@ -365,10 +365,8 @@ export default async function handler(req: ReqLike, res: ResLike) {
     return res.status(401).json({ error: 'invalid token' });
   }
 
-  if (
-    payload.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase() ||
-    payload.email_verified !== true
-  ) {
+  // Closed-beta gate: allowlist only. See note in /api/ai-analyze.ts.
+  if (!isAllowedEmail(payload.email)) {
     return res.status(403).json({ error: 'forbidden' });
   }
 

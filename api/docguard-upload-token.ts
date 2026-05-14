@@ -14,9 +14,9 @@
 
 import crypto from 'node:crypto';
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
+import { isAllowedEmail } from '../config.ts';
 
 const FIREBASE_PROJECT_ID = 'gen-lang-client-0703668573';
-const ADMIN_EMAIL = 'ehakun1807@gmail.com';
 const MAX_PDF_BYTES = 15 * 1024 * 1024;
 
 const PUBLIC_KEYS_URL =
@@ -131,10 +131,8 @@ export default async function handler(req: ReqLike, res: ResLike) {
           throw new Error('invalid token');
         }
 
-        if (
-          payload.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase() ||
-          payload.email_verified !== true
-        ) {
+        // Closed-beta gate: allowlist only. See note in /api/ai-analyze.ts.
+        if (!isAllowedEmail(payload.email)) {
           throw new Error('forbidden');
         }
 
