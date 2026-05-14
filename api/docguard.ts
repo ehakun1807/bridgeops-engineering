@@ -286,57 +286,150 @@ export default async function handler(req: ReqLike, res: ResLike) {
     return res.status(502).json({ error: 'blob fetch failed' });
   }
 
+  // ------------------------------------------------------------------------
+  // Gemini call with transient-failure retry + model fallback. Mirrors the
+  // pattern in /api/ai-analyze, /api/ai-coach, /api/find-equivalent,
+  // /api/quote-compare.
+  //
+  // Strategy:
+  //   1. Primary model (gemini-2.5-flash) with 2 backoff retries (500ms,
+  //      1500ms) on transient failures (503/429/5xx/network).
+  //   2. If primary still failing on transient errors, fall back ONCE to
+  //      gemini-2.5-flash-lite. Different capacity pool — typically up
+  //      when the primary is overloaded.
+  //
+  // 4xx other than 429 are NOT retried — they indicate a configuration
+  // problem that would fail identically on retry.
+  //
+  // Wrapped in the existing try/finally so the blob is ALWAYS cleaned up,
+  // regardless of which retry / fallback path the response takes.
+  // ------------------------------------------------------------------------
+  const PRIMARY_MODEL = 'gemini-2.5-flash';
+  const FALLBACK_MODEL = 'gemini-2.5-flash-lite';
+  const RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
+
+  type CallResult =
+    | { kind: 'ok'; res: Response; model: string }
+    | { kind: 'http_error'; statusCode: number; text: string; model: string }
+    | { kind: 'network_error'; error: any; model: string };
+
+  async function callModel(model: string, backoffMs: number[]): Promise<CallResult> {
+    const maxAttempts = 1 + backoffMs.length;
+    let lastHttp: { statusCode: number; text: string } | null = null;
+    let lastNetwork: any = null;
+
+    const body = {
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { text: SYSTEM_PROMPT },
+            {
+              inlineData: {
+                mimeType: 'application/pdf',
+                data: pdfBase64
+              }
+            },
+            {
+              text: `File name: ${fileName}\n\nPlease audit this PDF and return findings per the schema.`
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: RESPONSE_SCHEMA,
+        temperature: 0.4,
+        maxOutputTokens: 8192
+      }
+    };
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const r = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          }
+        );
+        if (r.ok) return { kind: 'ok', res: r, model };
+        const txt = await r.text().catch(() => '');
+        lastHttp = { statusCode: r.status, text: txt };
+        if (!RETRY_STATUSES.has(r.status) || attempt === maxAttempts) break;
+        const wait = backoffMs[attempt - 1];
+        console.warn(
+          `Gemini ${model} transient ${r.status} attempt ${attempt}/${maxAttempts}, retrying in ${wait}ms`
+        );
+        await new Promise((resolve) => setTimeout(resolve, wait));
+      } catch (err: any) {
+        lastNetwork = err;
+        if (attempt === maxAttempts) break;
+        const wait = backoffMs[attempt - 1];
+        console.warn(
+          `Gemini ${model} fetch threw attempt ${attempt}/${maxAttempts}, retrying in ${wait}ms:`,
+          err?.message
+        );
+        await new Promise((resolve) => setTimeout(resolve, wait));
+      }
+    }
+
+    if (lastHttp) {
+      return { kind: 'http_error', model, statusCode: lastHttp.statusCode, text: lastHttp.text };
+    }
+    return { kind: 'network_error', model, error: lastNetwork };
+  }
+
   // Single try/finally wraps the Gemini call + parse so we ALWAYS delete
   // the blob, even on early returns.
   let parsed: any;
   try {
-    let geminiRes: Response;
-    try {
-      geminiRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [
-              {
-                role: 'user',
-                parts: [
-                  { text: SYSTEM_PROMPT },
-                  {
-                    inlineData: {
-                      mimeType: 'application/pdf',
-                      data: pdfBase64
-                    }
-                  },
-                  {
-                    text: `File name: ${fileName}\n\nPlease audit this PDF and return findings per the schema.`
-                  }
-                ]
-              }
-            ],
-            generationConfig: {
-              responseMimeType: 'application/json',
-              responseSchema: RESPONSE_SCHEMA,
-              temperature: 0.4,
-              maxOutputTokens: 8192
-            }
-          })
+    const primaryResult = await callModel(PRIMARY_MODEL, [500, 1500]);
+
+    let result: CallResult = primaryResult;
+    if (primaryResult.kind !== 'ok') {
+      const primaryTransient =
+        primaryResult.kind === 'network_error' ||
+        (primaryResult.kind === 'http_error' && RETRY_STATUSES.has(primaryResult.statusCode));
+      if (primaryTransient) {
+        console.warn(
+          `Primary model ${PRIMARY_MODEL} exhausted retries, falling back to ${FALLBACK_MODEL}`
+        );
+        const fallbackResult = await callModel(FALLBACK_MODEL, []);
+        if (fallbackResult.kind === 'ok') {
+          result = fallbackResult;
+        } else if (
+          fallbackResult.kind === 'http_error' &&
+          primaryResult.kind === 'network_error'
+        ) {
+          result = fallbackResult;
         }
-      );
-    } catch (err: any) {
-      console.error('Gemini fetch failed:', err);
-      return res.status(502).json({ error: 'ai service unreachable' });
+      }
     }
 
-    if (!geminiRes.ok) {
-      const txt = await geminiRes.text().catch(() => '');
-      console.error('Gemini error:', geminiRes.status, txt);
+    if (result.kind === 'network_error') {
+      console.error(`Gemini fetch failed after retries (${result.model}):`, result.error);
+      return res.status(502).json({ error: 'ai service unreachable' });
+    }
+    if (result.kind === 'http_error') {
+      console.error(`Gemini error after retries (${result.model}):`, result.statusCode, result.text);
+      const safeDetail = (result.text || '')
+        .replace(/AIza[0-9A-Za-z_\-]{20,}/g, '[key]')
+        .slice(0, 300);
+      // 503 specifically = model overloaded. Surface a friendlier message so
+      // the user knows it's transient and worth retrying in a moment.
+      const friendly =
+        result.statusCode === 503
+          ? 'AI service is overloaded right now — please try again in a minute'
+          : `ai service error (${result.statusCode})`;
       return res.status(502).json({
-        error: `ai service error (${geminiRes.status}): ${txt.slice(0, 300) || 'no body'}`
+        error: friendly,
+        ...(safeDetail ? { detail: safeDetail } : {})
       });
     }
 
+    const geminiRes = result.res;
     const data: any = await geminiRes.json();
     const textOut = data?.candidates?.[0]?.content?.parts?.[0]?.text;
     const finishReason = data?.candidates?.[0]?.finishReason;
