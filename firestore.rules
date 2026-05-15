@@ -174,6 +174,33 @@ service cloud.firestore {
              (!('manualPositions' in data) || data.manualPositions is map);
     }
 
+    // Product BOMs — one doc per BOM revision uploaded to a project. Scoped
+    // to userId + projectId. Lines are stored as an embedded list of
+    // normalized {internalPn, mpn, manufacturer, description, refDes, qty,
+    // unitCost, package, raw} maps; client-side bomParser is the source of
+    // truth for the shape. We allow update because the client writes the AI
+    // impactAnalysis subfield back into the doc after /api/bom-impact-analyze
+    // completes — but the core BOM data (lines, columnMap, uploadedAtMs) is
+    // immutable in practice (the client never overwrites it). Embedded shape
+    // validated client-side for the same reasons as taktStudies / pfmeas.
+    function isValidProductBom(data) {
+      return data.keys().hasAll(['userId', 'projectId', 'fileName', 'uploadedAtMs', 'lines', 'totalLines', 'columnMap', 'source']) &&
+             data.userId == request.auth.uid &&
+             data.projectId is string && data.projectId.size() > 0 &&
+             data.fileName is string && data.fileName.size() > 0 && data.fileName.size() <= 300 &&
+             data.uploadedAtMs is number &&
+             data.totalLines is number &&
+             data.lines is list && data.lines.size() <= 5000 &&
+             data.columnMap is map &&
+             data.source in ['upload', 'plm', 'manual'] &&
+             (!('versionLabel' in data) || (data.versionLabel is string && data.versionLabel.size() <= 60)) &&
+             (!('effectiveDateMs' in data) || data.effectiveDateMs is number) &&
+             (!('reasonForChange' in data) || (data.reasonForChange is string && data.reasonForChange.size() <= 500)) &&
+             (!('uploadedAtGate' in data) || data.uploadedAtGate is string) &&
+             (!('externalId' in data) || (data.externalId is string && data.externalId.size() <= 200)) &&
+             (!('impactAnalysis' in data) || data.impactAnalysis is map);
+    }
+
     // DocGuard audits — one doc per PDF audit run. Project-agnostic for v1
     // (matches Alt BOM placement in AdvancedToolsModal). Embedded findings
     // and summary shapes are enforced client-side by docGuardClient
@@ -269,6 +296,18 @@ service cloud.firestore {
       allow list: if isAuthenticated();
       allow create: if isAuthenticated() && isValidProcessMap(request.resource.data);
       allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidProcessMap(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    match /productBoms/{bomId} {
+      // Same get + list split — client passes userId + projectId filter on
+      // list queries so per-user isolation is enforced. Update allowed so
+      // the client can persist the AI impactAnalysis subfield after the
+      // /api/bom-impact-analyze handler returns.
+      allow get: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidProductBom(request.resource.data);
+      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidProductBom(request.resource.data);
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 

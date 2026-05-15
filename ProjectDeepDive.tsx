@@ -42,6 +42,7 @@ import {
   Timer,
   ShieldAlert,
   Workflow,
+  Boxes,
   LayoutGrid
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -67,6 +68,7 @@ import TaktStudyTool from './TaktStudyTool.tsx';
 import MeetingsTool from './MeetingsTool.tsx';
 import PFMEATool from './PFMEATool.tsx';
 import ProcessMapTool from './ProcessMapTool.tsx';
+import ProductBomTool from './ProductBomTool.tsx';
 import ScopeEditor from './ScopeEditor.tsx';
 import CoachPanel from './CoachPanel.tsx';
 import StandardsPicker from './StandardsPicker.tsx';
@@ -277,6 +279,7 @@ const STUDIES_TAB_ID = '__studies__';
 const MEETINGS_TAB_ID = '__meetings__';
 const PFMEA_TAB_ID = '__pfmea__';
 const PROCESS_MAP_TAB_ID = '__process_map__';
+const PRODUCT_BOM_TAB_ID = '__product_bom__';
 
 // ---------------------------------------------------------------------------
 // Project Tools registry — sub-app surfaces that live inside the deep-dive
@@ -335,6 +338,15 @@ const PROJECT_TOOLS: ProjectToolEntry[] = [
     iconActiveClass: 'text-blue-600',
     tileBg: 'bg-blue-50 border-blue-200',
     tileIcon: 'text-blue-700'
+  },
+  {
+    id: PRODUCT_BOM_TAB_ID,
+    label: 'BOM Pulse',
+    description: 'Live pulse on BOM evolution — diff every revision, AI-detect the ripple on readiness',
+    icon: Boxes,
+    iconActiveClass: 'text-amber-600',
+    tileBg: 'bg-amber-50 border-amber-200',
+    tileIcon: 'text-amber-700'
   }
 ];
 const HISTORY_TAB_ID = '__history__';
@@ -1903,6 +1915,25 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
           >
             <ProcessMapTool projectId={project.id} readOnly={readOnly} />
+          </motion.div>
+        ) : activeGroupId === PRODUCT_BOM_TAB_ID ? (
+          <motion.div
+            key={PRODUCT_BOM_TAB_ID}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <ProductBomTool
+              projectId={project.id}
+              projectName={projectName}
+              productType={productType || project.productType}
+              currentGate={currentGate}
+              gateTargets={gateTargets}
+              standards={projectStandards}
+              disabledItemIds={disabledItemIds}
+              readOnly={readOnly}
+            />
           </motion.div>
         ) : activeGroupId === HISTORY_TAB_ID ? (
           <motion.div
