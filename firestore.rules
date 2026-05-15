@@ -174,8 +174,8 @@ service cloud.firestore {
              (!('manualPositions' in data) || data.manualPositions is map);
     }
 
-    // Product BOMs — one doc per BOM revision uploaded to a project. Scoped
-    // to userId + projectId. Lines are stored as an embedded list of
+    // Product BOMs (user-facing: "BOM Pulse") — one doc per BOM revision
+    // uploaded to a project. Scoped to userId + projectId. Lines are stored as an embedded list of
     // normalized {internalPn, mpn, manufacturer, description, refDes, qty,
     // unitCost, package, raw} maps; client-side bomParser is the source of
     // truth for the shape. We allow update because the client writes the AI
