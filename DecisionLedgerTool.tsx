@@ -49,6 +49,7 @@ import {
   Timestamp
 } from 'firebase/firestore';
 import { buildDecisionRegisterPdf } from './utils/decisionRegisterPdf.ts';
+import type { ProjectDecisionSummary } from './ProjectDeepDive.tsx';
 
 // ---------------------------------------------------------------------------
 // Data model
@@ -202,8 +203,9 @@ const DecisionLedgerTool: React.FC<DecisionLedgerToolProps> = ({
 
   // ── Load ────────────────────────────────────────────────────────────────
 
-  const load = async () => {
-    if (!uid || !projectId) { setDecisions([]); setLoading(false); return; }
+  // Returns the freshly loaded list so save/remove can pass it to writeSummary.
+  const load = async (): Promise<Decision[]> => {
+    if (!uid || !projectId) { setDecisions([]); setLoading(false); return []; }
     setLoading(true); setError(null);
     try {
       const snap = await getDocs(query(
@@ -212,16 +214,39 @@ const DecisionLedgerTool: React.FC<DecisionLedgerToolProps> = ({
         where('projectId', '==', projectId),
         orderBy('dateMs', 'desc')
       ));
-      setDecisions(snap.docs.map(d => ({ ...d.data() as Omit<Decision, 'id'>, id: d.id })));
+      const loaded = snap.docs.map(d => ({ ...d.data() as Omit<Decision, 'id'>, id: d.id }));
+      setDecisions(loaded);
+      return loaded;
     } catch (e: any) {
       console.error('[DecisionLedgerTool] load failed', e);
       setError(e?.message ?? 'Failed to load decisions');
+      return [];
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => { load(); }, [uid, projectId]); // eslint-disable-line
+
+  // ── Summary mirror ───────────────────────────────────────────────────────
+  // Writes a lightweight snapshot to the project doc so Dashboard + header
+  // pills can show decision counts without querying the decisions collection.
+  // Same try/catch-warn pattern as TaktStudyTool's taktSummary writeback.
+
+  const writeSummary = async (list: Decision[]) => {
+    try {
+      if (!projectId) return;
+      const summary: ProjectDecisionSummary = {
+        totalCount:      list.length,
+        activeCount:     list.filter(d => d.status === 'active').length,
+        reversedCount:   list.filter(d => d.status === 'reversed').length,
+        lastDecisionMs:  list.length > 0 ? Math.max(...list.map(d => d.dateMs)) : 0
+      };
+      await updateDoc(doc(db, 'projects', projectId), { decisionSummary: summary });
+    } catch (e) {
+      console.warn('[DecisionLedgerTool] writeSummary failed (non-fatal)', e);
+    }
+  };
 
   // ── CRUD ────────────────────────────────────────────────────────────────
 
@@ -248,7 +273,8 @@ const DecisionLedgerTool: React.FC<DecisionLedgerToolProps> = ({
     } else {
       await addDoc(collection(db, 'decisions'), { ...payload, createdAt: serverTimestamp() });
     }
-    await load();
+    const fresh = await load();
+    await writeSummary(fresh);
     setMode({ kind: 'list' });
   };
 
@@ -257,7 +283,8 @@ const DecisionLedgerTool: React.FC<DecisionLedgerToolProps> = ({
     if (!confirm(`Delete "${d.title || 'this decision'}"? This cannot be undone.`)) return;
     try {
       await deleteDoc(doc(db, 'decisions', d.id));
-      await load();
+      const fresh = await load();
+      await writeSummary(fresh);
     } catch (e: any) {
       alert(e?.message ?? 'Delete failed');
     }

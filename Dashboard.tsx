@@ -43,7 +43,9 @@ import {
   GraduationCap,
   ChevronDown,
   Trash2,
-  Wrench
+  Wrench,
+  Scale,
+  RotateCcw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ProjectDeepDive, {
@@ -53,7 +55,8 @@ import ProjectDeepDive, {
   ProjectAttachment,
   ScoreSnapshot,
   SubItemDeliverables,
-  CustomSubItem
+  CustomSubItem,
+  ProjectDecisionSummary
 } from './ProjectDeepDive';
 import PortfolioHeatmap from './PortfolioHeatmap.tsx';
 import AuthModal from './AuthModal.tsx';
@@ -974,9 +977,25 @@ const ProjectCard: React.FC<{
 
       {/* Footer meta */}
       <div className="mt-auto flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-slate-400 pt-4 border-t border-slate-100">
-        <span className="flex items-center gap-1.5">
-          <Calendar size={11} />
-          {archiveMode && closed ? `Closed ${closed}` : `Created ${created}`}
+        <span className="flex items-center gap-1.5 flex-wrap gap-y-1">
+          <span className="flex items-center gap-1.5">
+            <Calendar size={11} />
+            {archiveMode && closed ? `Closed ${closed}` : `Created ${created}`}
+          </span>
+          {/* Decision chip — shows reversed count (rose) or total (indigo) */}
+          {project.decisionSummary && project.decisionSummary.totalCount > 0 && (
+            project.decisionSummary.reversedCount > 0 ? (
+              <span className="flex items-center gap-1 px-1.5 py-0.5 bg-rose-50 text-rose-600 border border-rose-200 rounded-sm">
+                <RotateCcw size={9} />
+                {project.decisionSummary.reversedCount} reversed
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 px-1.5 py-0.5 bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-sm">
+                <Scale size={9} />
+                {project.decisionSummary.totalCount} decision{project.decisionSummary.totalCount !== 1 ? 's' : ''}
+              </span>
+            )
+          )}
         </span>
         <span className="flex items-center gap-3">
           {archiveMode && onDelete && (

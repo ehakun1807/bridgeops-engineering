@@ -37,7 +37,8 @@ import {
   Info,
   BarChart3,
   LayoutGrid,
-  Copy
+  Copy,
+  Scale
 } from 'lucide-react';
 import { db, auth } from './firebase.ts';
 import {
@@ -53,6 +54,28 @@ import {
   serverTimestamp,
   Timestamp
 } from 'firebase/firestore';
+
+// ---------------------------------------------------------------------------
+// Decision cross-link — lightweight type (avoids circular import with
+// DecisionLedgerTool which imports from ProjectDeepDive).
+// ---------------------------------------------------------------------------
+
+interface DecisionRef {
+  id: string;
+  title: string;
+  status: 'active' | 'superseded' | 'reversed';
+  description: string;
+  relatedRisks: string;
+}
+
+// Returns word-overlap similarity score (# of shared words ≥4 chars).
+function decisionMatchScore(risk: { processStep: string; failureMode: string; cause: string }, dec: DecisionRef): number {
+  const riskText  = [risk.processStep, risk.failureMode, risk.cause].join(' ').toLowerCase();
+  const decText   = [dec.title, dec.description, dec.relatedRisks].join(' ').toLowerCase();
+  const tokenize  = (s: string) => s.match(/\b[a-z]{4,}\b/g) ?? [];
+  const riskWords = new Set(tokenize(riskText));
+  return tokenize(decText).filter(w => riskWords.has(w)).length;
+}
 
 // ---------------------------------------------------------------------------
 // Data model
@@ -297,8 +320,32 @@ const PFMEATool: React.FC<PFMEAToolProps> = ({ projectId, readOnly = false }) =>
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>({ kind: 'list' });
+  // Decision cross-links — loaded once on mount, used in RiskCard badges.
+  const [decisions, setDecisions] = useState<DecisionRef[]>([]);
 
   const uid = auth.currentUser?.uid ?? '';
+
+  // Load decisions for cross-link matching (fire-and-forget — non-blocking).
+  useEffect(() => {
+    if (!uid || !projectId) return;
+    getDocs(query(
+      collection(db, 'decisions'),
+      where('userId', '==', uid),
+      where('projectId', '==', projectId),
+      orderBy('dateMs', 'desc')
+    )).then(snap => {
+      setDecisions(snap.docs.map(d => {
+        const data = d.data() as any;
+        return {
+          id:           d.id,
+          title:        data.title ?? '',
+          status:       data.status ?? 'active',
+          description:  data.description ?? '',
+          relatedRisks: data.relatedRisks ?? ''
+        };
+      }));
+    }).catch(() => { /* non-fatal — cross-links just won't show */ });
+  }, [uid, projectId]); // eslint-disable-line
 
   const load = async () => {
     if (!uid || !projectId) {
@@ -470,6 +517,7 @@ const PFMEATool: React.FC<PFMEAToolProps> = ({ projectId, readOnly = false }) =>
               onCancel={cancelEdit}
               onSave={save}
               readOnly={readOnly}
+              decisions={decisions}
             />
           </motion.div>
         )}
@@ -598,9 +646,10 @@ interface PFMEAFormProps {
   onCancel: () => void;
   onSave: (p: PFMEA) => Promise<void>;
   readOnly: boolean;
+  decisions?: DecisionRef[];
 }
 
-const PFMEAForm: React.FC<PFMEAFormProps> = ({ initial, onCancel, onSave, readOnly }) => {
+const PFMEAForm: React.FC<PFMEAFormProps> = ({ initial, onCancel, onSave, readOnly, decisions = [] }) => {
   const [draft, setDraft] = useState<PFMEA>(initial);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -785,17 +834,24 @@ const PFMEAForm: React.FC<PFMEAFormProps> = ({ initial, onCancel, onSave, readOn
         </div>
 
         <div className="space-y-3">
-          {draft.risks.map((r, idx) => (
-            <RiskCard
-              key={r.id}
-              index={idx}
-              risk={r}
-              readOnly={readOnly}
-              onChange={(patch) => updateRisk(idx, patch)}
-              onDuplicate={() => duplicateRisk(idx)}
-              onDelete={() => deleteRisk(idx)}
-            />
-          ))}
+          {draft.risks.map((r, idx) => {
+            const matchedDecisions = decisions
+              .filter(d => decisionMatchScore(r, d) >= 2)
+              .sort((a, b) => decisionMatchScore(r, b) - decisionMatchScore(r, a))
+              .slice(0, 3);
+            return (
+              <RiskCard
+                key={r.id}
+                index={idx}
+                risk={r}
+                readOnly={readOnly}
+                onChange={(patch) => updateRisk(idx, patch)}
+                onDuplicate={() => duplicateRisk(idx)}
+                onDelete={() => deleteRisk(idx)}
+                matchedDecisions={matchedDecisions}
+              />
+            );
+          })}
         </div>
       </div>
 
@@ -867,9 +923,10 @@ interface RiskCardProps {
   onChange: (patch: Partial<RiskLine>) => void;
   onDuplicate: () => void;
   onDelete: () => void;
+  matchedDecisions?: DecisionRef[];
 }
 
-const RiskCard: React.FC<RiskCardProps> = ({ index, risk, readOnly, onChange, onDuplicate, onDelete }) => {
+const RiskCard: React.FC<RiskCardProps> = ({ index, risk, readOnly, onChange, onDuplicate, onDelete, matchedDecisions = [] }) => {
   const rpn = computeRPN(risk.severity, risk.occurrence, risk.detection);
   const tier = rpnTier(rpn);
   const tierTok = TIER_CHIP[tier];
@@ -909,6 +966,20 @@ const RiskCard: React.FC<RiskCardProps> = ({ index, risk, readOnly, onChange, on
               Revised RPN {revisedRPN} · {TIER_CHIP[revisedTier].label}
               <span className="opacity-60">·</span>
               {AP_CHIP[revisedAP].label}
+            </span>
+          )}
+          {/* Decision cross-link badge */}
+          {matchedDecisions.length > 0 && (
+            <span
+              title={matchedDecisions.map(d => d.title).join(' · ')}
+              className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest bg-amber-50 text-amber-700 border border-amber-300"
+            >
+              <Scale size={9} />
+              {matchedDecisions.length === 1
+                ? matchedDecisions[0].title.length > 40
+                  ? matchedDecisions[0].title.slice(0, 38) + '…'
+                  : matchedDecisions[0].title
+                : `${matchedDecisions.length} linked decisions`}
             </span>
           )}
         </div>

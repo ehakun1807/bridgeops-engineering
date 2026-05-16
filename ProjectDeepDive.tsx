@@ -260,6 +260,10 @@ export interface DeepDiveProject {
   // show capacity readiness without an extra read. Drafts never write
   // here; Reopen/Delete leave it alone (the snapshot is point-in-time).
   taktSummary?: ProjectTaktSummary;
+  // Snapshot of the decision ledger counts -- mirrored from the decisions
+  // collection on every save/delete so Dashboard + header can show a chip
+  // without an extra query. Updated on every mutation in DecisionLedgerTool.
+  decisionSummary?: ProjectDecisionSummary;
 }
 
 export interface ProjectTaktSummary {
@@ -270,6 +274,13 @@ export interface ProjectTaktSummary {
   balanceLoss: number;       // 0..1 — see lineBalanceLoss in taktMath
   capacity: 'green' | 'yellow' | 'red';
   completedAtMs: number;
+}
+
+export interface ProjectDecisionSummary {
+  activeCount: number;
+  reversedCount: number;
+  totalCount: number;
+  lastDecisionMs: number;
 }
 
 const NOTE_MAX = 200;
