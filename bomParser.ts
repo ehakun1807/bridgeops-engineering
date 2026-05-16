@@ -159,6 +159,15 @@ const HEURISTICS: HeuristicPattern[] = [
     priority: 60,
     test: (n) => /^[a-z]{2,8} (pn|part number|part no|part num)$/.test(n)
   },
+  // Bare "Number" / "Item Number" / "Doc Number" — the standard export column
+  // name from Agile PLM, Arena, Windchill, and similar systems. Intentionally
+  // low priority (40) so more specific patterns always win, but high enough to
+  // catch PLM exports where "Number" IS the internal part number.
+  {
+    field: 'internalPn',
+    priority: 40,
+    test: (n) => /^(number|item number|item no|item num|doc number|part no\.|item id)$/.test(n)
+  },
 
   // MPN — most specific first.
   {

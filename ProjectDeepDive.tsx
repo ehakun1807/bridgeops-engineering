@@ -1870,6 +1870,10 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
               cached={aiAnalysis}
               onAnalyzed={persistAiAnalysis}
               readOnly={readOnly}
+              projectId={project.id}
+              userId={auth.currentUser?.uid ?? ''}
+              db={db}
+              taktSummary={project.taktSummary}
             />
           </motion.div>
         ) : activeGroupId === STUDIES_TAB_ID ? (

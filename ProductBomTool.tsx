@@ -521,7 +521,11 @@ const BomList: React.FC<BomListProps> = ({
             diffBadge = 'no change';
             diffTone = 'emerald';
           } else {
-            diffBadge = `+${d.summary.addedCount} / -${d.summary.removedCount} / Δ${d.summary.changedCount}`;
+            const parts = [];
+            if (d.summary.addedCount) parts.push(`+${d.summary.addedCount} added`);
+            if (d.summary.removedCount) parts.push(`-${d.summary.removedCount} removed`);
+            if (d.summary.changedCount) parts.push(`${d.summary.changedCount} changed`);
+            diffBadge = parts.join(' · ');
             diffTone = d.summary.supplierSwapCount > 0 ? 'rose' : 'amber';
           }
         }
@@ -1049,20 +1053,21 @@ const PreviewDiffPanel: React.FC<PreviewDiffPanelProps> = ({ diff, baselineLabel
   const totalChanges = added.length + removed.length + changed.length;
   return (
     <div className="border border-slate-200 rounded">
+      {/* Summary badges */}
       <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <span className="text-[10px] font-black uppercase tracking-widest text-slate-700">
-            Diff vs. {baselineLabel}
+            Red Lines vs. {baselineLabel}
           </span>
           <div className="flex items-center gap-2 text-[10px] font-bold">
-            <span className="inline-flex items-center bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded">
+            <span className={`inline-flex items-center px-2 py-0.5 rounded ${summary.addedCount ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
               +{summary.addedCount} added
             </span>
-            <span className="inline-flex items-center bg-rose-100 text-rose-700 px-2 py-0.5 rounded">
+            <span className={`inline-flex items-center px-2 py-0.5 rounded ${summary.removedCount ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-400'}`}>
               -{summary.removedCount} removed
             </span>
-            <span className="inline-flex items-center bg-amber-100 text-amber-700 px-2 py-0.5 rounded">
-              Δ{summary.changedCount} changed
+            <span className={`inline-flex items-center px-2 py-0.5 rounded ${summary.changedCount ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-400'}`}>
+              {summary.changedCount} changed
             </span>
             {summary.supplierSwapCount > 0 && (
               <span className="inline-flex items-center gap-1 bg-rose-50 border border-rose-200 text-rose-700 px-2 py-0.5 rounded">
@@ -1071,29 +1076,29 @@ const PreviewDiffPanel: React.FC<PreviewDiffPanelProps> = ({ diff, baselineLabel
             )}
           </div>
         </div>
-        <div className="mt-2 text-[10px] text-slate-500 flex items-center gap-4 tabular-nums">
-          <span>Total {summary.totalBefore} → {summary.totalAfter}</span>
-          <span>
-            Qty Δ {summary.qtyDelta >= 0 ? '+' : ''}
-            {summary.qtyDelta}
-          </span>
-          {Math.abs(summary.costDelta) >= 0.01 && (
-            <span>
-              Cost/assembly Δ {summary.costDelta >= 0 ? '+$' : '-$'}
-              {Math.abs(summary.costDelta).toFixed(2)}
-            </span>
-          )}
-        </div>
+        {(Math.abs(summary.qtyDelta) > 0 || Math.abs(summary.costDelta) >= 0.01) && (
+          <div className="mt-2 text-[10px] text-slate-500 flex items-center gap-4 tabular-nums">
+            {Math.abs(summary.qtyDelta) > 0 && (
+              <span>Qty Δ {summary.qtyDelta >= 0 ? '+' : ''}{summary.qtyDelta}</span>
+            )}
+            {Math.abs(summary.costDelta) >= 0.01 && (
+              <span>Cost/assy Δ {summary.costDelta >= 0 ? '+$' : '-$'}{Math.abs(summary.costDelta).toFixed(2)}</span>
+            )}
+          </div>
+        )}
       </div>
+
       {totalChanges === 0 ? (
         <div className="px-6 py-8 text-center text-sm text-slate-500">
           No detected changes vs. {baselineLabel}.
         </div>
       ) : (
-        <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
+        <div className="max-h-96 overflow-y-auto divide-y divide-slate-100">
+          {/* Changed items first — the "red lines" */}
           {changed.map((c, i) => (
             <ChangedRow key={`c-${i}`} change={c} />
           ))}
+          {/* Added / removed only shown when they actually exist */}
           {added.map((l, i) => (
             <SimpleRow key={`a-${i}`} kind="added" line={l} />
           ))}
@@ -1106,37 +1111,70 @@ const PreviewDiffPanel: React.FC<PreviewDiffPanelProps> = ({ diff, baselineLabel
   );
 };
 
+/** Returns a human-readable before→after string for a given ChangeKind. */
+function attrDiff(kind: ChangeKind, before: BomLine, after: BomLine): { label: string; from: string; to: string } | null {
+  switch (kind) {
+    case 'qty':
+      return { label: 'BOM Qty', from: String(before.qty), to: String(after.qty) };
+    case 'mpn':
+      return { label: 'MPN', from: before.mpn ?? '—', to: after.mpn ?? '—' };
+    case 'manufacturer':
+      return { label: 'Manufacturer', from: before.manufacturer ?? '—', to: after.manufacturer ?? '—' };
+    case 'description':
+      return { label: 'Description', from: before.description ?? '—', to: after.description ?? '—' };
+    case 'cost':
+      return {
+        label: 'Unit cost',
+        from: before.unitCost != null ? `$${before.unitCost}` : '—',
+        to: after.unitCost != null ? `$${after.unitCost}` : '—'
+      };
+    case 'refDes':
+      return { label: 'RefDes', from: before.refDes ?? '—', to: after.refDes ?? '—' };
+    case 'package':
+      return { label: 'Package', from: before.package ?? '—', to: after.package ?? '—' };
+    case 'level':
+      return {
+        label: 'BOM Level',
+        from: before.bomLevel != null ? `L${before.bomLevel}` : '—',
+        to: after.bomLevel != null ? `L${after.bomLevel}` : '—'
+      };
+    default:
+      return null;
+  }
+}
+
 const ChangedRow: React.FC<{
   change: BomDiff['changed'][number];
 }> = ({ change }) => {
-  const hasLevel = change.before.bomLevel != null || change.after.bomLevel != null;
+  const { before, after, kinds } = change;
+  const diffs = kinds.map((k) => attrDiff(k, before, after)).filter((d): d is NonNullable<typeof d> => d !== null);
   return (
-    <div className="px-4 py-2 text-[12px] flex items-start gap-3">
-      <span className="inline-flex items-center bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-widest flex-shrink-0">
-        Δ
-      </span>
-      <div className="flex-1 min-w-0">
-        <div className="font-semibold text-slate-900 truncate">
-          {hasLevel && (
-            <span className="inline-flex items-center bg-slate-100 text-slate-600 px-1 mr-1 rounded text-[9px] font-bold tabular-nums">
-              L{change.after.bomLevel ?? '?'}
-            </span>
-          )}
-          {shortRef(change.after)}
-        </div>
-        <div className="text-[11px] text-slate-500 flex items-center gap-1 flex-wrap">
-          {change.kinds.map((k: ChangeKind) => (
-            <span key={k} className="bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded text-[10px]">
-              {changeKindLabel(k)}
-              {k === 'level' && change.before.bomLevel !== change.after.bomLevel && (
-                <span className="ml-1 text-slate-500">
-                  {change.before.bomLevel ?? '–'} → {change.after.bomLevel ?? '–'}
-                </span>
-              )}
-            </span>
-          ))}
-          <span className="text-[10px] text-slate-400">matched by {change.matchedBy}</span>
-        </div>
+    <div className="px-4 py-3 text-[12px]">
+      {/* Part identifier */}
+      <div className="flex items-center gap-2 mb-2">
+        <span className="inline-flex items-center bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-widest flex-shrink-0">
+          Δ changed
+        </span>
+        {after.bomLevel != null && (
+          <span className="inline-flex items-center bg-slate-100 text-slate-600 px-1 rounded text-[9px] font-bold tabular-nums">
+            L{after.bomLevel}
+          </span>
+        )}
+        <span className="font-semibold text-slate-900 truncate">{shortRef(after)}</span>
+        {after.description && after.description !== shortRef(after) && (
+          <span className="text-slate-500 truncate hidden sm:inline">{after.description}</span>
+        )}
+      </div>
+      {/* Attribute-level before → after (Red Lines) */}
+      <div className="ml-1 space-y-1">
+        {diffs.map((d) => (
+          <div key={d.label} className="flex items-baseline gap-2 text-[11px]">
+            <span className="text-slate-500 w-24 flex-shrink-0 font-medium">{d.label}</span>
+            <span className="line-through text-rose-500 font-mono">{d.from}</span>
+            <span className="text-slate-400 text-[10px]">→</span>
+            <span className="text-emerald-700 font-mono font-semibold">{d.to}</span>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -1168,6 +1206,7 @@ const SimpleRow: React.FC<{
           {shortRef(line)}
         </div>
         <div className="text-[11px] text-slate-500 truncate">
+          {line.description ? `${line.description} · ` : ''}
           {line.manufacturer ? `${line.manufacturer} · ` : ''}qty {line.qty}
           {line.unitCost != null ? ` · $${line.unitCost}` : ''}
         </div>
@@ -1464,12 +1503,6 @@ const ImpactPanel: React.FC<{
 }> = ({ analysis }) => {
   return (
     <div className="space-y-4">
-      {analysis.narrative && (
-        <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">
-          {analysis.narrative}
-        </p>
-      )}
-
       {analysis.affectedRampItems && analysis.affectedRampItems.length > 0 && (
         <div>
           <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">

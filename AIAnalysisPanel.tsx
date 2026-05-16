@@ -1,7 +1,8 @@
 // ---------------------------------------------------------------------------
-// AI Analysis panel — 6th tab on ProjectDeepDive.
-// Calls /api/ai-analyze, renders narrative + top actions + risk flags, caches
-// last result on the project doc so reopens don't re-bill the Gemini free tier.
+// AI Analysis panel — utility tab on ProjectDeepDive.
+// Fetches live tool signals (PFMEA, BOM Pulse, Meetings, Takt) from Firestore
+// just before calling /api/ai-analyze, so the AI sees a full YTD snapshot.
+// Caches last result on the project doc so reopens don't re-bill Gemini.
 // ---------------------------------------------------------------------------
 
 import React, { useState } from 'react';
@@ -14,16 +15,41 @@ import {
   Target,
   RefreshCw,
   Clock,
-  ArrowRight
+  ArrowRight,
+  Activity
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { analyzeProject, AIAnalysis, AnalyzeProjectInput } from './aiClient';
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  limit,
+  getDocs,
+  Firestore
+} from 'firebase/firestore';
+import {
+  analyzeProject,
+  AIAnalysis,
+  AnalyzeProjectInput,
+  ToolContext,
+  PFMEASignal,
+  MeetingSignal,
+  BomSignal,
+  TaktSignal
+} from './aiClient';
 
 interface AIAnalysisPanelProps {
   projectInput: AnalyzeProjectInput;
   cached?: AIAnalysis | null;
   onAnalyzed: (analysis: AIAnalysis) => void;
   readOnly?: boolean;
+  /** Needed for tool-data fetches. */
+  projectId: string;
+  userId: string;
+  db: Firestore;
+  /** Already on the project doc — pass through so we skip an extra read. */
+  taktSummary?: TaktSignal;
 }
 
 const IMPACT_STYLES: Record<'high' | 'medium' | 'low', string> = {
@@ -44,11 +70,149 @@ const SEVERITY_COLOR: Record<'high' | 'medium' | 'low', string> = {
   low:    'text-slate-500'
 };
 
+// ---------------------------------------------------------------------------
+// Fetch helpers — pull just the fields the AI needs; keep payloads small.
+// ---------------------------------------------------------------------------
+
+async function fetchToolContext(
+  db: Firestore,
+  userId: string,
+  projectId: string,
+  taktSummary?: TaktSignal
+): Promise<ToolContext> {
+  const ctx: ToolContext = {};
+
+  // Takt is already on the project doc — pass it straight through.
+  if (taktSummary) {
+    ctx.takt = taktSummary;
+  }
+
+  // PFMEA — up to 3 most-recent, extract top risks per FMEA.
+  try {
+    const pfmeaSnap = await getDocs(
+      query(
+        collection(db, 'pfmeas'),
+        where('userId', '==', userId),
+        where('projectId', '==', projectId),
+        orderBy('dateMs', 'desc'),
+        limit(3)
+      )
+    );
+    if (!pfmeaSnap.empty) {
+      ctx.pfmeas = pfmeaSnap.docs.map((d) => {
+        const data = d.data() as any;
+        const risks: any[] = Array.isArray(data.risks) ? data.risks : [];
+        const rpn = (r: any) => (r.severity ?? 1) * (r.occurrence ?? 1) * (r.detection ?? 1);
+        const sorted = [...risks].sort((a, b) => rpn(b) - rpn(a));
+        const highCount = risks.filter((r) => rpn(r) > 100).length;
+        const mediumCount = risks.filter((r) => rpn(r) >= 40 && rpn(r) <= 100).length;
+        const maxRpn = sorted.length > 0 ? rpn(sorted[0]) : 0;
+        const topRisks = sorted.slice(0, 3).map((r) => ({
+          processStep: String(r.processStep || '').slice(0, 60),
+          failureMode: String(r.failureMode || '').slice(0, 60),
+          rpn: rpn(r)
+        }));
+        return {
+          title: String(data.title || 'Untitled'),
+          dateMs: Number(data.dateMs || 0),
+          totalRisks: risks.length,
+          highCount,
+          mediumCount,
+          maxRpn,
+          topRisks
+        } satisfies PFMEASignal;
+      });
+    }
+  } catch (e) {
+    console.warn('[AIAnalysisPanel] pfmeas fetch failed', e);
+  }
+
+  // Meetings — up to 5 most-recent.
+  try {
+    const meetSnap = await getDocs(
+      query(
+        collection(db, 'meetings'),
+        where('userId', '==', userId),
+        where('projectId', '==', projectId),
+        orderBy('dateMs', 'desc'),
+        limit(5)
+      )
+    );
+    if (!meetSnap.empty) {
+      ctx.recentMeetings = meetSnap.docs.map((d) => {
+        const data = d.data() as any;
+        const ai = String(data.actionItems || '').trim();
+        return {
+          dateMs: Number(data.dateMs || 0),
+          title: String(data.title || 'Untitled').slice(0, 100),
+          type: data.meetingType === 'External' ? 'External' : 'Internal',
+          hasActionItems: ai.length > 0,
+          actionItemsPreview: ai.length > 0 ? ai.slice(0, 300) : undefined
+        } satisfies MeetingSignal;
+      });
+    }
+  } catch (e) {
+    console.warn('[AIAnalysisPanel] meetings fetch failed', e);
+  }
+
+  // BOM Pulse — latest 1.
+  try {
+    const bomSnap = await getDocs(
+      query(
+        collection(db, 'productBoms'),
+        where('userId', '==', userId),
+        where('projectId', '==', projectId),
+        orderBy('uploadedAtMs', 'desc'),
+        limit(1)
+      )
+    );
+    if (!bomSnap.empty) {
+      const data = bomSnap.docs[0].data() as any;
+      const ia = data.impactAnalysis;
+      const bom: BomSignal = {
+        versionLabel: data.versionLabel || undefined,
+        uploadedAtMs: Number(data.uploadedAtMs || 0),
+        effectiveDateMs: data.effectiveDateMs || undefined,
+        reasonForChange: data.reasonForChange
+          ? String(data.reasonForChange).slice(0, 200)
+          : undefined,
+        totalLines: Number(data.totalLines || 0)
+      };
+      // Diff stats live on the doc after the client writes them back.
+      if (data.diffStats) {
+        bom.diff = {
+          added: data.diffStats.added ?? 0,
+          removed: data.diffStats.removed ?? 0,
+          changed: data.diffStats.changed ?? 0,
+          supplierSwapCount: data.diffStats.supplierSwapCount ?? 0,
+          costDelta: data.diffStats.costDelta ?? 0
+        };
+      }
+      if (ia?.narrative) {
+        bom.aiImpactNarrative = String(ia.narrative).slice(0, 400);
+      }
+      ctx.latestBom = bom;
+    }
+  } catch (e) {
+    console.warn('[AIAnalysisPanel] productBoms fetch failed', e);
+  }
+
+  return ctx;
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 const AIAnalysisPanel: React.FC<AIAnalysisPanelProps> = ({
   projectInput,
   cached,
   onAnalyzed,
-  readOnly = false
+  readOnly = false,
+  projectId,
+  userId,
+  db,
+  taktSummary
 }) => {
   const [analysis, setAnalysis] = useState<AIAnalysis | null>(cached ?? null);
   const [loading, setLoading] = useState(false);
@@ -58,7 +222,14 @@ const AIAnalysisPanel: React.FC<AIAnalysisPanelProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const result = await analyzeProject(projectInput);
+      // Fetch tool data first, then hand everything to analyzeProject.
+      const toolContext = await fetchToolContext(
+        db,
+        userId,
+        projectId,
+        taktSummary
+      );
+      const result = await analyzeProject({ ...projectInput, toolContext });
       setAnalysis(result);
       onAnalyzed(result);
     } catch (err: any) {
@@ -89,7 +260,7 @@ const AIAnalysisPanel: React.FC<AIAnalysisPanelProps> = ({
           </div>
           <div>
             <p className="text-[9px] font-black uppercase tracking-[0.3em] text-white/70 mb-1">
-              Powered by Gemini
+              Powered by Gemini · Full project scan
             </p>
             <h3 className="text-lg font-black uppercase tracking-tight leading-tight">
               AI Analysis
@@ -110,7 +281,7 @@ const AIAnalysisPanel: React.FC<AIAnalysisPanelProps> = ({
             ) : (
               <Sparkles size={12} />
             )}
-            {loading ? 'Analyzing…' : analysis ? 'Regenerate' : 'Analyze Project'}
+            {loading ? 'Scanning project…' : analysis ? 'Regenerate' : 'Analyze Project'}
           </button>
         )}
       </div>
@@ -135,13 +306,14 @@ const AIAnalysisPanel: React.FC<AIAnalysisPanelProps> = ({
         {/* Empty state */}
         {!analysis && !loading && !error && (
           <div className="py-12 text-center">
-            <Sparkles size={28} className="mx-auto text-slate-300 mb-3" />
+            <Activity size={28} className="mx-auto text-slate-300 mb-3" />
             <p className="text-[12px] font-black uppercase tracking-widest text-slate-600 mb-2">
-              Get an AI readiness assessment
+              Full project scan
             </p>
             <p className="text-[11px] text-slate-500 max-w-md mx-auto leading-relaxed">
-              Synthesizes your scores, notes, and timeline into a plain-English
-              summary, top actions, and risk flags. Takes ~10 seconds.
+              Reads your RAMP scores, PFMEA risks, BOM changes, meeting action items,
+              and takt capacity — then gives you a YTD snapshot, top 5 actions, and
+              up to 8 risk flags. Takes ~15 seconds.
             </p>
           </div>
         )}
@@ -151,7 +323,7 @@ const AIAnalysisPanel: React.FC<AIAnalysisPanelProps> = ({
           <div className="py-12 text-center">
             <Loader2 size={28} className="mx-auto text-blue-500 animate-spin mb-3" />
             <p className="text-[11px] font-black uppercase tracking-widest text-slate-500">
-              Gemini is reading your project…
+              Scanning scores, risks, BOM, meetings…
             </p>
           </div>
         )}
@@ -165,6 +337,16 @@ const AIAnalysisPanel: React.FC<AIAnalysisPanelProps> = ({
             transition={{ duration: 0.3 }}
             className="space-y-8"
           >
+            {/* YTD Status Snapshot — prominent verdict card */}
+            {analysis.statusSnapshot && (
+              <div className="bg-slate-900 text-white px-5 py-4 rounded-sm flex items-start gap-3">
+                <Activity size={16} className="text-blue-300 flex-shrink-0 mt-0.5" />
+                <p className="text-[13px] font-bold leading-snug">
+                  {analysis.statusSnapshot}
+                </p>
+              </div>
+            )}
+
             {/* Narrative */}
             <section>
               <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 mb-3">
@@ -180,7 +362,7 @@ const AIAnalysisPanel: React.FC<AIAnalysisPanelProps> = ({
               <section>
                 <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 mb-3 flex items-center gap-2">
                   <Target size={12} />
-                  Top Next Actions
+                  Top Actions
                 </h4>
                 <ol className="space-y-3">
                   {analysis.topActions.map((act, i) => (
@@ -249,8 +431,7 @@ const AIAnalysisPanel: React.FC<AIAnalysisPanelProps> = ({
 
             {/* Disclaimer */}
             <div className="pt-4 border-t border-slate-100 text-[10px] text-slate-400 leading-relaxed">
-              AI-generated from your current project state. Use as a starting
-              point — always verify with subject-matter experts.
+              AI-generated from your current project state including RAMP scores, PFMEA, BOM Pulse, meetings, and takt data. Use as a starting point — always verify with subject-matter experts.
             </div>
           </motion.div>
         )}

@@ -27,6 +27,7 @@ export interface AIRisk {
 }
 
 export interface AIAnalysis {
+  statusSnapshot: string;  // 1-sentence YTD verdict shown prominently
   narrative: string;
   topActions: AIAction[];
   risks: AIRisk[];
@@ -34,6 +35,66 @@ export interface AIAnalysis {
 }
 
 export type ProductGate = 'CR' | 'PDR' | 'CDR' | 'TRR' | 'PRR' | 'MP';
+
+// ---------------------------------------------------------------------------
+// Tool context — live signals from the per-project tools. Fetched on demand
+// just before running AI Analysis; not persisted in the cached result.
+// ---------------------------------------------------------------------------
+
+export interface PFMEASignal {
+  title: string;
+  dateMs: number;
+  totalRisks: number;
+  highCount: number;
+  mediumCount: number;
+  maxRpn: number;
+  /** Top 3 highest-RPN risks, for the AI prompt. */
+  topRisks: Array<{ processStep: string; failureMode: string; rpn: number }>;
+}
+
+export interface MeetingSignal {
+  dateMs: number;
+  title: string;
+  type: 'Internal' | 'External';
+  hasActionItems: boolean;
+  /** First 300 chars of action items text, if any. */
+  actionItemsPreview?: string;
+}
+
+export interface BomSignal {
+  versionLabel?: string;
+  uploadedAtMs: number;
+  effectiveDateMs?: number;
+  reasonForChange?: string;
+  totalLines: number;
+  /** Diff stats vs the prior BOM version, if available. */
+  diff?: {
+    added: number;
+    removed: number;
+    changed: number;
+    supplierSwapCount: number;
+    costDelta: number;
+  };
+  /** First 400 chars of any persisted AI impact narrative. */
+  aiImpactNarrative?: string;
+}
+
+export interface TaktSignal {
+  studyName: string;
+  taktSec: number;
+  bottleneckSec: number;
+  /** 0–1 fraction */
+  balanceLoss: number;
+  capacity: 'green' | 'yellow' | 'red';
+  completedAtMs: number;
+}
+
+export interface ToolContext {
+  takt?: TaktSignal;
+  pfmeas?: PFMEASignal[];        // up to 3 most-recent
+  recentMeetings?: MeetingSignal[]; // up to 5 most-recent
+  latestBom?: BomSignal;
+}
 
 export interface AnalyzeProjectInput {
   name: string;
@@ -66,6 +127,9 @@ export interface AnalyzeProjectInput {
       custom?: Array<{ done?: boolean; waived?: boolean }>;
     }
   >;
+  // Live signals from per-project tools — fetched on demand just before
+  // calling analyzeProject so the AI sees real tool data, not just scores.
+  toolContext?: ToolContext;
 }
 
 function buildSnapshot(input: AnalyzeProjectInput) {
@@ -120,7 +184,8 @@ function buildSnapshot(input: AnalyzeProjectInput) {
     templateName: input.templateName,
     standards: Array.isArray(input.standards) ? input.standards : undefined,
     groups,
-    excludedSummary: excludedSummary.length > 0 ? excludedSummary : undefined
+    excludedSummary: excludedSummary.length > 0 ? excludedSummary : undefined,
+    toolContext: input.toolContext ?? undefined
   };
 }
 

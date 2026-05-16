@@ -106,19 +106,24 @@ async function verifyFirebaseToken(idToken: string): Promise<FirebasePayload> {
 const RESPONSE_SCHEMA = {
   type: 'object',
   properties: {
+    statusSnapshot: {
+      type: 'string',
+      description:
+        'One-sentence YTD verdict. Format: "<Project> is <on track / at risk / slipping> for <next gate> — <single sharpest observation>." Max 25 words.'
+    },
     narrative: {
       type: 'string',
       description:
-        '2-3 paragraph executive summary of current readiness state, in plain English. Reference specific buckets and sub-items.'
+        '3 short paragraphs: (1) Overall readiness status referencing RAMP score + gate position. (2) Key signals from live tools — PFMEA risks, BOM changes, meeting action items, takt capacity. (3) Schedule outlook and top concern. ~200 words total.'
     },
     topActions: {
       type: 'array',
-      description: 'The 3 most impactful next moves, ranked.',
+      description: 'The 5 most impactful next moves, ranked by urgency × impact. Mix RAMP score gaps with tool signals.',
       items: {
         type: 'object',
         properties: {
           title: { type: 'string', description: 'Short action title' },
-          rationale: { type: 'string', description: '1-2 sentence why' },
+          rationale: { type: 'string', description: '1-2 sentence why, citing specific metric, risk, or tool signal' },
           impact: { type: 'string', enum: ['high', 'medium', 'low'] }
         },
         required: ['title', 'rationale', 'impact']
@@ -126,14 +131,14 @@ const RESPONSE_SCHEMA = {
     },
     risks: {
       type: 'array',
-      description: 'Risk flags inferred from notes and low scores.',
+      description: 'Up to 8 risk flags — inferred from RAMP scores, notes, tool signals (PFMEA, BOM churn, overdue action items), and gate timing.',
       items: {
         type: 'object',
         properties: {
-          flag: { type: 'string', description: 'Risk description' },
+          flag: { type: 'string', description: 'Risk description, max 20 words' },
           source: {
             type: 'string',
-            description: 'Which sub-item / note surfaced this'
+            description: 'Which metric / tool / note surfaced this (e.g. "PFMEA · Soldering defect RPN 280", "BOM Pulse · 3 supplier swaps post-CDR")'
           },
           severity: { type: 'string', enum: ['high', 'medium', 'low'] }
         },
@@ -141,7 +146,7 @@ const RESPONSE_SCHEMA = {
       }
     }
   },
-  required: ['narrative', 'topActions', 'risks']
+  required: ['statusSnapshot', 'narrative', 'topActions', 'risks']
 };
 
 interface ProjectItem {
@@ -181,6 +186,61 @@ const GATE_DESCRIPTIONS: Record<ProductGate, string> = {
   'MP':  'MP — Mass Production / sustaining'
 };
 
+// ---------------------------------------------------------------------------
+// Tool context shapes — mirrors aiClient.ts ToolContext (kept in sync manually
+// since server handlers can't cross-import client TS files at runtime).
+// ---------------------------------------------------------------------------
+
+interface TaktSignal {
+  studyName: string;
+  taktSec: number;
+  bottleneckSec: number;
+  balanceLoss: number;
+  capacity: 'green' | 'yellow' | 'red';
+  completedAtMs: number;
+}
+
+interface PFMEASignal {
+  title: string;
+  dateMs: number;
+  totalRisks: number;
+  highCount: number;
+  mediumCount: number;
+  maxRpn: number;
+  topRisks: Array<{ processStep: string; failureMode: string; rpn: number }>;
+}
+
+interface MeetingSignal {
+  dateMs: number;
+  title: string;
+  type: 'Internal' | 'External';
+  hasActionItems: boolean;
+  actionItemsPreview?: string;
+}
+
+interface BomSignal {
+  versionLabel?: string;
+  uploadedAtMs: number;
+  effectiveDateMs?: number;
+  reasonForChange?: string;
+  totalLines: number;
+  diff?: {
+    added: number;
+    removed: number;
+    changed: number;
+    supplierSwapCount: number;
+    costDelta: number;
+  };
+  aiImpactNarrative?: string;
+}
+
+interface ToolContext {
+  takt?: TaktSignal;
+  pfmeas?: PFMEASignal[];
+  recentMeetings?: MeetingSignal[];
+  latestBom?: BomSignal;
+}
+
 interface ProjectInput {
   name: string;
   productType?: string;
@@ -198,6 +258,9 @@ interface ProjectInput {
   standards?: string[];
   groups: ProjectGroup[];
   excludedSummary?: ExcludedGroup[];
+  // Live signals from per-project tools — wired in when the user clicks
+  // "Analyze" so the AI sees real tool data alongside the RAMP scores.
+  toolContext?: ToolContext;
 }
 
 function buildPrompt(p: ProjectInput): string {
@@ -299,16 +362,95 @@ function buildPrompt(p: ProjectInput): string {
     }
   }
 
+  // -------------------------------------------------------------------
+  // Live Tool Signals — real data from per-project tools.
+  // These are first-class inputs, not just score hints.
+  // -------------------------------------------------------------------
+  const tc = p.toolContext;
+  const hasToolContext = tc && (tc.takt || tc.pfmeas?.length || tc.recentMeetings?.length || tc.latestBom);
+
+  if (hasToolContext) {
+    lines.push('');
+    lines.push('## Live Tool Signals');
+    lines.push('(These are actual recorded data from the project tools — treat them as primary evidence alongside the RAMP scores.)');
+
+    if (tc!.takt) {
+      const t = tc!.takt;
+      const balPct = (t.balanceLoss * 100).toFixed(0);
+      const headroom = t.taktSec > 0
+        ? (((t.taktSec - t.bottleneckSec) / t.taktSec) * 100).toFixed(0)
+        : '0';
+      const completedDate = new Date(t.completedAtMs).toISOString().slice(0, 10);
+      lines.push('');
+      lines.push(`### Takt / Capacity Study: "${t.studyName}" (completed ${completedDate})`);
+      lines.push(`- Takt time: ${t.taktSec.toFixed(1)}s | Bottleneck: ${t.bottleneckSec.toFixed(1)}s | Headroom: ${headroom}%`);
+      lines.push(`- Line balance loss: ${balPct}% | Capacity verdict: ${t.capacity.toUpperCase()}`);
+      if (t.capacity === 'red') lines.push('  ⚠ CAPACITY CRITICAL — bottleneck exceeds takt; line cannot meet demand rate.');
+      else if (t.capacity === 'yellow') lines.push('  ⚠ CAPACITY AT-RISK — slim headroom; any variation could cause misses.');
+    }
+
+    if (tc!.pfmeas && tc!.pfmeas.length > 0) {
+      lines.push('');
+      lines.push(`### PFMEA (${tc!.pfmeas.length} analysis${tc!.pfmeas.length > 1 ? 'es' : ''})`);
+      for (const pfmea of tc!.pfmeas) {
+        const date = new Date(pfmea.dateMs).toISOString().slice(0, 10);
+        lines.push(`**"${pfmea.title}"** (${date}): ${pfmea.totalRisks} risks — ${pfmea.highCount} HIGH / ${pfmea.mediumCount} MEDIUM | Max RPN: ${pfmea.maxRpn}`);
+        if (pfmea.topRisks.length > 0) {
+          lines.push('  Top risks by RPN:');
+          for (const r of pfmea.topRisks) {
+            lines.push(`    - [RPN ${r.rpn}] Step: "${r.processStep}" → Failure: "${r.failureMode}"`);
+          }
+        }
+      }
+    }
+
+    if (tc!.recentMeetings && tc!.recentMeetings.length > 0) {
+      lines.push('');
+      lines.push(`### Recent Meetings (last ${tc!.recentMeetings.length})`);
+      const withActions = tc!.recentMeetings.filter((m) => m.hasActionItems);
+      lines.push(`${tc!.recentMeetings.length} meetings recorded; ${withActions.length} have open action items.`);
+      for (const m of withActions.slice(0, 3)) {
+        const date = new Date(m.dateMs).toISOString().slice(0, 10);
+        lines.push(`- ${date} [${m.type}] "${m.title}"${m.actionItemsPreview ? ` — Actions: "${m.actionItemsPreview}"` : ''}`);
+      }
+      if (withActions.length === 0) {
+        lines.push('No meetings have logged action items.');
+      }
+    }
+
+    if (tc!.latestBom) {
+      const b = tc!.latestBom;
+      const uploadDate = new Date(b.uploadedAtMs).toISOString().slice(0, 10);
+      lines.push('');
+      lines.push(`### BOM Pulse — Latest BOM${b.versionLabel ? ` (${b.versionLabel})` : ''} uploaded ${uploadDate}`);
+      lines.push(`- ${b.totalLines} line items`);
+      if (b.reasonForChange) lines.push(`- Reason for change: "${b.reasonForChange}"`);
+      if (b.diff) {
+        const d = b.diff;
+        lines.push(`- Delta vs prior: +${d.added} added / -${d.removed} removed / ${d.changed} changed | ${d.supplierSwapCount} supplier swap(s) | Cost delta: $${d.costDelta.toFixed(2)}`);
+        if (d.supplierSwapCount > 0) {
+          lines.push(`  ⚠ Supplier swap(s) detected — re-qualification risk, especially if post-CDR.`);
+        }
+      }
+      if (b.aiImpactNarrative) {
+        lines.push(`- Prior AI impact assessment: "${b.aiImpactNarrative.slice(0, 400)}${b.aiImpactNarrative.length > 400 ? '…' : ''}"`);
+      }
+    }
+  }
+
   lines.push('');
   lines.push('Your job (be concise — stay within the token budget):');
   lines.push(
-    '1. narrative — 2 short paragraphs max (~150 words total). Call out strongest and weakest buckets, reference specific sub-items, and note schedule pressure if dates imply it. If a current gate is set, frame the narrative around that gate (what it takes to pass, what is blocking). If a next gate target date is set, explicitly mention days-until and whether readiness suggests on-track / at-risk / slipping.'
+    '0. statusSnapshot — EXACTLY one sentence (≤25 words) YTD verdict. Format: "<Project> is <on track / at risk / slipping> for <next gate or current gate> — <sharpest single observation>." Make it specific — include the score, gate name, or a key tool signal.'
   );
   lines.push(
-    '2. topActions — exactly 3 moves, ranked by (score gap × criticality × feasibility) AND weighted by what matters most at the current gate. Design sub-items matter most at PDR/CDR; Manufacturing/Supply/Quality matter most at TRR/PRR. Each: short title, 1-sentence rationale referencing specific metrics by name. If schedule pressure is high, bias toward feasible moves with fast impact.'
+    '1. narrative — 3 short paragraphs (~200 words total): (1) Overall RAMP readiness — score, strongest/weakest buckets, gate position. (2) Tool signals synthesis — what PFMEA, BOM Pulse, meetings, takt data reveal about real-world status. Skip this para if no tool context was provided. (3) Schedule outlook — days to next gate, on-track vs at-risk assessment, single biggest open question.'
   );
   lines.push(
-    '3. risks — up to 5 risks max, inferred from notes, low scores, and gate timing. Each: short flag, short source reference. Flag gate-slip risk explicitly if a gate target is inconsistent with current readiness.'
+    '2. topActions — exactly 5 moves, ranked by urgency × impact. Draw from BOTH RAMP score gaps AND tool signals (e.g. unresolved PFMEA high-RPN, BOM supplier swaps needing requalification, overdue meeting action items, capacity shortfalls). Each: short title, 1–2 sentence rationale citing specific metrics or tool findings by name.'
+  );
+  lines.push(
+    '3. risks — up to 8 risks, sourced from RAMP scores, notes, AND tool signals. Prioritize: PFMEA high-RPN items, supplier swaps post-CDR, takt capacity RED/YELLOW, overdue action items, gate-slip risk. Each: short flag (≤20 words), source attribution (metric name / tool / note).'
   );
   if (selectedStandards.length > 0) {
     lines.push('');
@@ -318,7 +460,7 @@ function buildPrompt(p: ProjectInput): string {
   }
   lines.push('');
   lines.push(
-    'Be concrete and specific. Avoid filler and generic advice. Anchor everything to the data provided. Keep sentences tight.'
+    'Be concrete and specific. Avoid filler and generic advice. Anchor everything to the data provided — especially tool signals when available. Keep sentences tight.'
   );
 
   return lines.join('\n');
@@ -538,6 +680,7 @@ export default async function handler(req: ReqLike, res: ResLike) {
   }
 
   return res.status(200).json({
+    statusSnapshot: String(parsed.statusSnapshot || ''),
     narrative: String(parsed.narrative || ''),
     topActions: Array.isArray(parsed.topActions) ? parsed.topActions : [],
     risks: Array.isArray(parsed.risks) ? parsed.risks : [],
