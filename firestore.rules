@@ -321,6 +321,35 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
+    // Decision Ledger — one doc per decision, scoped to userId + projectId.
+    // Always editable (status can move active → superseded / reversed without
+    // deleting; reversals retained for traceability). Mirrors meetings posture.
+    function isValidDecision(data) {
+      return data.keys().hasAll(['userId', 'projectId', 'title', 'description', 'category', 'status', 'dateMs']) &&
+             data.userId == request.auth.uid &&
+             data.projectId is string && data.projectId.size() > 0 &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 150 &&
+             data.description is string && data.description.size() > 0 && data.description.size() <= 600 &&
+             data.category in ['design', 'process', 'supplier', 'regulatory', 'commercial', 'other'] &&
+             data.status in ['active', 'superseded', 'reversed'] &&
+             data.dateMs is number &&
+             (!('decisionMaker' in data) || (data.decisionMaker is string && data.decisionMaker.size() <= 100)) &&
+             (!('gate' in data)          || (data.gate is string && data.gate.size() <= 10)) &&
+             (!('rationale' in data)     || (data.rationale is string && data.rationale.size() <= 600)) &&
+             (!('relatedRisks' in data)  || (data.relatedRisks is string && data.relatedRisks.size() <= 500)) &&
+             (!('impact' in data)        || (data.impact is string && data.impact.size() <= 500));
+    }
+
+    match /decisions/{decisionId} {
+      // Same get + list split as meetings — client passes userId + projectId
+      // filter on list queries so per-user isolation is enforced.
+      allow get: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidDecision(request.resource.data);
+      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidDecision(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
     // Leads / waitlist captures (ramp-score email grabs + Pricing waitlist signups).
     // Public can create, only admin can read — keeps the list private.
     match /leads/{leadId} {

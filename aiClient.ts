@@ -89,11 +89,25 @@ export interface TaktSignal {
   completedAtMs: number;
 }
 
+export interface DecisionSignal {
+  title: string;
+  dateMs: number;
+  decisionMaker: string;
+  description: string;
+  rationale: string;
+  relatedRisks?: string;
+  impact?: string;
+  status: 'active' | 'superseded' | 'reversed';
+  category: string;
+  gate?: string;
+}
+
 export interface ToolContext {
   takt?: TaktSignal;
-  pfmeas?: PFMEASignal[];        // up to 3 most-recent
-  recentMeetings?: MeetingSignal[]; // up to 5 most-recent
+  pfmeas?: PFMEASignal[];            // up to 3 most-recent
+  recentMeetings?: MeetingSignal[];  // up to 5 most-recent
   latestBom?: BomSignal;
+  decisions?: DecisionSignal[];      // up to 5 active + any reversed, for drift/risk detection
 }
 
 export interface AnalyzeProjectInput {

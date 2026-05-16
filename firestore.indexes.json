@@ -43,6 +43,15 @@
         { "fieldPath": "projectId", "order": "ASCENDING" },
         { "fieldPath": "uploadedAtMs", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "decisions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "projectId", "order": "ASCENDING" },
+        { "fieldPath": "dateMs", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

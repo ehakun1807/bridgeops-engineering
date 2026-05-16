@@ -234,11 +234,25 @@ interface BomSignal {
   aiImpactNarrative?: string;
 }
 
+interface DecisionSignal {
+  title: string;
+  dateMs: number;
+  decisionMaker: string;
+  description: string;
+  rationale: string;
+  relatedRisks?: string;
+  impact?: string;
+  status: 'active' | 'superseded' | 'reversed';
+  category: string;
+  gate?: string;
+}
+
 interface ToolContext {
   takt?: TaktSignal;
   pfmeas?: PFMEASignal[];
   recentMeetings?: MeetingSignal[];
   latestBom?: BomSignal;
+  decisions?: DecisionSignal[];
 }
 
 interface ProjectInput {
@@ -367,7 +381,7 @@ function buildPrompt(p: ProjectInput): string {
   // These are first-class inputs, not just score hints.
   // -------------------------------------------------------------------
   const tc = p.toolContext;
-  const hasToolContext = tc && (tc.takt || tc.pfmeas?.length || tc.recentMeetings?.length || tc.latestBom);
+  const hasToolContext = tc && (tc.takt || tc.pfmeas?.length || tc.recentMeetings?.length || tc.latestBom || tc.decisions?.length);
 
   if (hasToolContext) {
     lines.push('');
@@ -436,6 +450,35 @@ function buildPrompt(p: ProjectInput): string {
         lines.push(`- Prior AI impact assessment: "${b.aiImpactNarrative.slice(0, 400)}${b.aiImpactNarrative.length > 400 ? '…' : ''}"`);
       }
     }
+
+    if (tc!.decisions && tc!.decisions.length > 0) {
+      const allDecisions  = tc!.decisions;
+      const active        = allDecisions.filter(d => d.status === 'active');
+      const reversed      = allDecisions.filter(d => d.status === 'reversed');
+      const superseded    = allDecisions.filter(d => d.status === 'superseded');
+      lines.push('');
+      lines.push(`### Decision Ledger (${allDecisions.length} decision${allDecisions.length !== 1 ? 's' : ''}: ${active.length} active, ${superseded.length} superseded, ${reversed.length} reversed)`);
+      lines.push('(Use these for: drift detection — does a later BOM change or PFMEA risk contradict an earlier decision? risk memory — does the decision\'s stated risk now show up in PFMEA high-RPN? instability signal — repeated reversals suggest design churn.)');
+      if (reversed.length > 0) {
+        lines.push(`⚠ ${reversed.length} decision(s) REVERSED — each reversal is a signal of design instability or new information invalidating prior assumptions. Weight these heavily in risk assessment.`);
+      }
+      for (const d of active.slice(0, 5)) {
+        const date = new Date(d.dateMs).toISOString().slice(0, 10);
+        lines.push(`- [${date}${d.gate ? ` @${d.gate}` : ''} | ${d.category}] "${d.title}" — By: ${d.decisionMaker || 'unspecified'}`);
+        lines.push(`    WHAT: ${d.description.slice(0, 300)}`);
+        if (d.rationale)    lines.push(`    WHY: ${d.rationale.slice(0, 200)}`);
+        if (d.relatedRisks) lines.push(`    RISKS NOTED: ${d.relatedRisks.slice(0, 200)}`);
+        if (d.impact)       lines.push(`    EXPECTED IMPACT: ${d.impact.slice(0, 200)}`);
+      }
+      if (reversed.length > 0) {
+        lines.push('  Reversed decisions (traceability):');
+        for (const d of reversed) {
+          const date = new Date(d.dateMs).toISOString().slice(0, 10);
+          lines.push(`  - [REVERSED ${date}] "${d.title}"`);
+          if (d.rationale) lines.push(`      Original rationale: ${d.rationale.slice(0, 150)}`);
+        }
+      }
+    }
   }
 
   lines.push('');
@@ -447,10 +490,10 @@ function buildPrompt(p: ProjectInput): string {
     '1. narrative — 3 short paragraphs (~200 words total): (1) Overall RAMP readiness — score, strongest/weakest buckets, gate position. (2) Tool signals synthesis — what PFMEA, BOM Pulse, meetings, takt data reveal about real-world status. Skip this para if no tool context was provided. (3) Schedule outlook — days to next gate, on-track vs at-risk assessment, single biggest open question.'
   );
   lines.push(
-    '2. topActions — exactly 5 moves, ranked by urgency × impact. Draw from BOTH RAMP score gaps AND tool signals (e.g. unresolved PFMEA high-RPN, BOM supplier swaps needing requalification, overdue meeting action items, capacity shortfalls). Each: short title, 1–2 sentence rationale citing specific metrics or tool findings by name.'
+    '2. topActions — exactly 5 moves, ranked by urgency × impact. Draw from BOTH RAMP score gaps AND tool signals (e.g. unresolved PFMEA high-RPN, BOM supplier swaps needing requalification, overdue meeting action items, capacity shortfalls, decision drift). Each: short title, 1–2 sentence rationale citing specific metrics or tool findings by name.'
   );
   lines.push(
-    '3. risks — up to 8 risks, sourced from RAMP scores, notes, AND tool signals. Prioritize: PFMEA high-RPN items, supplier swaps post-CDR, takt capacity RED/YELLOW, overdue action items, gate-slip risk. Each: short flag (≤20 words), source attribution (metric name / tool / note).'
+    '3. risks — up to 8 risks, sourced from RAMP scores, notes, AND tool signals. Prioritize: PFMEA high-RPN items, supplier swaps post-CDR, takt capacity RED/YELLOW, overdue action items, gate-slip risk, decision drift (later evidence contradicts an earlier decision), risk memory (a risk noted in a decision now shows as high-RPN in PFMEA), and instability (repeated decision reversals). Each: short flag (≤20 words), source attribution (metric name / tool / note).'
   );
   if (selectedStandards.length > 0) {
     lines.push('');

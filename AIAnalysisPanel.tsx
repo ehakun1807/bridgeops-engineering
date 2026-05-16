@@ -36,7 +36,8 @@ import {
   PFMEASignal,
   MeetingSignal,
   BomSignal,
-  TaktSignal
+  TaktSignal,
+  DecisionSignal
 } from './aiClient';
 
 interface AIAnalysisPanelProps {
@@ -195,6 +196,39 @@ async function fetchToolContext(
     }
   } catch (e) {
     console.warn('[AIAnalysisPanel] productBoms fetch failed', e);
+  }
+
+  // Decision Ledger — up to 5 active + any reversed (for drift/instability detection).
+  try {
+    const decSnap = await getDocs(
+      query(
+        collection(db, 'decisions'),
+        where('userId',    '==', userId),
+        where('projectId', '==', projectId),
+        orderBy('dateMs', 'desc'),
+        limit(10)
+      )
+    );
+    if (!decSnap.empty) {
+      const all = decSnap.docs.map(d => d.data() as any);
+      // Keep up to 5 active + all reversed (reversed = instability signal)
+      const active   = all.filter((d: any) => d.status === 'active').slice(0, 5);
+      const reversed = all.filter((d: any) => d.status === 'reversed');
+      ctx.decisions = [...active, ...reversed].map((d: any): DecisionSignal => ({
+        title:         String(d.title         || '').slice(0, 150),
+        dateMs:        Number(d.dateMs        || 0),
+        decisionMaker: String(d.decisionMaker || '').slice(0, 60),
+        description:   String(d.description  || '').slice(0, 300),
+        rationale:     String(d.rationale     || '').slice(0, 200),
+        relatedRisks:  d.relatedRisks ? String(d.relatedRisks).slice(0, 200) : undefined,
+        impact:        d.impact       ? String(d.impact).slice(0, 200)       : undefined,
+        status:        d.status in ['active', 'superseded', 'reversed'] ? d.status : 'active',
+        category:      String(d.category || 'other'),
+        gate:          d.gate ? String(d.gate) : undefined
+      }));
+    }
+  } catch (e) {
+    console.warn('[AIAnalysisPanel] decisions fetch failed', e);
   }
 
   return ctx;
