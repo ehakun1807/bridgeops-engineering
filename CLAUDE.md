@@ -294,3 +294,49 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   5. **Decision search / filter.** With 20+ decisions the list becomes hard to scan. Add: category filter pills (Design / Process / Supplier / …), status filter (Active / All), and a text search input. Low complexity, high value.
   6. **Decision xlsx export.** Mirror the `taktXlsx.ts` pattern — 1-sheet register with all fields as columns. ~60 lines of SheetJS glue. Alternative to PDF for teams that prefer spreadsheets.
   7. **Carry-over from earlier today** — BOM Pulse xlsx export, latestBomSummary pill, Vercel deploy, end-of-beta cleanup.
+
+### 2026-05-16 (continued 2)
+- **Decision Ledger — Dashboard chip + PFMEA cross-link.** Three complementary features that surface decision insights outside the Decision Ledger tab itself, so decisions stay visible without navigating away.
+
+- **`decisionSummary` mirror to project doc.** Implemented `ProjectDecisionSummary` interface (`{ activeCount, reversedCount, totalCount, lastDecisionMs }`) exported from `ProjectDeepDive.tsx` and added `decisionSummary?: ProjectDecisionSummary` to `DeepDiveProject`. `DecisionLedgerTool.tsx` gains a `writeSummary(list)` helper that writes the snapshot to `projects/{projectId}` via `updateDoc` (same try/catch-warn pattern as `TaktStudyTool`'s `taktSummary` writeback). Called on save, delete, **and initial load** — the initial-load writeback bootstraps the field for projects that had decisions saved before this feature was added (without it the chip would never appear until the next manual save).
+
+- **Dashboard decision chip** (`Dashboard.tsx`). Added `Scale` + `RotateCcw` to lucide imports, `ProjectDecisionSummary` to the `ProjectDeepDive` import. In `ProjectListItem`'s footer: when `project.decisionSummary.reversedCount > 0` → rose "N reversed" chip (`RotateCcw` icon, attention-grabbing because reversals = design churn); otherwise → indigo "N decisions" chip (`Scale` icon). Hidden when no decisions exist or `decisionSummary` is absent. Both chips are compact (border + `px-1.5 py-0.5`, no bold uppercase so they don't compete with the readiness % headline).
+
+- **PFMEA decision cross-link badge** (`PFMEATool.tsx`). On mount, a fire-and-forget `getDocs` query loads the project's `decisions` collection into a `decisions: DecisionRef[]` state (non-blocking — if it fails, badges just don't show). New `decisionMatchScore(risk, decision)` function tokenizes risk text (`processStep + failureMode + cause`) and decision text (`title + description + relatedRisks`) to lowercase words ≥4 chars and counts the overlap; threshold ≥2 shared words to avoid false positives from short common terms. In `PFMEAForm`, before rendering each `RiskCard`, the top 3 matching decisions (by score, descending) are computed and passed as `matchedDecisions`. `RiskCard` renders an amber `Scale` badge in its top bar: single match shows the decision title (truncated at 40 chars); multiple matches show "N linked decisions"; hover tooltip lists all titles. Threshold and truncation chosen to keep the badge informative without overflowing the top bar on smaller screens.
+
+- **Open follow-ups (after today):**
+  1. **Push to Vercel** — all changes (decisionSummary writeback, Dashboard chip, PFMEA cross-link) are local-only until deployed.
+  2. **Decisions ● header pill in `ProjectDeepDive`** — analogous to "Capacity ●" from `taktSummary`. Reads `project.decisionSummary` and shows reversed-count warning or active-count info pill in the header pill row. Separate from Dashboard chip; deferred.
+  3. **RAMP_GROUPS wiring** — wire `reversedCount` / `activeCount` into a decision-health sub-item so reversals actually move the readiness score. Same follow-up family as `taktSummary` capacity scoring.
+  4. **Carry-over** — decision search/filter, decision xlsx export, BOM Pulse xlsx export, latestBomSummary pill, end-of-beta cleanup, Sentry, per-UID rate limiting on authenticated AI handlers.
+
+### 2026-05-16 (continued 3) — Layer 1: Project Memory / Activity Feed
+
+- **Strategic shift.** The platform now has 7 data-capture tools (BOM Pulse, PFMEA, Decision Ledger, Studies, Meetings, Process Map, Doc Guard) + AI Analysis. This session begins the "NPI Intelligence Platform" arc by building a persistent, real-time event log (Layer 1 of 3). Layer 2 = proactive cross-tool propagation; Layer 3 = cross-project org learning. Focused on single-project scope for now.
+
+- **`activityLogger.ts` (new file).** Shared fire-and-forget utility. Defines `ActivityEventType` union (20+ event kinds across all tools), `ActivityTool` enum (8 tools), and `ActivityEvent` interface. `logActivity(event)` writes to `projectActivity` Firestore collection with `serverTimestamp()` — errors are non-fatal (`console.warn` only) so tool saves never block on the activity write. Never awaited by callers.
+
+- **`ActivityFeedPanel.tsx` (new file).** Real-time project activity feed (~280 lines). Uses `onSnapshot` for live updates (new events appear instantly without page reload). Features: tool-color-coded icon plates + timeline connector lines, relative timestamps ("3m ago", "2d ago") with absolute on hover, high-signal event highlight (amber left-border on `takt_study_completed`, `pfmea_risk_high`, `decision_reversed`, `bom_impact_analyzed`, `ai_analysis_run`), day-divider grouping, per-tool filter dropdown, load-more pagination (30/page), empty-state and error-state (with Firestore index hint). Color palette matches the existing Project Tools launcher (emerald/violet/rose/blue/amber/indigo/teal/blue).
+
+- **Activity tab wired into `ProjectDeepDive.tsx`.** `ACTIVITY_TAB_ID = '__activity__'` constant added. `Activity` icon imported from lucide-react. Tab added to the `pinnedTabs` array (between AI Analysis and History — pinned secondary strip, NOT behind the Project Tools launcher, same rationale as AI Analysis and History: it's a cross-cutting view over the project, not a workspace). `ActivityFeedPanel` render branch added to `AnimatePresence` block.
+
+- **`logActivity()` wired into all 6 project tools.** Each tool gets one `import { logActivity } from './activityLogger.ts'` line + fire-and-forget calls in its save/complete/delete handlers:
+  - **TaktStudyTool** — `takt_study_created` / `takt_study_updated` / `takt_study_completed` on save; `takt_study_deleted` on delete. Detail = step count.
+  - **MeetingsTool** — `meeting_created` / `meeting_updated` on save (detail = action items preview or attendees); `meeting_deleted` on delete.
+  - **PFMEATool** — `pfmea_created` / `pfmea_updated` on save (detail = risk count + High-RPN count); `pfmea_deleted` on delete. **Also emits a separate `pfmea_risk_high` event** (timestampMs +1) when any risk has RPN > 100 — this is the first cross-tool high-signal trigger; the detail lists the top-3 failure modes.
+  - **ProcessMapTool** — `process_map_created` / `process_map_updated` on save (detail = step count + decision-point count); `process_map_deleted` on delete.
+  - **ProductBomTool** — `bom_uploaded` on upload save (detail = reasonForChange or file/line count); `bom_impact_analyzed` when AI Impact completes (detail = top action or affected RAMP items count). Also logs `bom_uploaded` on deleteBom (describes the deletion).
+  - **DecisionLedgerTool** — `decision_created` / `decision_updated` / `decision_reversed` on save (status drives the event type; detail = rationale preview); `decision_deleted` on delete.
+
+- **Firestore rules.** Added `isValidActivityEvent` validator + `match /projectActivity/{eventId}` block. Create-only (immutable audit trail — `allow update: if false`; admin can purge via `allow delete: if isAdmin()`). Validates required fields, sizes, and types. **Same multi-DB deploy lie applies** — paste into Firebase Console + verify "Last published" moves.
+
+- **`firestore.indexes.json`.** Added composite index `(userId asc, projectId asc, timestampMs desc)` for `projectActivity`. Required for the Activity Feed's `onSnapshot` query to execute. Will hit "Enabled" 1–3 min after deploy.
+
+- **Architecture notes for Layer 2.** The `pfmea_risk_high` double-emit pattern (saving a synthetic high-signal event alongside the regular `pfmea_updated` event) is intentional — it's the seed for the cross-tool propagation layer. In Layer 2, these high-signal events become triggers: `pfmea_risk_high` + BOM data → auto-check if the risk references a recently-changed part; `decision_reversed` → auto-scan for contradictions. The `projectActivity` collection is the event bus.
+
+- **Open follow-ups (after today):**
+  1. **Deploy** `firestore.rules` (projectActivity block) + `firestore.indexes.json` (projectActivity composite index). Per the multi-DB lie gotcha, paste rules into Console manually. Activity Feed will show Firestore index error until the index hits "Enabled."
+  2. **Push to Vercel** so all today's changes are live in prod.
+  3. **Layer 2 — Proactive cross-tool intelligence.** High-signal events (`pfmea_risk_high`, `decision_reversed`, `bom_impact_analyzed`) should trigger lightweight cross-checks without user clicking Analyze: BOM change → flag matching PFMEA causes, decision reversal → scan for contradictions. Architecturally: a `useEffect` in `AIAnalysisPanel` watches `projectActivity` for high-signal events and auto-triggers a lightweight scan (not a full Analyze run).
+  4. **`projectIntelligence` doc per project (Layer 1b).** AI Analysis result should be persisted to a `projectIntelligence` doc on Firestore after each run (not just rendered in-panel). Enables: "last analyzed N days ago" badge in the header, incremental updates in Layer 2 (append new findings rather than full re-scan), and future cross-project comparison.
+  5. **Carry-over** — Decisions ● header pill, RAMP_GROUPS wiring for decisions/takt/pfmea/processMap, BOM Pulse xlsx export, latestBomSummary pill, end-of-beta cleanup, Sentry, per-UID rate limiting.

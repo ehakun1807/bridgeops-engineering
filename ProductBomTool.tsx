@@ -54,6 +54,7 @@ import {
   X
 } from 'lucide-react';
 import { db, auth } from './firebase.ts';
+import { logActivity } from './activityLogger.ts';
 import {
   collection,
   query,
@@ -322,6 +323,14 @@ const ProductBomTool: React.FC<ProductBomToolProps> = ({
       return;
     try {
       await deleteDoc(doc(db, 'productBoms', b.id));
+      logActivity({
+        userId: uid,
+        projectId,
+        eventType: 'bom_uploaded',
+        tool: 'bom_pulse',
+        title: `BOM revision deleted: ${b.versionLabel || b.fileName}`,
+        timestampMs: Date.now(),
+      });
       await loadBoms();
     } catch (e: any) {
       console.error('[ProductBomTool] delete failed', e);
@@ -717,6 +726,19 @@ const BomUploadForm: React.FC<BomUploadFormProps> = ({
         ...stripUndefined(payload),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
+      });
+      // Log activity (fire-and-forget)
+      logActivity({
+        userId,
+        projectId,
+        eventType: 'bom_uploaded',
+        tool: 'bom_pulse',
+        title: `BOM uploaded: ${payload.versionLabel}`,
+        detail: payload.reasonForChange
+          ? payload.reasonForChange.slice(0, 120)
+          : `${lines.length} line${lines.length !== 1 ? 's' : ''} · ${file.name}`,
+        metadata: { lineCount: lines.length, gate: currentGate ?? '' },
+        timestampMs: Date.now(),
       });
       onSaved(mapping);
     } catch (e: any) {
@@ -1321,6 +1343,26 @@ const BomView: React.FC<BomViewProps> = ({
       });
       setAdhocResult(result);
       setAdhocBaselineId(effectiveBaseline.id);
+      // Log AI analysis event (fire-and-forget)
+      if (bom) {
+        logActivity({
+          userId: bom.userId,
+          projectId: bom.projectId,
+          eventType: 'bom_impact_analyzed',
+          tool: 'bom_pulse',
+          title: `AI Impact analyzed: ${bom.versionLabel || bom.fileName}`,
+          detail: result.topActions?.length
+            ? `Top action: ${result.topActions[0]?.slice(0, 100)}`
+            : result.affectedRampItems?.length
+              ? `${result.affectedRampItems.length} RAMP items affected`
+              : undefined,
+          metadata: {
+            affectedCount: result.affectedRampItems?.length ?? 0,
+            newRisksCount: result.newRisks?.length ?? 0,
+          },
+          timestampMs: Date.now(),
+        });
+      }
       // If this matches the natural baseline, also persist on the BOM doc
       // so it's surfaced on reload + listed in the BOM row badge.
       if (effectiveBaseline.id === baseline?.id) {

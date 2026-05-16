@@ -41,6 +41,7 @@ import {
   Scale
 } from 'lucide-react';
 import { db, auth } from './firebase.ts';
+import { logActivity } from './activityLogger.ts';
 import {
   collection,
   query,
@@ -430,6 +431,35 @@ const PFMEATool: React.FC<PFMEAToolProps> = ({ projectId, readOnly = false }) =>
         createdAt: serverTimestamp()
       });
     }
+    // Log activity (fire-and-forget)
+    const isNew = !p.id;
+    const highRisks = cleanRisks.filter((r) => r.severity * r.occurrence * r.detection > 100);
+    logActivity({
+      userId: uid,
+      projectId,
+      eventType: isNew ? 'pfmea_created' : 'pfmea_updated',
+      tool: 'pfmea',
+      title: isNew ? `PFMEA created: ${payload.title}` : `PFMEA updated: ${payload.title}`,
+      detail: cleanRisks.length > 0
+        ? `${cleanRisks.length} risk${cleanRisks.length !== 1 ? 's' : ''}${highRisks.length > 0 ? ` · ${highRisks.length} High RPN` : ''}`
+        : undefined,
+      metadata: { riskCount: cleanRisks.length, highRpnCount: highRisks.length },
+      timestampMs: Date.now(),
+    });
+    // Separate high-signal event if any High-RPN risks exist
+    if (highRisks.length > 0) {
+      logActivity({
+        userId: uid,
+        projectId,
+        eventType: 'pfmea_risk_high',
+        tool: 'pfmea',
+        title: `${highRisks.length} High-RPN risk${highRisks.length !== 1 ? 's' : ''} in: ${payload.title}`,
+        detail: highRisks.map((r) => r.failureMode || r.processStep).filter(Boolean).slice(0, 3).join(' · '),
+        metadata: { highRpnCount: highRisks.length },
+        timestampMs: Date.now() + 1,
+      });
+    }
+
     await load();
     setMode({ kind: 'list' });
   };
@@ -439,6 +469,14 @@ const PFMEATool: React.FC<PFMEAToolProps> = ({ projectId, readOnly = false }) =>
     if (!confirm(`Delete "${p.title || 'this PFMEA'}"? This cannot be undone.`)) return;
     try {
       await deleteDoc(doc(db, 'pfmeas', p.id));
+      logActivity({
+        userId: uid,
+        projectId,
+        eventType: 'pfmea_deleted',
+        tool: 'pfmea',
+        title: `PFMEA deleted: ${p.title || 'Untitled'}`,
+        timestampMs: Date.now(),
+      });
       await load();
     } catch (e: any) {
       console.error('[PFMEATool] delete failed', e);

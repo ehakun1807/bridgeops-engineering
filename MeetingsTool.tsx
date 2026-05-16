@@ -30,6 +30,7 @@ import {
   ExternalLink as ExternalLinkIcon
 } from 'lucide-react';
 import { db, auth } from './firebase.ts';
+import { logActivity } from './activityLogger.ts';
 import {
   collection,
   query,
@@ -207,6 +208,21 @@ const MeetingsTool: React.FC<MeetingsToolProps> = ({ projectId, readOnly = false
         createdAt: serverTimestamp()
       });
     }
+    // Log activity (fire-and-forget)
+    const isNew = !m.id;
+    logActivity({
+      userId: uid,
+      projectId,
+      eventType: isNew ? 'meeting_created' : 'meeting_updated',
+      tool: 'meetings',
+      title: isNew ? `Meeting logged: ${payload.title}` : `Meeting updated: ${payload.title}`,
+      detail: payload.actionItems.trim()
+        ? `Action items: ${payload.actionItems.slice(0, 120)}`
+        : payload.attendees.trim() ? `Attendees: ${payload.attendees.slice(0, 80)}` : undefined,
+      metadata: { kind: payload.kind },
+      timestampMs: Date.now(),
+    });
+
     await loadMeetings();
     setMode({ kind: 'list' });
   };
@@ -216,6 +232,14 @@ const MeetingsTool: React.FC<MeetingsToolProps> = ({ projectId, readOnly = false
     if (!confirm(`Delete "${m.title || 'this meeting'}"? This cannot be undone.`)) return;
     try {
       await deleteDoc(doc(db, 'meetings', m.id));
+      logActivity({
+        userId: uid,
+        projectId,
+        eventType: 'meeting_deleted',
+        tool: 'meetings',
+        title: `Meeting deleted: ${m.title || 'Untitled'}`,
+        timestampMs: Date.now(),
+      });
       await loadMeetings();
     } catch (e: any) {
       console.error('[MeetingsTool] delete failed', e);

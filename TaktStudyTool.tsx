@@ -50,6 +50,7 @@ import {
   serverTimestamp,
   Timestamp
 } from 'firebase/firestore';
+import { logActivity } from './activityLogger.ts';
 import {
   computeTaktSec,
   stepMeanSec,
@@ -270,6 +271,25 @@ const TaktStudyTool: React.FC<TaktStudyToolProps> = ({
       }
     }
 
+    // Log activity event (fire-and-forget)
+    const isNew = !s.id;
+    const isCompleted = s.status === 'completed';
+    logActivity({
+      userId: uid,
+      projectId,
+      eventType: isCompleted ? 'takt_study_completed' : isNew ? 'takt_study_created' : 'takt_study_updated',
+      tool: 'takt',
+      title: isCompleted
+        ? `Study completed: ${payload.name}`
+        : isNew
+          ? `New study created: ${payload.name}`
+          : `Study updated: ${payload.name}`,
+      detail: s.steps.length > 0
+        ? `${s.steps.length} step${s.steps.length !== 1 ? 's' : ''} captured`
+        : undefined,
+      timestampMs: Date.now(),
+    });
+
     await loadStudies();
     setMode({ kind: 'list' });
   };
@@ -279,6 +299,14 @@ const TaktStudyTool: React.FC<TaktStudyToolProps> = ({
     if (!confirm(`Delete "${s.name}"? This cannot be undone.`)) return;
     try {
       await deleteDoc(doc(db, 'taktStudies', s.id));
+      logActivity({
+        userId: uid,
+        projectId,
+        eventType: 'takt_study_deleted',
+        tool: 'takt',
+        title: `Study deleted: ${s.name}`,
+        timestampMs: Date.now(),
+      });
       await loadStudies();
     } catch (e: any) {
       console.error('[TaktStudyTool] delete failed', e);

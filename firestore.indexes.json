@@ -52,6 +52,15 @@
         { "fieldPath": "projectId", "order": "ASCENDING" },
         { "fieldPath": "dateMs", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "projectActivity",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "projectId", "order": "ASCENDING" },
+        { "fieldPath": "timestampMs", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

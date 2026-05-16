@@ -44,7 +44,8 @@ import {
   Workflow,
   Boxes,
   LayoutGrid,
-  Scale
+  Scale,
+  Activity
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db, auth } from './firebase.ts';
@@ -71,6 +72,7 @@ import PFMEATool from './PFMEATool.tsx';
 import ProcessMapTool from './ProcessMapTool.tsx';
 import ProductBomTool from './ProductBomTool.tsx';
 import DecisionLedgerTool from './DecisionLedgerTool.tsx';
+import ActivityFeedPanel from './ActivityFeedPanel.tsx';
 import ScopeEditor from './ScopeEditor.tsx';
 import CoachPanel from './CoachPanel.tsx';
 import StandardsPicker from './StandardsPicker.tsx';
@@ -373,6 +375,7 @@ const PROJECT_TOOLS: ProjectToolEntry[] = [
   }
 ];
 const HISTORY_TAB_ID = '__history__';
+const ACTIVITY_TAB_ID = '__activity__';
 const INFO_STATUS_OPTIONS: InfoStatus[] = ['TBD', 'In Process', 'Completed', 'Cancelled'];
 const GATE_OPTIONS: ProductGate[] = ['CR', 'PDR', 'CDR', 'TRR', 'PRR', 'MP'];
 const GATE_LABELS: Record<ProductGate, string> = {
@@ -1721,7 +1724,8 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
             iconActiveClass: string;
             count?: number;
           }> = [
-            { id: AI_ANALYSIS_TAB_ID, label: 'AI Analysis', icon: Sparkles, iconActiveClass: 'text-blue-600' }
+            { id: AI_ANALYSIS_TAB_ID, label: 'AI Analysis', icon: Sparkles,  iconActiveClass: 'text-blue-600' },
+            { id: ACTIVITY_TAB_ID,    label: 'Activity',    icon: Activity,  iconActiveClass: 'text-slate-600' },
           ];
           const historyTab = {
             id: HISTORY_TAB_ID,
@@ -1976,6 +1980,16 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
               currentGate={currentGate}
               readOnly={readOnly}
             />
+          </motion.div>
+        ) : activeGroupId === ACTIVITY_TAB_ID ? (
+          <motion.div
+            key={ACTIVITY_TAB_ID}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <ActivityFeedPanel projectId={project.id} />
           </motion.div>
         ) : activeGroupId === HISTORY_TAB_ID ? (
           <motion.div

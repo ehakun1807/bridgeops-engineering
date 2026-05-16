@@ -54,6 +54,7 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { db, auth } from './firebase.ts';
+import { logActivity } from './activityLogger.ts';
 import {
   collection,
   query,
@@ -744,6 +745,22 @@ const ProcessMapTool: React.FC<ProcessMapToolProps> = ({ projectId, readOnly = f
     } else {
       await addDoc(collection(db, 'processMaps'), { ...payload, createdAt: serverTimestamp() });
     }
+    // Log activity (fire-and-forget)
+    const isNew = !m.id;
+    const decisionCount = sanitizedSteps.filter((s) => s.kind === 'decision').length;
+    logActivity({
+      userId: uid,
+      projectId,
+      eventType: isNew ? 'process_map_created' : 'process_map_updated',
+      tool: 'process_map',
+      title: isNew ? `Process Map created: ${payload.title}` : `Process Map updated: ${payload.title}`,
+      detail: sanitizedSteps.length > 0
+        ? `${sanitizedSteps.length} step${sanitizedSteps.length !== 1 ? 's' : ''}${decisionCount > 0 ? ` · ${decisionCount} decision point${decisionCount !== 1 ? 's' : ''}` : ''}`
+        : undefined,
+      metadata: { stepCount: sanitizedSteps.length, decisionCount },
+      timestampMs: Date.now(),
+    });
+
     await load();
     setMode({ kind: 'list' });
   };
@@ -753,6 +770,14 @@ const ProcessMapTool: React.FC<ProcessMapToolProps> = ({ projectId, readOnly = f
     if (!confirm(`Delete "${m.title || 'this process map'}"? This cannot be undone.`)) return;
     try {
       await deleteDoc(doc(db, 'processMaps', m.id));
+      logActivity({
+        userId: uid,
+        projectId,
+        eventType: 'process_map_deleted',
+        tool: 'process_map',
+        title: `Process Map deleted: ${m.title || 'Untitled'}`,
+        timestampMs: Date.now(),
+      });
       await load();
     } catch (e: any) {
       console.error('[ProcessMapTool] delete failed', e);

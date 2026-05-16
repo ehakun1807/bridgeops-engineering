@@ -35,6 +35,7 @@ import {
   MinusCircle
 } from 'lucide-react';
 import { db, auth } from './firebase.ts';
+import { logActivity } from './activityLogger.ts';
 import {
   collection,
   query,
@@ -226,7 +227,9 @@ const DecisionLedgerTool: React.FC<DecisionLedgerToolProps> = ({
     }
   };
 
-  useEffect(() => { load(); }, [uid, projectId]); // eslint-disable-line
+  // On mount: load + write summary to bootstrap the Dashboard chip for
+  // projects that had decisions saved before this writeback was introduced.
+  useEffect(() => { load().then(writeSummary); }, [uid, projectId]); // eslint-disable-line
 
   // ── Summary mirror ───────────────────────────────────────────────────────
   // Writes a lightweight snapshot to the project doc so Dashboard + header
@@ -275,6 +278,27 @@ const DecisionLedgerTool: React.FC<DecisionLedgerToolProps> = ({
     }
     const fresh = await load();
     await writeSummary(fresh);
+
+    // Log activity (fire-and-forget)
+    const isNew = !d.id;
+    const isReversed = payload.status === 'reversed';
+    logActivity({
+      userId: uid,
+      projectId,
+      eventType: isReversed ? 'decision_reversed' : isNew ? 'decision_created' : 'decision_updated',
+      tool: 'decisions',
+      title: isReversed
+        ? `Decision reversed: ${payload.title}`
+        : isNew
+          ? `Decision recorded: ${payload.title}`
+          : `Decision updated: ${payload.title}`,
+      detail: payload.rationale
+        ? payload.rationale.slice(0, 120)
+        : payload.description.slice(0, 120),
+      metadata: { category: payload.category, status: payload.status, gate: payload.gate ?? '' },
+      timestampMs: Date.now(),
+    });
+
     setMode({ kind: 'list' });
   };
 
@@ -283,6 +307,14 @@ const DecisionLedgerTool: React.FC<DecisionLedgerToolProps> = ({
     if (!confirm(`Delete "${d.title || 'this decision'}"? This cannot be undone.`)) return;
     try {
       await deleteDoc(doc(db, 'decisions', d.id));
+      logActivity({
+        userId: uid,
+        projectId,
+        eventType: 'decision_deleted',
+        tool: 'decisions',
+        title: `Decision deleted: ${d.title || 'Untitled'}`,
+        timestampMs: Date.now(),
+      });
       const fresh = await load();
       await writeSummary(fresh);
     } catch (e: any) {
