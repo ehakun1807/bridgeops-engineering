@@ -321,8 +321,8 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
-    // Decision Ledger — one doc per decision, scoped to userId + projectId.
-    // Always editable (status can move active → superseded / reversed without
+    // Decision Ledger -- one doc per decision, scoped to userId + projectId.
+    // Always editable (status can move active -> superseded / reversed without
     // deleting; reversals retained for traceability). Mirrors meetings posture.
     function isValidDecision(data) {
       return data.keys().hasAll(['userId', 'projectId', 'title', 'description', 'category', 'status', 'dateMs']) &&
