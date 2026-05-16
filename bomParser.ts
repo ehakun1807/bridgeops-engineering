@@ -63,6 +63,8 @@ export interface BomLine {
   unitCost?: number;
   /** Package / footprint (e.g. 0603, LQFP-100). */
   package?: string;
+  /** Part / document revision (e.g. "B", "C  ECO2600003", "v1.2"). */
+  rev?: string;
   /** Original row values keyed by header. Preserved for AI analysis. */
   raw: Record<string, string>;
 }
@@ -86,6 +88,7 @@ export interface ColumnMapping {
   qty?: string;
   unitCost?: string;
   package?: string;
+  rev?: string;
 }
 
 /** Output of the first parse pass. */
@@ -238,7 +241,27 @@ const HEURISTICS: HeuristicPattern[] = [
     priority: 80,
     test: (n) => /^(package|footprint|case|pkg|pkg type|smd case)$/.test(n)
   },
-  { field: 'package', priority: 50, test: (n) => /\b(package|footprint)\b/.test(n) }
+  { field: 'package', priority: 50, test: (n) => /\b(package|footprint)\b/.test(n) },
+
+  // Revision — part / document revision letter or version string.
+  // Exact matches are high priority; "Rev" alone is very common in PLM exports
+  // (Agile, Arena, Windchill all use "Rev"). "Version" / "Ver" at lower priority
+  // since they can collide with software version fields.
+  {
+    field: 'rev',
+    priority: 88,
+    test: (n) => /^(rev|revision|rev number|revision number|rev letter|rev level)$/.test(n)
+  },
+  {
+    field: 'rev',
+    priority: 70,
+    test: (n) => /^(ver|version|release|rel)$/.test(n)
+  },
+  {
+    field: 'rev',
+    priority: 55,
+    test: (n) => /\b(revision|rev)\b/.test(n) && !/\b(release date|date)\b/.test(n)
+  }
 ];
 
 // ---------------------------------------------------------------------------
@@ -419,6 +442,7 @@ function buildLine(
   const qty = parseQty(qtyRaw);
   const unitCost = mapping.unitCost ? parseCost(row[mapping.unitCost]) : undefined;
   const pkg = mapping.package ? cleanStr(row[mapping.package]) : undefined;
+  const rev = mapping.rev ? cleanStr(row[mapping.rev]) : undefined;
 
   // Skip lines with no identifier at all — they're not meaningful as a BOM
   // line. (We still don't throw — partial / messy BOMs should parse what they
@@ -443,6 +467,7 @@ function buildLine(
     qty,
     unitCost,
     package: pkg,
+    rev,
     raw
   };
 }

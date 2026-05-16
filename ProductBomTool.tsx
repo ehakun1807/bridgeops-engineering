@@ -1138,6 +1138,8 @@ function attrDiff(kind: ChangeKind, before: BomLine, after: BomLine): { label: s
         from: before.bomLevel != null ? `L${before.bomLevel}` : '—',
         to: after.bomLevel != null ? `L${after.bomLevel}` : '—'
       };
+    case 'rev':
+      return { label: 'Revision', from: before.rev ?? '—', to: after.rev ?? '—' };
     default:
       return null;
   }

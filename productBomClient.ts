@@ -67,7 +67,21 @@ export interface AnalyzeBomImpactInput {
 // magnitude when individual lines overflow.
 const MAX_LINES_OVER_WIRE = 60;
 
+/** Common column names for part type / item category across PLM systems. */
+const PART_TYPE_KEYS = [
+  'Part Type', 'Item Type', 'Category', 'Object Type', 'Type',
+  'Component Type', 'BOM Type', 'Line Type', 'Item Category'
+];
+
 function compactLine(l: BomLine) {
+  // Pull part type from raw using the first matching key. This gives the AI
+  // enough context to classify the change (label, document, PCBA, sub-assy,
+  // fastener, etc.) before attributing readiness impact — without sending the
+  // entire raw row over the wire.
+  const rawPartType = l.raw
+    ? PART_TYPE_KEYS.map((k) => l.raw[k]).find((v) => v && v.trim() !== '')
+    : undefined;
+
   return {
     bomLevel: l.bomLevel,
     internalPn: l.internalPn,
@@ -76,7 +90,9 @@ function compactLine(l: BomLine) {
     description: l.description ? l.description.slice(0, 120) : undefined,
     refDes: l.refDes,
     qty: l.qty,
-    unitCost: l.unitCost
+    unitCost: l.unitCost,
+    rev: l.rev,
+    partType: rawPartType ? rawPartType.trim() : undefined
   };
 }
 

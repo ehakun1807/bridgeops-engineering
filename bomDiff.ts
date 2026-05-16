@@ -29,7 +29,8 @@ export type ChangeKind =
   | 'cost'
   | 'refDes'
   | 'package'
-  | 'level';
+  | 'level'
+  | 'rev';
 
 export interface BomLineChange {
   /** Line as it appeared in the baseline BOM. */
@@ -226,6 +227,13 @@ function classifyChanges(before: BomLine, after: BomLine): ChangeKind[] {
   // Multi-level BOM: surface re-parenting. Treat both-missing as equal so
   // flat BOMs (no level column) don't generate spurious change-kinds.
   if ((before.bomLevel ?? null) !== (after.bomLevel ?? null)) kinds.push('level');
+  // Revision — a rev bump on a part or document is a design/process change
+  // even if no other normalized field changed (e.g. mechanical drawing update,
+  // work instruction re-release). Treat both-missing as equal so BOMs without
+  // a rev column don't generate spurious changes.
+  if (before.rev !== undefined || after.rev !== undefined) {
+    if (!strEq(before.rev, after.rev)) kinds.push('rev');
+  }
   return kinds;
 }
 
@@ -313,5 +321,6 @@ export function changeKindLabel(k: ChangeKind): string {
     case 'refDes': return 'Ref Des';
     case 'package': return 'Package';
     case 'level': return 'BOM Level';
+    case 'rev': return 'Revision';
   }
 }

@@ -176,6 +176,10 @@ interface DiffLinePreview {
   refDes?: string;
   qty?: number;
   unitCost?: number;
+  /** Revision / revision letter of the part or document (e.g. "A", "B", "02"). */
+  rev?: string;
+  /** Part type / item category from the originating PLM (e.g. "Label", "Sub Assy", "MFG", "PCBA"). */
+  partType?: string;
 }
 
 interface ChangedLinePreview extends DiffLinePreview {
@@ -233,15 +237,17 @@ interface ImpactInput {
 const MAX_LINES_LISTED = 40;
 
 function lineRef(l: DiffLinePreview): string {
-  // Best identifier in compact form. Prefix with "L<n>" for multi-level
-  // lines so the AI can reason about hierarchy.
+  // Best identifier in compact form. Prefix with "[PartType]" when available
+  // so the AI can classify the part before attributing impact.
   const parts: string[] = [];
+  if (l.partType) parts.push(`[${l.partType}]`);
   if (l.bomLevel != null) parts.push(`L${l.bomLevel}`);
   if (l.internalPn) parts.push(l.internalPn);
+  if (l.rev) parts.push(`Rev ${l.rev}`);
   if (l.mpn) parts.push(`MPN ${l.mpn}`);
   if (l.manufacturer && !parts.some((p) => p.includes('MPN'))) parts.push(l.manufacturer);
-  if (l.refDes && parts.length === (l.bomLevel != null ? 1 : 0)) parts.push(`@${l.refDes}`);
-  if (l.description && parts.length === (l.bomLevel != null ? 1 : 0)) parts.push(l.description.slice(0, 40));
+  if (l.refDes && parts.filter((p) => !p.startsWith('[') && !p.startsWith('L')).length === 0) parts.push(`@${l.refDes}`);
+  if (l.description && parts.filter((p) => !p.startsWith('[') && !p.startsWith('L')).length === 0) parts.push(l.description.slice(0, 40));
   return parts.length ? parts.join(' / ') : '(unidentified)';
 }
 
@@ -353,21 +359,40 @@ function buildPrompt(p: ImpactInput): string {
   }
 
   lines.push('');
+  lines.push('## Part Classification — apply BEFORE attributing readiness impact');
+  lines.push(
+    'Each changed line is tagged with [PartType] when available. Use it to classify the part FIRST, then determine what impact is actually plausible. Wrong attributions are worse than no attribution.'
+  );
+  lines.push('Classification rules:');
+  lines.push('- [Label] / [Artwork] / [Packaging] / [Label Assy]: cosmetic/regulatory-marking parts. Impact is LIMITED TO labeling compliance (UDI, CE, FDA marking) and documentation updates. Do NOT flag test coverage, test fixtures, firmware, mechanical tooling, or manufacturing capacity — labels have zero bearing on those.');
+  lines.push('- [Document] / [MFG] (work instruction, routing, SOP): affects process documentation and traceability metrics only. Does NOT affect hardware design, firmware, or supplier readiness unless the content change introduces a process step requiring new tooling or qualification.');
+  lines.push('- [PCBA] / [PCB] / [Electronic] / [IC] / [Component]: may affect firmware, test coverage, EMC, supplier readiness, design freeze — assess carefully.');
+  lines.push('- [Sub Assy] / [Assy] / [Mechanical]: may affect DFM, tooling, fixture, and manufacturing metrics — scope to function served.');
+  lines.push('- [Fastener] / [Hardware] / [Standard]: generally low risk; flag only if the supplier swap or qty delta is large enough to threaten supply.');
+  lines.push('- Unknown type or no [PartType] tag: use description and MPN to infer. When uncertain, err conservative — do not invent impacts.');
+  lines.push('');
+  lines.push('## Revision (Rev) changes — interpretation rules');
+  lines.push('When a change includes a `rev` kind, a part or document revision bumped without the part identifier changing. Apply the following:');
+  lines.push('- Document / MFG / SOP rev bump → traceability and process-doc currency risk. Check whether the new revision is reflected in the DHF / DMR and if any approval signatures are now stale.');
+  lines.push('- Mechanical / Custom part rev bump → likely a fit/form/function modification. Flag DFM, fixture, and tooling implications. If post-CDR, flag design-freeze risk.');
+  lines.push('- PCBA / Electronic component rev bump → may indicate an approved vendor list (AVL) change or silicon stepping. Flag qualification re-spin and test coverage.');
+  lines.push('- Label / Artwork rev bump → artwork review and regulatory marking compliance only. Do NOT flag test fixtures or firmware.');
+  lines.push('');
   lines.push('Your analysis must be concrete and tied to this specific delta:');
   lines.push(
-    '1. narrative — 2 short paragraphs. Open with the magnitude of the change relative to the BOM size. Call out the highest-leverage patterns (supplier swaps, regulatory-relevant part swaps, large qty deltas). If a gate is set, frame timing implications (e.g. "supplier swap after CDR ⇒ re-qual cost"). ≤180 words.'
+    '1. narrative — 2 short paragraphs. Open with the magnitude of the change. Call out the highest-leverage patterns (supplier swaps, regulatory-relevant part swaps, large qty deltas). If cosmetic/label changes dominate, say so explicitly. If a gate is set, frame timing implications. ≤180 words.'
   );
   lines.push(
-    '2. affectedRampItems — pick the readiness items materially impacted by this delta, using IDs verbatim from the list above. Examples: a supplier swap touches "Design Freeze & BOM Structure", "Supplier Readiness"; a new MCU touches "Firmware", "Test Coverage"; a large qty Δ touches "Manufacturing Capacity". ≤6 items.'
+    '2. affectedRampItems — only items GENUINELY impacted after applying the classification rules above. A label swap does NOT affect "Production Test Coverage" or "Test Fixture Readiness". A supplier swap on a functional component DOES affect "Supplier Readiness". Use IDs verbatim. ≤6 items.'
   );
   lines.push(
-    '3. newRisks — risks created or revived by this delta. ≤5. Examples: re-qualification window, lead-time exposure on new MPN, regression in test fixtures, compliance re-attestation for swapped supplier.'
+    '3. newRisks — risks actually introduced by this delta (applying classification). ≤5.'
   );
   lines.push(
-    '4. topActions — up to 3 prioritized next moves. Concrete and verifiable. Example: "Run delta DV vs. baseline on swapped MCU U7" not "Review the change".'
+    '4. topActions — up to 3 concrete next moves. Match the action to the actual part type — label changes → update artwork review checklist, not fixture regression.'
   );
   lines.push('');
-  lines.push('Be terse. No filler. Anchor every claim to a specific line / change kind.');
+  lines.push('Be terse. No filler. Anchor every claim to a specific line + its part type.');
 
   return lines.join('\n');
 }
