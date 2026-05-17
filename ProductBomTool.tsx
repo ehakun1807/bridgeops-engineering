@@ -55,6 +55,8 @@ import {
 } from 'lucide-react';
 import { db, auth } from './firebase.ts';
 import { logActivity } from './activityLogger.ts';
+import { checkBomVsDecisions, type CrossCheckResult } from './crossCheckEngine.ts';
+import CrossCheckBanner from './CrossCheckBanner.tsx';
 import {
   collection,
   query,
@@ -237,6 +239,8 @@ const ProductBomTool: React.FC<ProductBomToolProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>({ kind: 'list' });
+  // Layer-2 cross-check: banner shown when a supplier swap conflicts with a decision.
+  const [crossCheck, setCrossCheck] = useState<CrossCheckResult | null>(null);
   // The user-confirmed column mapping for THIS project. Loaded from
   // project.bomColumnMap on mount; written back on first save so subsequent
   // uploads apply silently — this is the "learns the user's convention" piece.
@@ -381,6 +385,13 @@ const ProductBomTool: React.FC<ProductBomToolProps> = ({
         )}
       </div>
 
+      {/* Layer-2 cross-check banner */}
+      {crossCheck && mode.kind === 'list' && (
+        <div className="px-6 pt-4">
+          <CrossCheckBanner result={crossCheck} onDismiss={() => setCrossCheck(null)} />
+        </div>
+      )}
+
       {/* Body */}
       <AnimatePresence mode="wait">
         {mode.kind === 'list' ? (
@@ -419,6 +430,30 @@ const ProductBomTool: React.FC<ProductBomToolProps> = ({
                 if (mapping) await persistColumnMap(mapping);
                 await loadBoms();
                 setMode({ kind: 'list' });
+                // Layer-2: after the BOM list reloads, check if the new upload
+                // has supplier swaps that conflict with active decisions.
+                // boms state isn't updated yet (setState is async), so we
+                // re-read it via a functional update trick — use the setter
+                // to peek at fresh state, then run the check.
+                setBoms((fresh) => {
+                  if (fresh.length >= 2) {
+                    const diff = diffBoms(fresh[1].lines, fresh[0].lines);
+                    const swapped = diff.changed
+                      .filter((c) => c.kinds.includes('manufacturer'))
+                      .map((c) => ({
+                        internalPn:   c.after.internalPn,
+                        description:  c.after.description,
+                        manufacturer: c.after.manufacturer,
+                        mpn:          c.after.mpn
+                      }));
+                    if (swapped.length > 0) {
+                      checkBomVsDecisions(db, uid, projectId, swapped)
+                        .then((result) => { if (result) setCrossCheck(result); })
+                        .catch(() => { /* non-fatal */ });
+                    }
+                  }
+                  return fresh; // no actual state mutation
+                });
               }}
               onCancel={() => setMode({ kind: 'list' })}
             />
@@ -1352,7 +1387,7 @@ const BomView: React.FC<BomViewProps> = ({
           tool: 'bom_pulse',
           title: `AI Impact analyzed: ${bom.versionLabel || bom.fileName}`,
           detail: result.topActions?.length
-            ? `Top action: ${result.topActions[0]?.slice(0, 100)}`
+            ? `Top action: ${result.topActions[0]?.title?.slice(0, 100)}`
             : result.affectedRampItems?.length
               ? `${result.affectedRampItems.length} RAMP items affected`
               : undefined,

@@ -36,6 +36,8 @@ import {
 } from 'lucide-react';
 import { db, auth } from './firebase.ts';
 import { logActivity } from './activityLogger.ts';
+import { checkDecisionVsPfmea, type CrossCheckResult } from './crossCheckEngine.ts';
+import CrossCheckBanner from './CrossCheckBanner.tsx';
 import {
   collection,
   query,
@@ -197,6 +199,8 @@ const DecisionLedgerTool: React.FC<DecisionLedgerToolProps> = ({
   const [decisions, setDecisions] = useState<Decision[]>([]);
   const [loading,   setLoading]   = useState(true);
   const [error,     setError]     = useState<string | null>(null);
+  // Layer-2 cross-check: banner shown after a decision is reversed.
+  const [crossCheck, setCrossCheck] = useState<CrossCheckResult | null>(null);
   const [mode,      setMode]      = useState<Mode>({ kind: 'list' });
   const [exporting, setExporting] = useState(false);
 
@@ -298,6 +302,17 @@ const DecisionLedgerTool: React.FC<DecisionLedgerToolProps> = ({
       metadata: { category: payload.category, status: payload.status, gate: payload.gate ?? '' },
       timestampMs: Date.now(),
     });
+
+    // Layer-2: when a decision is reversed, proactively check for PFMEA overlap.
+    if (isReversed) {
+      checkDecisionVsPfmea(db, uid, projectId, {
+        title:        payload.title,
+        description:  payload.description,
+        relatedRisks: payload.relatedRisks
+      }).then((result) => {
+        if (result) setCrossCheck(result);
+      }).catch(() => { /* non-fatal */ });
+    }
 
     setMode({ kind: 'list' });
   };
@@ -417,6 +432,13 @@ const DecisionLedgerTool: React.FC<DecisionLedgerToolProps> = ({
           </div>
         )}
       </div>
+
+      {/* Layer-2 cross-check banner */}
+      {crossCheck && mode.kind === 'list' && (
+        <div className="px-6 pt-4">
+          <CrossCheckBanner result={crossCheck} onDismiss={() => setCrossCheck(null)} />
+        </div>
+      )}
 
       {/* Body */}
       <AnimatePresence mode="wait">

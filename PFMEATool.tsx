@@ -42,6 +42,8 @@ import {
 } from 'lucide-react';
 import { db, auth } from './firebase.ts';
 import { logActivity } from './activityLogger.ts';
+import { checkPfmeaVsBom, type CrossCheckResult } from './crossCheckEngine.ts';
+import CrossCheckBanner from './CrossCheckBanner.tsx';
 import {
   collection,
   query,
@@ -323,6 +325,8 @@ const PFMEATool: React.FC<PFMEAToolProps> = ({ projectId, readOnly = false }) =>
   const [mode, setMode] = useState<Mode>({ kind: 'list' });
   // Decision cross-links — loaded once on mount, used in RiskCard badges.
   const [decisions, setDecisions] = useState<DecisionRef[]>([]);
+  // Layer-2 cross-check: banner shown after saving with high-RPN risks.
+  const [crossCheck, setCrossCheck] = useState<CrossCheckResult | null>(null);
 
   const uid = auth.currentUser?.uid ?? '';
 
@@ -458,6 +462,20 @@ const PFMEATool: React.FC<PFMEAToolProps> = ({ projectId, readOnly = false }) =>
         metadata: { highRpnCount: highRisks.length },
         timestampMs: Date.now() + 1,
       });
+      // Layer-2: proactively check if any high-RPN risk references a recently changed BOM part.
+      checkPfmeaVsBom(
+        db,
+        uid,
+        projectId,
+        highRisks.map((r) => ({
+          processStep: r.processStep,
+          failureMode: r.failureMode,
+          cause:       r.cause,
+          rpn:         r.severity * r.occurrence * r.detection
+        }))
+      ).then((result) => {
+        if (result) setCrossCheck(result);
+      }).catch(() => { /* non-fatal */ });
     }
 
     await load();
@@ -522,6 +540,13 @@ const PFMEATool: React.FC<PFMEAToolProps> = ({ projectId, readOnly = false }) =>
           </div>
         )}
       </div>
+
+      {/* Layer-2 cross-check banner */}
+      {crossCheck && mode.kind === 'list' && (
+        <div className="px-6 pt-4">
+          <CrossCheckBanner result={crossCheck} onDismiss={() => setCrossCheck(null)} />
+        </div>
+      )}
 
       {/* Body */}
       <AnimatePresence mode="wait">
