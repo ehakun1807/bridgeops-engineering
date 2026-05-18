@@ -3096,7 +3096,7 @@ const DeliverableChecklist: React.FC<{
               )}
 
               {filteredTemplates.length > 0 && (
-                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mt-2">
+                <p className="text-[13px] font-black uppercase tracking-widest text-slate-400 mt-2">
                   Reference checklist
                 </p>
               )}
@@ -3139,7 +3139,7 @@ const DeliverableChecklist: React.FC<{
                             <Square size={14} className="flex-shrink-0 mt-0.5 text-slate-400" />
                           )}
                           <span
-                            className={`text-[11px] leading-snug ${
+                            className={`text-[15px] leading-snug ${
                               waived
                                 ? 'text-amber-800 line-through decoration-amber-400/70'
                                 : checked
