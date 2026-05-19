@@ -9,7 +9,8 @@ export type View =
   | 'contact'
   | 'ramp_score'
   | 'pricing'
-  | 'dashboard';
+  | 'dashboard'
+  | 'intelligence';
 
 export type NavigateFn = (view: View) => void;
 

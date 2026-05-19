@@ -399,8 +399,11 @@ const Dashboard: React.FC = () => {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 text-left">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
         <div>
+          <p className="text-blue-600 font-black uppercase tracking-[0.2em] text-[10px] mb-1">
+            BridgeOps Intelligence
+          </p>
           <h2 className="text-4xl font-black text-slate-900 tracking-tighter uppercase mb-2">
-            Client Workspace
+            Program Workspace
           </h2>
           <p className="text-slate-500 font-medium uppercase tracking-widest text-[10px]">
             Parallel Project Ramp Tracking · {activeProjects.length} Active ·{' '}
@@ -430,10 +433,10 @@ const Dashboard: React.FC = () => {
               Tools
             </span>
           </button>
-          <div className="bg-white border border-slate-200 px-6 py-3 rounded-sm shadow-sm flex items-center">
-            <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">
-              SaaS · Active
+          <div className="bg-white border border-blue-500 px-6 py-3 rounded-sm shadow-sm flex items-center gap-2.5">
+            <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
+            <span className="text-[10px] font-black uppercase tracking-widest text-blue-600">
+              Intelligence · Live
             </span>
           </div>
         </div>

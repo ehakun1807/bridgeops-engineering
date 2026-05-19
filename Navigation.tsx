@@ -44,9 +44,10 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate }) => {
     }
   };
 
-  const navLinks: Array<{ name: string; id: View }> = [
+  const navLinks: Array<{ name: string; id: View; isNew?: boolean }> = [
     { name: 'Methodology', id: 'methodology' },
     { name: 'Ramp Score', id: 'ramp_score' },
+    { name: 'Intelligence', id: 'intelligence', isNew: true },
     { name: 'Engagements', id: 'pricing' },
     { name: 'About', id: 'about' },
   ];
@@ -83,13 +84,20 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate }) => {
                 <button
                   key={link.id}
                   onClick={() => handleLinkClick(link.id)}
-                  className={`text-[11px] font-black uppercase tracking-[0.2em] transition-all relative py-1 ${
-                    currentView === link.id 
-                      ? 'text-blue-400' 
+                  className={`text-[11px] font-black uppercase tracking-[0.2em] transition-all relative py-1 flex items-center gap-1.5 ${
+                    currentView === link.id
+                      ? 'text-blue-400'
+                      : link.isNew
+                      ? 'text-white hover:text-blue-300'
                       : 'text-slate-300 hover:text-white'
                   }`}
                 >
                   {link.name}
+                  {link.isNew && currentView !== link.id && (
+                    <span className="text-[8px] font-black tracking-widest bg-blue-600/30 text-blue-400 border border-blue-500/40 px-1.5 py-0.5 rounded-sm">
+                      NEW
+                    </span>
+                  )}
                   {currentView === link.id && (
                     <span className="absolute -bottom-1 left-0 w-full h-[2px] bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.8)]"></span>
                   )}
@@ -116,11 +124,11 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate }) => {
                   <div className="flex items-center space-x-6">
                     <button
                       onClick={() => handleLinkClick('dashboard')}
-                      aria-label="Open your dashboard"
+                      aria-label="Open BridgeOps Intelligence platform"
                       className="bg-blue-600 text-white px-6 py-3 border border-blue-400/30 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-blue-500 transition-all shadow-xl shadow-blue-500/20 flex items-center space-x-2"
                     >
                       <UserIcon size={14} />
-                      <span>Join SaaS</span>
+                      <span>Intelligence</span>
                     </button>
                     <button
                       onClick={handleSignOut}
@@ -191,7 +199,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate }) => {
                       onClick={() => handleLinkClick('dashboard')}
                       className="w-full text-center bg-blue-600 text-white py-5 font-black uppercase tracking-[0.2em] text-sm shadow-2xl shadow-blue-500/30"
                     >
-                      Join SaaS
+                      Intelligence
                     </button>
                     <button
                       onClick={handleSignOut}

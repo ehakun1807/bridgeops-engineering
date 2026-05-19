@@ -352,3 +352,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### 2026-05-18
 - **GitHub personal access token (classic) "eran-mac" regenerated.** Token was expiring in 7 days. Regenerated via GitHub → Settings → Personal access tokens → eran-mac. Kept same scopes: `repo` + `workflow`. New expiry: **Aug 16, 2026**. Git credential system updated automatically — no Keychain changes needed. The second token **"bridgeops-engineering deploy"** (`repo` scope only, expires Jul 27, 2026) was left untouched — used by Vercel for deployments.
+- **Font size increase in `ProjectDeepDive.tsx` — deliverable checklist + notes area.** All text in the sub-item expanded panel was too small at 100% zoom. Updated three sections in `DeliverableChecklist` and the notes textarea (both MetricRow instances):
+  - **"Reference checklist" section heading:** `9px` → `15px`.
+  - **Reference checklist item labels** (`filteredTemplates` span): `11px` → `17px`.
+  - **"Custom items" section heading:** `9px` → `15px`.
+  - **Custom item labels** (`filteredCustoms` span): `11px` → `17px`.
+  - **Notes textarea** (both MetricRow + CustomSubItemRow instances, `replace_all`): `11px` → `15px`.
+  - **Gotcha hit:** The notes textarea content (`→`-style progress notes) was initially mistaken for custom deliverable items — they render identically in the collapsed view. Always check both the `DeliverableChecklist` component AND the notes `<textarea>` above it when adjusting text sizes in this panel.
+  - **Vite cache gotcha:** Changes weren't visible until running `cd ~/Downloads/bridgeops-engineering-main && lsof -ti:3000 | xargs kill -9; rm -rf node_modules/.vite && npm run dev` from the correct directory. The `cd` matters — running the cache-clear from a different working directory left the old `.vite` cache in place.

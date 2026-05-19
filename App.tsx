@@ -18,6 +18,7 @@ import { isAdminUser } from './config.ts';
 // Heavier views — load on demand to keep the home-page bundle lean.
 const RampScoreTool = lazy(() => import('./RampScoreTool.tsx'));
 const Dashboard = lazy(() => import('./Dashboard.tsx'));
+const IntelligencePage = lazy(() => import('./IntelligencePage.tsx'));
 
 // URL <-> view mapping. Hash routing keeps things simple and works on any static host.
 const VIEW_TO_PATH: Record<View, string> = {
@@ -29,6 +30,7 @@ const VIEW_TO_PATH: Record<View, string> = {
   ramp_score: '/ramp-score',
   pricing: '/pricing',
   dashboard: '/dashboard',
+  intelligence: '/intelligence',
 };
 
 const PATH_TO_VIEW: Record<string, View> = Object.fromEntries(
@@ -44,6 +46,7 @@ const VIEW_TITLES: Record<View, string> = {
   ramp_score: 'Ramp Readiness Score | BridgeOps.ENGINEERING',
   pricing: 'Engagements | BridgeOps.ENGINEERING',
   dashboard: 'Dashboard | BridgeOps.ENGINEERING',
+  intelligence: 'BridgeOps Intelligence | Operational AI Platform',
 };
 
 function getViewFromHash(): View {
@@ -320,6 +323,15 @@ const App: React.FC = () => {
             />
           </div>
         );
+      case 'intelligence':
+        return (
+          <div className="pt-24 min-h-screen">
+            <Suspense fallback={<ViewLoader />}>
+              <IntelligencePage onNavigate={navigateTo} />
+            </Suspense>
+          </div>
+        );
+
       case 'dashboard': {
         // While we're still resolving auth state, show the loader so the
         // page doesn't flash the private-beta screen for a signed-in admin.
