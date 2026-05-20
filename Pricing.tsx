@@ -125,7 +125,7 @@ const engagements: Engagement[] = [
 const faqs: Array<{ q: string; a: string }> = [
   {
     q: 'Why not buy NPI consulting from a large firm?',
-    a: "Large firms send junior consultants to learn on your project. I'm one operator with 17 years of hands-on NPI and operations experience across regulated hardware. You're hiring the senior who will do the work, not a slide deck."
+    a: "Large firms send junior consultants to learn on your project. I'm one operator with 20+ years of hands-on NPI and operations experience across regulated hardware. You're hiring the senior who will do the work, not a slide deck."
   },
   {
     q: 'How long does the Expert Audit actually take?',
@@ -311,7 +311,7 @@ const Pricing: React.FC<PricingProps> = ({ onSelectPlan, onNavigate }) => {
               </span>
             </div>
             <p className="text-slate-500 text-[11px] font-semibold leading-relaxed max-w-xl">
-              Engagements grounded in <span className="text-slate-900 font-bold">17+ years</span> of
+              Engagements grounded in <span className="text-slate-900 font-bold">20+ years</span> of
               NPI, manufacturing ramp, and operations leadership across medical, industrial, and
               electro-mechanical hardware programs. NDA and written MSA + SOW before any paid
               engagement.
