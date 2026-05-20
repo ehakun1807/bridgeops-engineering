@@ -275,6 +275,32 @@ const Pricing: React.FC<PricingProps> = ({ onSelectPlan, onNavigate }) => {
           ))}
         </div>
 
+        {/* Track Record ---------------------------------------------------- */}
+        <div className="mt-20">
+          <div className="flex items-center space-x-2 mb-8">
+            <div className="w-10 h-[1px] bg-blue-600" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-blue-600">Proven in the Field</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {[
+              {
+                label: 'IoT Hardware Scale-up',
+                text: 'Built and led the NPI function from scratch at a fast-scaling IoT hardware company — established production lines within 2 quarters each, reaching >95% first-pass yield. Drove PLM implementation and a full KPI framework within the same timeframe.',
+              },
+              {
+                label: 'MedTech — Class II/III Devices',
+                text: 'Over 10 years at MedTech organizations, owned product transfer from R&D to manufacturing for Class II/III medical devices — from supplier qualification and validation through production line establishment and calibration system introduction — under FDA and ISO 13485 requirements.',
+              },
+            ].map((item) => (
+              <div key={item.label} className="bg-slate-50 border border-slate-200 p-8">
+                <div className="w-6 h-[2px] bg-blue-600 mb-4" />
+                <p className="text-[10px] font-black uppercase tracking-widest text-blue-600 mb-3">{item.label}</p>
+                <p className="text-slate-600 text-sm font-medium leading-relaxed">{item.text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Trust strip ------------------------------------------------------ */}
         <div className="mt-20 pt-10 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-8">
           <div className="flex flex-col md:flex-row items-center md:items-start gap-6 text-center md:text-left">

@@ -123,10 +123,10 @@ const IntelligencePage: React.FC<IntelligencePageProps> = ({ onNavigate }) => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               {[
-                { stat: '72%', label: 'of NPI delays are traceable to risks that were visible but unconnected' },
-                { stat: '6×', label: 'more expensive to fix a manufacturing issue post-CDR than pre-PDR' },
-                { stat: '0', label: 'purpose-built operational intelligence tools for hardware NPI — before this' },
-                { stat: 'CR→MP', label: 'full gate coverage from concept release to mass production' },
+                { stat: '#1', label: 'Root cause of ramp slip — risks visible in silos, invisible as a connected system' },
+                { stat: 'Post-CDR', label: 'When most teams discover what should have been caught at PDR — after the cost multiplied' },
+                { stat: 'Built for NPI', label: 'The only operational intelligence platform purpose-built for hardware transfer to production' },
+                { stat: 'CR→MP', label: 'Full gate coverage from concept release to mass production' },
               ].map((item) => (
                 <div key={item.stat} className="bg-slate-900 p-6 relative overflow-hidden">
                   <div className="absolute inset-0 blueprint-grid-dark opacity-10"></div>

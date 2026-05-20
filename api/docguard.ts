@@ -306,7 +306,9 @@ export default async function handler(req: ReqLike, res: ResLike) {
   // ------------------------------------------------------------------------
   const PRIMARY_MODEL = 'gemini-2.5-flash';
   const FALLBACK_MODEL = 'gemini-2.5-flash-lite';
-  const RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
+  // 504 intentionally excluded: retrying a Gemini timeout within our 30s
+  // function budget just burns more time and guarantees a function-level 504.
+  const RETRY_STATUSES = new Set([429, 500, 502, 503]);
 
   type CallResult =
     | { kind: 'ok'; res: Response; model: string }
