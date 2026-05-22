@@ -5,6 +5,13 @@
 // scoped, ordered by timestampMs desc). Renders a color-coded event stream
 // across all tools with optional per-tool filtering.
 //
+// When connectedProjectIds is non-empty, the feed aggregates events across
+// the primary project + all connected projects using a single IN query
+// (Firestore IN supports up to 30 values — no fan-out writes needed).
+// Events from connected projects show a source badge so the user knows
+// where the activity originated. A "This project / All" scope toggle lets
+// the user narrow back to the primary project at any time.
+//
 // Pinned as a utility tab in ProjectDeepDive's secondary strip (alongside
 // AI Analysis and History) — NOT behind the Project Tools launcher.
 // ---------------------------------------------------------------------------
@@ -25,7 +32,8 @@ import {
   Loader2,
   Inbox,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  Link2
 } from 'lucide-react';
 import { db, auth } from './firebase.ts';
 import {
@@ -34,10 +42,10 @@ import {
   where,
   orderBy,
   limit,
-  getDocs,
   onSnapshot
 } from 'firebase/firestore';
 import type { ActivityEvent, ActivityEventType, ActivityTool } from './activityLogger.ts';
+import type { ProjectStub } from './projectConnectionsClient.ts';
 
 // ---------------------------------------------------------------------------
 // Config
@@ -51,22 +59,21 @@ const FEED_MAX_ITEMS = 150;
 const TOOL_META: Record<ActivityTool, {
   label: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
-  dotClass: string;      // bg-* for the timeline dot
-  textClass: string;     // text-* for the icon
-  bgClass: string;       // bg-* for the icon plate
-  borderClass: string;   // border-* for the icon plate
+  dotClass: string;
+  textClass: string;
+  bgClass: string;
+  borderClass: string;
 }> = {
-  takt:         { label: 'Studies',       icon: Timer,       dotClass: 'bg-emerald-400', textClass: 'text-emerald-700', bgClass: 'bg-emerald-50',  borderClass: 'border-emerald-200' },
-  meetings:     { label: 'Meetings',      icon: CalendarIcon,dotClass: 'bg-violet-400',  textClass: 'text-violet-700',  bgClass: 'bg-violet-50',   borderClass: 'border-violet-200'  },
-  pfmea:        { label: 'PFMEA',         icon: ShieldAlert, dotClass: 'bg-rose-400',    textClass: 'text-rose-700',    bgClass: 'bg-rose-50',     borderClass: 'border-rose-200'    },
-  process_map:  { label: 'Process Map',   icon: Workflow,    dotClass: 'bg-blue-400',    textClass: 'text-blue-700',    bgClass: 'bg-blue-50',     borderClass: 'border-blue-200'    },
-  bom_pulse:    { label: 'BOM Pulse',     icon: Boxes,       dotClass: 'bg-amber-400',   textClass: 'text-amber-700',   bgClass: 'bg-amber-50',    borderClass: 'border-amber-200'   },
-  decisions:    { label: 'Decisions',     icon: Scale,       dotClass: 'bg-indigo-400',  textClass: 'text-indigo-700',  bgClass: 'bg-indigo-50',   borderClass: 'border-indigo-200'  },
-  doc_guard:    { label: 'Doc Guard',     icon: FileText,    dotClass: 'bg-teal-400',    textClass: 'text-teal-700',    bgClass: 'bg-teal-50',     borderClass: 'border-teal-200'    },
-  ai_analysis:  { label: 'AI Analysis',   icon: Sparkles,    dotClass: 'bg-blue-500',    textClass: 'text-blue-700',    bgClass: 'bg-blue-50',     borderClass: 'border-blue-200'    },
+  takt:         { label: 'Studies',     icon: Timer,        dotClass: 'bg-emerald-400', textClass: 'text-emerald-700', bgClass: 'bg-emerald-50',  borderClass: 'border-emerald-200' },
+  meetings:     { label: 'Meetings',    icon: CalendarIcon, dotClass: 'bg-violet-400',  textClass: 'text-violet-700',  bgClass: 'bg-violet-50',   borderClass: 'border-violet-200'  },
+  pfmea:        { label: 'PFMEA',       icon: ShieldAlert,  dotClass: 'bg-rose-400',    textClass: 'text-rose-700',    bgClass: 'bg-rose-50',     borderClass: 'border-rose-200'    },
+  process_map:  { label: 'Process Map', icon: Workflow,     dotClass: 'bg-blue-400',    textClass: 'text-blue-700',    bgClass: 'bg-blue-50',     borderClass: 'border-blue-200'    },
+  bom_pulse:    { label: 'BOM Pulse',   icon: Boxes,        dotClass: 'bg-amber-400',   textClass: 'text-amber-700',   bgClass: 'bg-amber-50',    borderClass: 'border-amber-200'   },
+  decisions:    { label: 'Decisions',   icon: Scale,        dotClass: 'bg-indigo-400',  textClass: 'text-indigo-700',  bgClass: 'bg-indigo-50',   borderClass: 'border-indigo-200'  },
+  doc_guard:    { label: 'Doc Guard',   icon: FileText,     dotClass: 'bg-teal-400',    textClass: 'text-teal-700',    bgClass: 'bg-teal-50',     borderClass: 'border-teal-200'    },
+  ai_analysis:  { label: 'AI Analysis', icon: Sparkles,     dotClass: 'bg-blue-500',    textClass: 'text-blue-700',    bgClass: 'bg-blue-50',     borderClass: 'border-blue-200'    },
 };
 
-// Events that warrant a subtle highlight (high-signal moments)
 const HIGH_SIGNAL_EVENTS = new Set<ActivityEventType>([
   'takt_study_completed',
   'pfmea_risk_high',
@@ -98,7 +105,6 @@ function formatAbsoluteTime(ms: number): string {
   });
 }
 
-// Group events by calendar day for the date-divider rows
 function groupByDay(events: ActivityEvent[]): Array<{ label: string; events: ActivityEvent[] }> {
   const groups: Map<string, ActivityEvent[]> = new Map();
   for (const e of events) {
@@ -113,11 +119,19 @@ function groupByDay(events: ActivityEvent[]): Array<{ label: string; events: Act
 // ---------------------------------------------------------------------------
 // FeedRow
 // ---------------------------------------------------------------------------
-function FeedRow({ event, isLast }: { event: ActivityEvent; isLast: boolean }) {
+interface FeedRowProps {
+  event: ActivityEvent;
+  isLast: boolean;
+  primaryProjectId: string;
+  projectName?: string; // name of the source project (only set for connected projects)
+}
+
+function FeedRow({ event, isLast, primaryProjectId, projectName }: FeedRowProps) {
   const [hovered, setHovered] = useState(false);
   const meta = TOOL_META[event.tool];
   const Icon = meta.icon;
   const isHigh = HIGH_SIGNAL_EVENTS.has(event.eventType);
+  const isExternal = event.projectId !== primaryProjectId;
 
   return (
     <div
@@ -153,9 +167,18 @@ function FeedRow({ event, isLast }: { event: ActivityEvent; isLast: boolean }) {
             {event.detail}
           </p>
         )}
-        <p className="text-[10px] text-slate-300 mt-0.5 uppercase tracking-wider">
-          {meta.label}
-        </p>
+        <div className="flex items-center gap-2 mt-0.5">
+          <p className="text-[10px] text-slate-300 uppercase tracking-wider">
+            {meta.label}
+          </p>
+          {/* Source badge — only shown for events from connected projects */}
+          {isExternal && projectName && (
+            <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-sm">
+              <Link2 size={8} />
+              {projectName.length > 20 ? projectName.slice(0, 20) + '…' : projectName}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -166,9 +189,12 @@ function FeedRow({ event, isLast }: { event: ActivityEvent; isLast: boolean }) {
 // ---------------------------------------------------------------------------
 interface Props {
   projectId: string;
+  connectedProjectIds?: string[];
+  allUserProjects?: ProjectStub[];
 }
 
 type FilterTool = ActivityTool | 'all';
+type ScopeFilter = 'all' | 'this';
 
 const FILTER_OPTIONS: Array<{ value: FilterTool; label: string }> = [
   { value: 'all',         label: 'All tools' },
@@ -182,33 +208,56 @@ const FILTER_OPTIONS: Array<{ value: FilterTool; label: string }> = [
   { value: 'ai_analysis', label: 'AI Analysis' },
 ];
 
-export default function ActivityFeedPanel({ projectId }: Props) {
+export default function ActivityFeedPanel({ projectId, connectedProjectIds = [], allUserProjects = [] }: Props) {
   const uid = auth.currentUser?.uid ?? '';
-  const [events, setEvents]       = useState<ActivityEvent[]>([]);
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState<string | null>(null);
-  const [filter, setFilter]       = useState<FilterTool>('all');
+  const [events, setEvents]           = useState<ActivityEvent[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState<string | null>(null);
+  const [filter, setFilter]           = useState<FilterTool>('all');
+  const [scopeFilter, setScopeFilter] = useState<ScopeFilter>('all');
   const [loadedCount, setLoadedCount] = useState(FEED_PAGE_SIZE);
   const unsubRef = useRef<(() => void) | null>(null);
 
-  // Real-time listener — re-subscribes when projectId changes
+  const hasConnected = connectedProjectIds.length > 0;
+
+  // All project IDs to include in the query
+  const allProjectIds = [projectId, ...connectedProjectIds];
+
+  // Real-time listener — re-subscribes when projectId or connected IDs change
   useEffect(() => {
     if (!uid || !projectId) { setLoading(false); return; }
     setLoading(true);
     setError(null);
 
-    const q = query(
-      collection(db, 'projectActivity'),
-      where('userId', '==', uid),
-      where('projectId', '==', projectId),
-      orderBy('timestampMs', 'desc'),
-      limit(FEED_MAX_ITEMS)
-    );
+    // Unsubscribe previous listener
+    if (unsubRef.current) { unsubRef.current(); unsubRef.current = null; }
+
+    // Firestore IN clause supports up to 30 values — safe for our use case.
+    // When there are no connected projects, fall back to equality (slightly
+    // more efficient than IN with a single value).
+    const q = allProjectIds.length === 1
+      ? query(
+          collection(db, 'projectActivity'),
+          where('userId', '==', uid),
+          where('projectId', '==', projectId),
+          orderBy('timestampMs', 'desc'),
+          limit(FEED_MAX_ITEMS)
+        )
+      : query(
+          collection(db, 'projectActivity'),
+          where('userId', '==', uid),
+          where('projectId', 'in', allProjectIds.slice(0, 30)),
+          orderBy('timestampMs', 'desc'),
+          limit(FEED_MAX_ITEMS)
+        );
 
     const unsub = onSnapshot(
       q,
       (snap) => {
         const docs = snap.docs.map((d) => d.data() as ActivityEvent);
+        // Sort descending by timestamp (the IN query may return events
+        // out of order across project IDs from the client's perspective)
+        docs.sort((a, b) => b.timestampMs - a.timestampMs);
         setEvents(docs);
         setLoading(false);
       },
@@ -221,12 +270,25 @@ export default function ActivityFeedPanel({ projectId }: Props) {
 
     unsubRef.current = unsub;
     return () => unsub();
-  }, [uid, projectId]);
+  }, [uid, projectId, connectedProjectIds.join(',')]);
 
-  const filtered = filter === 'all' ? events : events.filter((e) => e.tool === filter);
-  const visible  = filtered.slice(0, loadedCount);
-  const groups   = groupByDay(visible);
-  const hasMore  = filtered.length > loadedCount;
+  // Build a projectId → name map for source badges
+  const projectNameMap = new Map<string, string>(
+    allUserProjects.map((p) => [p.id, p.name])
+  );
+
+  // Apply scope filter first, then tool filter
+  const scopeFiltered = scopeFilter === 'this'
+    ? events.filter((e) => e.projectId === projectId)
+    : events;
+
+  const filtered = filter === 'all'
+    ? scopeFiltered
+    : scopeFiltered.filter((e) => e.tool === filter);
+
+  const visible = filtered.slice(0, loadedCount);
+  const groups  = groupByDay(visible);
+  const hasMore = filtered.length > loadedCount;
 
   return (
     <div className="bg-white border border-slate-200 rounded-sm shadow-xl overflow-hidden">
@@ -243,7 +305,35 @@ export default function ActivityFeedPanel({ projectId }: Props) {
             </h3>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap justify-end">
+          {/* Scope toggle — only shown when there are connected projects */}
+          {hasConnected && (
+            <div className="flex rounded overflow-hidden border border-slate-700">
+              <button
+                type="button"
+                onClick={() => { setScopeFilter('all'); setLoadedCount(FEED_PAGE_SIZE); }}
+                className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 transition-colors ${
+                  scopeFilter === 'all'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                onClick={() => { setScopeFilter('this'); setLoadedCount(FEED_PAGE_SIZE); }}
+                className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 transition-colors ${
+                  scopeFilter === 'this'
+                    ? 'bg-slate-600 text-white'
+                    : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                This project
+              </button>
+            </div>
+          )}
+
           {/* Tool filter */}
           <div className="relative">
             <select
@@ -257,6 +347,7 @@ export default function ActivityFeedPanel({ projectId }: Props) {
             </select>
             <ChevronDown size={10} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400" />
           </div>
+
           {/* Count badge */}
           {!loading && (
             <span className="text-[10px] font-bold text-slate-400 tabular-nums">
@@ -265,6 +356,17 @@ export default function ActivityFeedPanel({ projectId }: Props) {
           )}
         </div>
       </div>
+
+      {/* Connected projects indicator */}
+      {hasConnected && !loading && (
+        <div className="bg-blue-950 border-b border-blue-900 px-5 py-2 flex items-center gap-2">
+          <Link2 size={10} className="text-blue-400 flex-none" />
+          <p className="text-[10px] text-blue-400">
+            Showing activity from {connectedProjectIds.length + 1} connected project{connectedProjectIds.length !== 1 ? 's' : ''}
+            {scopeFilter === 'this' ? ' — filtered to this project only' : ''}
+          </p>
+        </div>
+      )}
 
       {/* Body */}
       <div className="min-h-[200px]">
@@ -308,7 +410,7 @@ export default function ActivityFeedPanel({ projectId }: Props) {
                   {/* Events */}
                   {group.events.map((event, idx) => (
                     <motion.div
-                      key={`${event.timestampMs}-${event.eventType}`}
+                      key={`${event.timestampMs}-${event.projectId}-${event.eventType}`}
                       initial={{ opacity: 0, y: -4 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0 }}
@@ -317,6 +419,12 @@ export default function ActivityFeedPanel({ projectId }: Props) {
                       <FeedRow
                         event={event}
                         isLast={idx === group.events.length - 1}
+                        primaryProjectId={projectId}
+                        projectName={
+                          event.projectId !== projectId
+                            ? (projectNameMap.get(event.projectId) ?? 'Connected project')
+                            : undefined
+                        }
                       />
                     </motion.div>
                   ))}

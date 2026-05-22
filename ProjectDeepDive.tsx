@@ -45,7 +45,12 @@ import {
   Boxes,
   LayoutGrid,
   Scale,
-  Activity
+  Activity,
+  Link2,
+  ArrowRight,
+  ArrowLeftRight,
+  Search,
+  Unlink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db, auth } from './firebase.ts';
@@ -83,6 +88,16 @@ import {
 } from './coachClient.ts';
 import type { AIAnalysis } from './aiClient';
 import { generateExecutiveSummary } from './pptxGenerator';
+import {
+  type ProjectConnection,
+  type ProjectStub,
+  loadOutboundConnections,
+  loadUserProjects,
+  addConnection,
+  addBidirectionalConnection,
+  removeConnection,
+  removeBidirectionalConnection
+} from './projectConnectionsClient.ts';
 
 export type InfoStatus = 'TBD' | 'In Process' | 'Completed' | 'Cancelled';
 
@@ -693,6 +708,17 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
   );
   const [scopeEditorOpen, setScopeEditorOpen] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<AIAnalysis | null>(project.aiAnalysis || null);
+
+  // Project connections — outbound edges from this project.
+  const [connections, setConnections] = useState<ProjectConnection[]>([]);
+  const [allUserProjects, setAllUserProjects] = useState<ProjectStub[]>([]);
+  const [connectionsLoading, setConnectionsLoading] = useState(false);
+  const [showConnectionModal, setShowConnectionModal] = useState(false);
+  const [pickerSearch, setPickerSearch] = useState('');
+  const [pickerSelected, setPickerSelected] = useState<string | null>(null);
+  const [pickerDirection, setPickerDirection] = useState<'one-way' | 'both-ways'>('one-way');
+  const [pickerSaving, setPickerSaving] = useState(false);
+
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -752,6 +778,17 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
     setSavedAt(null);
     setError(null);
     setActiveGroupId(RAMP_GROUPS[0].id);
+  }, [project.id]);
+
+  // Load outbound connections whenever the project changes.
+  useEffect(() => {
+    let cancelled = false;
+    setConnections([]);
+    setConnectionsLoading(true);
+    loadOutboundConnections(project.id).then((conns) => {
+      if (!cancelled) { setConnections(conns); setConnectionsLoading(false); }
+    }).catch(() => { if (!cancelled) setConnectionsLoading(false); });
+    return () => { cancelled = true; };
   }, [project.id]);
 
   // Stage-gate UI (gate readiness strip + per-deliverable due-by chips/pickers)
@@ -1444,6 +1481,66 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
     }
   };
 
+  // ---------------------------------------------------------------------------
+  // Connection handlers
+  // ---------------------------------------------------------------------------
+
+  const handleOpenConnectionModal = async () => {
+    setPickerSearch('');
+    setPickerSelected(null);
+    setPickerDirection('one-way');
+    setShowConnectionModal(true);
+    // Lazy-load user projects for the picker
+    if (allUserProjects.length === 0) {
+      const projs = await loadUserProjects();
+      setAllUserProjects(projs);
+    }
+  };
+
+  const handleAddConnection = async () => {
+    if (!pickerSelected || pickerSaving) return;
+    setPickerSaving(true);
+    try {
+      if (pickerDirection === 'both-ways') {
+        await addBidirectionalConnection(project.id, pickerSelected);
+      } else {
+        await addConnection(project.id, pickerSelected);
+      }
+      // Refresh the connection list
+      const conns = await loadOutboundConnections(project.id);
+      setConnections(conns);
+      setShowConnectionModal(false);
+    } catch (err) {
+      console.error('Add connection failed:', err);
+    } finally {
+      setPickerSaving(false);
+    }
+  };
+
+  const handleRemoveConnection = async (conn: ProjectConnection) => {
+    // Check if there's a reverse edge too (both-ways)
+    const hasReverse = connections.some(
+      (c) => c.sourceProjectId === conn.targetProjectId && c.targetProjectId === conn.sourceProjectId
+    );
+    try {
+      if (hasReverse) {
+        await removeBidirectionalConnection(project.id, conn.targetProjectId);
+      } else {
+        await removeConnection(conn.id);
+      }
+      const conns = await loadOutboundConnections(project.id);
+      setConnections(conns);
+    } catch (err) {
+      console.error('Remove connection failed:', err);
+    }
+  };
+
+  // Derive the connected project IDs (for Activity Feed + AI Analysis)
+  const connectedProjectIds = useMemo(
+    () => connections.map((c) => c.targetProjectId),
+    [connections]
+  );
+
   // Build an editable .pptx executive summary from the project's current
   // in-memory state + most recent AI analysis (if any).
   const handleDownloadSummary = async () => {
@@ -1908,6 +2005,8 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
               userId={auth.currentUser?.uid ?? ''}
               db={db}
               taktSummary={project.taktSummary}
+              connectedProjectIds={connectedProjectIds}
+              allUserProjects={allUserProjects}
             />
           </motion.div>
         ) : activeGroupId === STUDIES_TAB_ID ? (
@@ -1996,7 +2095,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
           >
-            <ActivityFeedPanel projectId={project.id} />
+            <ActivityFeedPanel projectId={project.id} connectedProjectIds={connectedProjectIds} allUserProjects={allUserProjects} />
           </motion.div>
         ) : activeGroupId === HISTORY_TAB_ID ? (
           <motion.div
@@ -2054,6 +2153,22 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
               onAddAttachment={addAttachment}
               onRemoveAttachment={removeAttachment}
               readOnly={readOnly}
+              connections={connections}
+              allUserProjects={allUserProjects}
+              connectionsLoading={connectionsLoading}
+              showConnectionModal={showConnectionModal}
+              pickerSearch={pickerSearch}
+              pickerSelected={pickerSelected}
+              pickerDirection={pickerDirection}
+              pickerSaving={pickerSaving}
+              onOpenConnectionModal={handleOpenConnectionModal}
+              onCloseConnectionModal={() => setShowConnectionModal(false)}
+              onPickerSearch={setPickerSearch}
+              onPickerSelect={setPickerSelected}
+              onPickerDirection={setPickerDirection}
+              onAddConnection={handleAddConnection}
+              onRemoveConnection={handleRemoveConnection}
+              currentProjectId={project.id}
             />
           </motion.div>
         ) : (
@@ -3653,6 +3768,23 @@ const GeneralInfoPanel: React.FC<{
   onAddAttachment: (name: string, url: string) => void;
   onRemoveAttachment: (att: ProjectAttachment) => void;
   readOnly?: boolean;
+  // Connected projects
+  currentProjectId: string;
+  connections: ProjectConnection[];
+  allUserProjects: ProjectStub[];
+  connectionsLoading: boolean;
+  showConnectionModal: boolean;
+  pickerSearch: string;
+  pickerSelected: string | null;
+  pickerDirection: 'one-way' | 'both-ways';
+  pickerSaving: boolean;
+  onOpenConnectionModal: () => void;
+  onCloseConnectionModal: () => void;
+  onPickerSearch: (v: string) => void;
+  onPickerSelect: (id: string | null) => void;
+  onPickerDirection: (d: 'one-way' | 'both-ways') => void;
+  onAddConnection: () => void;
+  onRemoveConnection: (conn: ProjectConnection) => void;
 }> = ({
   projectName,
   productType,
@@ -3682,7 +3814,23 @@ const GeneralInfoPanel: React.FC<{
   onChangeGateTarget,
   onAddAttachment,
   onRemoveAttachment,
-  readOnly = false
+  readOnly = false,
+  currentProjectId,
+  connections,
+  allUserProjects,
+  connectionsLoading,
+  showConnectionModal,
+  pickerSearch,
+  pickerSelected,
+  pickerDirection,
+  pickerSaving,
+  onOpenConnectionModal,
+  onCloseConnectionModal,
+  onPickerSearch,
+  onPickerSelect,
+  onPickerDirection,
+  onAddConnection,
+  onRemoveConnection
 }) => {
   const template = getTemplate(templateId);
   const scopeIsFull = enabledCount === totalCount;
@@ -4104,7 +4252,224 @@ const GeneralInfoPanel: React.FC<{
             </ul>
           )}
         </div>
+
+        {/* Connected Projects */}
+        <div className="border-t border-slate-100 pt-6">
+          <div className="flex items-center justify-between mb-3">
+            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 flex items-center gap-2">
+              <Link2 size={12} />
+              Connected Projects
+              {connections.length > 0 && (
+                <span className="text-slate-400">· {connections.length}</span>
+              )}
+            </label>
+            {!readOnly && (
+              <button
+                type="button"
+                onClick={onOpenConnectionModal}
+                className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-800 border border-dashed border-blue-300 hover:border-blue-500 px-2.5 py-1 transition-colors"
+              >
+                <Plus size={10} />
+                Connect
+              </button>
+            )}
+          </div>
+
+          {connectionsLoading ? (
+            <div className="flex items-center gap-2 py-2 text-slate-400">
+              <Loader2 size={12} className="animate-spin" />
+              <span className="text-[11px]">Loading…</span>
+            </div>
+          ) : connections.length === 0 ? (
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              Connect this project to related projects to share activity and AI insights across them.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {connections.map((conn) => {
+                const target = allUserProjects.find((p) => p.id === conn.targetProjectId);
+                const name = target?.name ?? conn.targetProjectId.slice(0, 8) + '…';
+                // Detect if there's also a reverse edge (both-ways)
+                const isBothWays = connections.some(
+                  (c) => c.sourceProjectId === conn.targetProjectId && c.targetProjectId === conn.sourceProjectId
+                );
+                return (
+                  <div
+                    key={conn.id}
+                    className="flex items-center gap-1.5 text-[11px] font-semibold text-blue-800 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-sm"
+                  >
+                    {isBothWays
+                      ? <ArrowLeftRight size={10} className="text-blue-500 flex-none" />
+                      : <ArrowRight size={10} className="text-blue-500 flex-none" />
+                    }
+                    <span className="truncate max-w-[160px]" title={name}>{name}</span>
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        onClick={() => onRemoveConnection(conn)}
+                        className="ml-0.5 text-blue-400 hover:text-red-500 transition-colors"
+                        title="Remove connection"
+                        aria-label={`Remove connection to ${name}`}
+                      >
+                        <X size={10} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <p className="text-[10px] text-slate-300 mt-2">
+            <ArrowRight size={9} className="inline mr-0.5" /> one-way &nbsp;·&nbsp;
+            <ArrowLeftRight size={9} className="inline mr-0.5" /> both ways
+          </p>
+        </div>
       </div>
+
+      {/* Connection picker modal */}
+      <AnimatePresence>
+        {showConnectionModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+            onMouseDown={(e) => { if (e.target === e.currentTarget) onCloseConnectionModal(); }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.18 }}
+              className="bg-white border border-slate-200 shadow-2xl w-full max-w-md mx-4 overflow-hidden"
+            >
+              {/* Modal header */}
+              <div className="bg-slate-900 text-white px-5 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Link2 size={14} className="text-blue-400" />
+                  <span className="text-sm font-black uppercase tracking-tight">Connect a project</span>
+                </div>
+                <button type="button" onClick={onCloseConnectionModal} className="text-slate-400 hover:text-white transition-colors">
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4">
+                {/* Search */}
+                <div className="relative">
+                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={pickerSearch}
+                    onChange={(e) => onPickerSearch(e.target.value)}
+                    placeholder="Search projects…"
+                    className="w-full bg-slate-50 border border-slate-200 pl-8 pr-3 py-2 text-[12px] font-medium text-slate-700 placeholder-slate-400 focus:border-blue-500 outline-none"
+                  />
+                </div>
+
+                {/* Project list */}
+                <div className="max-h-52 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-sm">
+                  {allUserProjects
+                    .filter((p) =>
+                      p.id !== currentProjectId &&
+                      !connections.some((c) => c.targetProjectId === p.id) &&
+                      (pickerSearch === '' || p.name.toLowerCase().includes(pickerSearch.toLowerCase()))
+                    )
+                    .map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => onPickerSelect(pickerSelected === p.id ? null : p.id)}
+                        className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
+                          pickerSelected === p.id
+                            ? 'bg-blue-50 border-l-2 border-blue-500'
+                            : 'bg-white hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className={`w-2 h-2 rounded-full flex-none ${
+                          p.status === 'active' ? 'bg-emerald-400' : 'bg-slate-300'
+                        }`} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[12px] font-semibold text-slate-800 truncate">{p.name}</p>
+                          <p className="text-[10px] text-slate-400">
+                            {[p.productType, p.currentGate].filter(Boolean).join(' · ') || 'No details'}
+                          </p>
+                        </div>
+                        {pickerSelected === p.id && (
+                          <CheckSquare size={14} className="text-blue-500 flex-none" />
+                        )}
+                      </button>
+                    ))}
+                  {allUserProjects.filter((p) =>
+                    p.id !== currentProjectId &&
+                    !connections.some((c) => c.targetProjectId === p.id) &&
+                    (pickerSearch === '' || p.name.toLowerCase().includes(pickerSearch.toLowerCase()))
+                  ).length === 0 && (
+                    <div className="px-4 py-6 text-center text-[12px] text-slate-400">
+                      {pickerSearch ? 'No projects match your search.' : 'No other projects to connect.'}
+                    </div>
+                  )}
+                </div>
+
+                {/* Direction toggle */}
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-2">Connection direction</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onPickerDirection('one-way')}
+                      className={`flex items-center justify-center gap-2 py-2.5 border text-[11px] font-black uppercase tracking-wider transition-colors ${
+                        pickerDirection === 'one-way'
+                          ? 'bg-blue-50 border-blue-400 text-blue-700'
+                          : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                      }`}
+                    >
+                      <ArrowRight size={12} /> One-way
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onPickerDirection('both-ways')}
+                      className={`flex items-center justify-center gap-2 py-2.5 border text-[11px] font-black uppercase tracking-wider transition-colors ${
+                        pickerDirection === 'both-ways'
+                          ? 'bg-blue-50 border-blue-400 text-blue-700'
+                          : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                      }`}
+                    >
+                      <ArrowLeftRight size={12} /> Both ways
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1.5">
+                    {pickerDirection === 'one-way'
+                      ? 'This project pulls data from the selected project. The reverse is not automatic.'
+                      : 'Both projects share data with each other.'}
+                  </p>
+                </div>
+
+                {/* Footer */}
+                <div className="flex items-center justify-end gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={onCloseConnectionModal}
+                    className="text-[11px] font-black uppercase tracking-widest text-slate-500 hover:text-slate-700 px-3 py-1.5 border border-slate-200 hover:border-slate-300 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onAddConnection}
+                    disabled={!pickerSelected || pickerSaving}
+                    className="text-[11px] font-black uppercase tracking-widest text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-4 py-1.5 flex items-center gap-1.5 transition-colors"
+                  >
+                    {pickerSaving ? <Loader2 size={11} className="animate-spin" /> : <Link2 size={11} />}
+                    Connect
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

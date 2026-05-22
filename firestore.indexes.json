@@ -61,6 +61,23 @@
         { "fieldPath": "projectId", "order": "ASCENDING" },
         { "fieldPath": "timestampMs", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "projectConnections",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "sourceProjectId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "projectConnections",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "sourceProjectId", "order": "ASCENDING" },
+        { "fieldPath": "targetProjectId", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

@@ -37,8 +37,10 @@ import {
   MeetingSignal,
   BomSignal,
   TaktSignal,
-  DecisionSignal
+  DecisionSignal,
+  ConnectedProjectContext
 } from './aiClient';
+import type { ProjectStub } from './projectConnectionsClient.ts';
 
 interface AIAnalysisPanelProps {
   projectInput: AnalyzeProjectInput;
@@ -51,6 +53,10 @@ interface AIAnalysisPanelProps {
   db: Firestore;
   /** Already on the project doc — pass through so we skip an extra read. */
   taktSummary?: TaktSignal;
+  /** IDs of projects connected to this one — enables cross-project AI signals. */
+  connectedProjectIds?: string[];
+  /** All user projects (for name lookup on connected projects). */
+  allUserProjects?: ProjectStub[];
 }
 
 const IMPACT_STYLES: Record<'high' | 'medium' | 'low', string> = {
@@ -79,8 +85,10 @@ async function fetchToolContext(
   db: Firestore,
   userId: string,
   projectId: string,
-  taktSummary?: TaktSignal
-): Promise<ToolContext> {
+  taktSummary?: TaktSignal,
+  connectedProjectIds?: string[],
+  projectNameMap?: Map<string, string>
+): Promise<{ toolContext: ToolContext; connectedProjectsContext?: ConnectedProjectContext[] }> {
   const ctx: ToolContext = {};
 
   // Takt is already on the project doc — pass it straight through.
@@ -231,7 +239,144 @@ async function fetchToolContext(
     console.warn('[AIAnalysisPanel] decisions fetch failed', e);
   }
 
-  return ctx;
+  // ---------------------------------------------------------------------------
+  // Cross-project signals — fetch key tool data for each connected project.
+  // Kept lightweight: up to 2 PFMEAs + 1 latest BOM + up to 5 active decisions
+  // per connected project. Failures are non-fatal — missing signals are silently
+  // skipped so a Firestore hiccup on a connected project never blocks the scan.
+  // ---------------------------------------------------------------------------
+  let connectedProjectsContext: ConnectedProjectContext[] | undefined;
+
+  if (connectedProjectIds && connectedProjectIds.length > 0) {
+    const connectedResults = await Promise.all(
+      connectedProjectIds.slice(0, 10).map(async (connProjectId): Promise<ConnectedProjectContext> => {
+        const projectName = projectNameMap?.get(connProjectId) ?? connProjectId;
+        const connCtx: ConnectedProjectContext = { projectId: connProjectId, projectName };
+
+        // PFMEA — up to 2 most-recent from connected project.
+        try {
+          const snap = await getDocs(
+            query(
+              collection(db, 'pfmeas'),
+              where('userId', '==', userId),
+              where('projectId', '==', connProjectId),
+              orderBy('dateMs', 'desc'),
+              limit(2)
+            )
+          );
+          if (!snap.empty) {
+            const rpn = (r: any) => (r.severity ?? 1) * (r.occurrence ?? 1) * (r.detection ?? 1);
+            connCtx.pfmeas = snap.docs.map((d) => {
+              const data = d.data() as any;
+              const risks: any[] = Array.isArray(data.risks) ? data.risks : [];
+              const sorted = [...risks].sort((a, b) => rpn(b) - rpn(a));
+              const highCount = risks.filter((r) => rpn(r) > 100).length;
+              const mediumCount = risks.filter((r) => rpn(r) >= 40 && rpn(r) <= 100).length;
+              const maxRpn = sorted.length > 0 ? rpn(sorted[0]) : 0;
+              return {
+                title: String(data.title || 'Untitled'),
+                dateMs: Number(data.dateMs || 0),
+                totalRisks: risks.length,
+                highCount,
+                mediumCount,
+                maxRpn,
+                topRisks: sorted.slice(0, 3).map((r) => ({
+                  processStep: String(r.processStep || '').slice(0, 60),
+                  failureMode: String(r.failureMode || '').slice(0, 60),
+                  rpn: rpn(r)
+                }))
+              } satisfies PFMEASignal;
+            });
+          }
+        } catch (e) {
+          console.warn(`[AIAnalysisPanel] connected pfmeas fetch failed for ${connProjectId}`, e);
+        }
+
+        // Latest BOM.
+        try {
+          const snap = await getDocs(
+            query(
+              collection(db, 'productBoms'),
+              where('userId', '==', userId),
+              where('projectId', '==', connProjectId),
+              orderBy('uploadedAtMs', 'desc'),
+              limit(1)
+            )
+          );
+          if (!snap.empty) {
+            const data = snap.docs[0].data() as any;
+            const bom: BomSignal = {
+              versionLabel: data.versionLabel || undefined,
+              uploadedAtMs: Number(data.uploadedAtMs || 0),
+              effectiveDateMs: data.effectiveDateMs || undefined,
+              reasonForChange: data.reasonForChange
+                ? String(data.reasonForChange).slice(0, 200)
+                : undefined,
+              totalLines: Number(data.totalLines || 0)
+            };
+            if (data.diffStats) {
+              bom.diff = {
+                added: data.diffStats.added ?? 0,
+                removed: data.diffStats.removed ?? 0,
+                changed: data.diffStats.changed ?? 0,
+                supplierSwapCount: data.diffStats.supplierSwapCount ?? 0,
+                costDelta: data.diffStats.costDelta ?? 0
+              };
+            }
+            if (data.impactAnalysis?.narrative) {
+              bom.aiImpactNarrative = String(data.impactAnalysis.narrative).slice(0, 300);
+            }
+            connCtx.latestBom = bom;
+          }
+        } catch (e) {
+          console.warn(`[AIAnalysisPanel] connected productBoms fetch failed for ${connProjectId}`, e);
+        }
+
+        // Active decisions + any reversed (instability/drift signal).
+        try {
+          const snap = await getDocs(
+            query(
+              collection(db, 'decisions'),
+              where('userId', '==', userId),
+              where('projectId', '==', connProjectId),
+              orderBy('dateMs', 'desc'),
+              limit(8)
+            )
+          );
+          if (!snap.empty) {
+            const all = snap.docs.map((d) => d.data() as any);
+            const active   = all.filter((d: any) => d.status === 'active').slice(0, 5);
+            const reversed = all.filter((d: any) => d.status === 'reversed');
+            connCtx.decisions = [...active, ...reversed].map((d: any): DecisionSignal => ({
+              title:         String(d.title         || '').slice(0, 150),
+              dateMs:        Number(d.dateMs        || 0),
+              decisionMaker: String(d.decisionMaker || '').slice(0, 60),
+              description:   String(d.description  || '').slice(0, 300),
+              rationale:     String(d.rationale     || '').slice(0, 200),
+              relatedRisks:  d.relatedRisks ? String(d.relatedRisks).slice(0, 150) : undefined,
+              impact:        d.impact       ? String(d.impact).slice(0, 150)       : undefined,
+              status:        d.status in ['active', 'superseded', 'reversed'] ? d.status : 'active',
+              category:      String(d.category || 'other'),
+              gate:          d.gate ? String(d.gate) : undefined
+            }));
+          }
+        } catch (e) {
+          console.warn(`[AIAnalysisPanel] connected decisions fetch failed for ${connProjectId}`, e);
+        }
+
+        return connCtx;
+      })
+    );
+
+    const populated = connectedResults.filter(
+      (c) => c.pfmeas?.length || c.latestBom || c.decisions?.length
+    );
+    if (populated.length > 0) {
+      connectedProjectsContext = populated;
+    }
+  }
+
+  return { toolContext: ctx, connectedProjectsContext };
 }
 
 // ---------------------------------------------------------------------------
@@ -246,7 +391,9 @@ const AIAnalysisPanel: React.FC<AIAnalysisPanelProps> = ({
   projectId,
   userId,
   db,
-  taktSummary
+  taktSummary,
+  connectedProjectIds,
+  allUserProjects
 }) => {
   const [analysis, setAnalysis] = useState<AIAnalysis | null>(cached ?? null);
   const [loading, setLoading] = useState(false);
@@ -256,14 +403,20 @@ const AIAnalysisPanel: React.FC<AIAnalysisPanelProps> = ({
     setLoading(true);
     setError(null);
     try {
-      // Fetch tool data first, then hand everything to analyzeProject.
-      const toolContext = await fetchToolContext(
+      // Build a name map for connected projects so the AI sees project names.
+      const projectNameMap = new Map<string, string>(
+        (allUserProjects ?? []).map((p) => [p.id, p.name])
+      );
+      // Fetch primary tool data + cross-project signals in one call.
+      const { toolContext, connectedProjectsContext } = await fetchToolContext(
         db,
         userId,
         projectId,
-        taktSummary
+        taktSummary,
+        connectedProjectIds,
+        projectNameMap
       );
-      const result = await analyzeProject({ ...projectInput, toolContext });
+      const result = await analyzeProject({ ...projectInput, toolContext, connectedProjectsContext });
       setAnalysis(result);
       onAnalyzed(result);
     } catch (err: any) {

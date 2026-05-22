@@ -255,6 +255,16 @@ interface ToolContext {
   decisions?: DecisionSignal[];
 }
 
+// Mirrors aiClient.ts ConnectedProjectContext — inlined per Vercel bundler
+// .ts extension gotcha (cross-file TS imports fail at runtime in serverless).
+interface ConnectedProjectContext {
+  projectId: string;
+  projectName: string;
+  pfmeas?: PFMEASignal[];
+  latestBom?: BomSignal;
+  decisions?: DecisionSignal[];
+}
+
 interface ProjectInput {
   name: string;
   productType?: string;
@@ -275,6 +285,9 @@ interface ProjectInput {
   // Live signals from per-project tools — wired in when the user clicks
   // "Analyze" so the AI sees real tool data alongside the RAMP scores.
   toolContext?: ToolContext;
+  // Signals from connected projects — enables cross-project drift detection,
+  // risk propagation, and supplier-chain awareness.
+  connectedProjectsContext?: ConnectedProjectContext[];
 }
 
 function buildPrompt(p: ProjectInput): string {
@@ -481,6 +494,69 @@ function buildPrompt(p: ProjectInput): string {
     }
   }
 
+  // -------------------------------------------------------------------
+  // Cross-Project Signals — data from connected projects.
+  // Enables drift detection, risk propagation, and supplier-chain
+  // awareness when this project is explicitly linked to others.
+  // -------------------------------------------------------------------
+  const cpc = p.connectedProjectsContext;
+  if (cpc && cpc.length > 0) {
+    lines.push('');
+    lines.push('## Cross-Project Signals');
+    lines.push(`This project is connected to ${cpc.length} other project(s). Use these signals for:`);
+    lines.push('  - DRIFT DETECTION: Does a BOM change or decision in a connected project contradict a decision made here?');
+    lines.push('  - RISK PROPAGATION: Does a high-RPN PFMEA risk in a connected project also affect this project\'s process steps or components?');
+    lines.push('  - SUPPLIER-CHAIN AWARENESS: Supplier swaps in connected projects may share the same vendor — flag shared exposure.');
+    lines.push('  - DEPENDENCY RISK: If a connected project is slipping or has high instability (reversed decisions), flag schedule dependencies.');
+    lines.push('(Surface any cross-project finding as a risk flag with source attribution like "Cross-project · <ProjectName>")');
+
+    for (const conn of cpc) {
+      lines.push('');
+      lines.push(`### Connected Project: "${conn.projectName}"`);
+
+      if (conn.pfmeas && conn.pfmeas.length > 0) {
+        for (const pfmea of conn.pfmeas) {
+          const date = new Date(pfmea.dateMs).toISOString().slice(0, 10);
+          lines.push(`**PFMEA "${pfmea.title}"** (${date}): ${pfmea.totalRisks} risks — ${pfmea.highCount} HIGH | Max RPN: ${pfmea.maxRpn}`);
+          if (pfmea.topRisks.length > 0) {
+            for (const r of pfmea.topRisks) {
+              lines.push(`  - [RPN ${r.rpn}] "${r.processStep}" → "${r.failureMode}"`);
+            }
+          }
+        }
+      }
+
+      if (conn.latestBom) {
+        const b = conn.latestBom;
+        const date = new Date(b.uploadedAtMs).toISOString().slice(0, 10);
+        lines.push(`**BOM Pulse** (uploaded ${date}): ${b.totalLines} lines${b.versionLabel ? ` · ${b.versionLabel}` : ''}`);
+        if (b.reasonForChange) lines.push(`  Reason for change: "${b.reasonForChange}"`);
+        if (b.diff) {
+          const d = b.diff;
+          lines.push(`  Delta: +${d.added} / -${d.removed} / ${d.changed} changed | ${d.supplierSwapCount} supplier swap(s)`);
+          if (d.supplierSwapCount > 0) lines.push('  ⚠ Supplier swaps — check if this project shares any affected vendors.');
+        }
+      }
+
+      if (conn.decisions && conn.decisions.length > 0) {
+        const active   = conn.decisions.filter((d) => d.status === 'active');
+        const reversed = conn.decisions.filter((d) => d.status === 'reversed');
+        lines.push(`**Decision Ledger**: ${active.length} active, ${reversed.length} reversed`);
+        if (reversed.length > 0) {
+          lines.push(`  ⚠ ${reversed.length} reversed decision(s) in connected project — may signal upstream design churn.`);
+          for (const d of reversed) {
+            lines.push(`  - [REVERSED] "${d.title}"`);
+          }
+        }
+        for (const d of active.slice(0, 3)) {
+          const date = new Date(d.dateMs).toISOString().slice(0, 10);
+          lines.push(`  - [${date} | ${d.category}] "${d.title}" — ${d.description.slice(0, 150)}`);
+          if (d.relatedRisks) lines.push(`    Risks noted: ${d.relatedRisks.slice(0, 100)}`);
+        }
+      }
+    }
+  }
+
   lines.push('');
   lines.push('Your job (be concise — stay within the token budget):');
   lines.push(
@@ -493,7 +569,7 @@ function buildPrompt(p: ProjectInput): string {
     '2. topActions — exactly 5 moves, ranked by urgency × impact. Draw from BOTH RAMP score gaps AND tool signals (e.g. unresolved PFMEA high-RPN, BOM supplier swaps needing requalification, overdue meeting action items, capacity shortfalls, decision drift). Each: short title, 1–2 sentence rationale citing specific metrics or tool findings by name.'
   );
   lines.push(
-    '3. risks — up to 8 risks, sourced from RAMP scores, notes, AND tool signals. Prioritize: PFMEA high-RPN items, supplier swaps post-CDR, takt capacity RED/YELLOW, overdue action items, gate-slip risk, decision drift (later evidence contradicts an earlier decision), risk memory (a risk noted in a decision now shows as high-RPN in PFMEA), and instability (repeated decision reversals). Each: short flag (≤20 words), source attribution (metric name / tool / note).'
+    '3. risks — up to 8 risks, sourced from RAMP scores, notes, tool signals, AND cross-project signals. Prioritize: PFMEA high-RPN items, supplier swaps post-CDR, takt capacity RED/YELLOW, overdue action items, gate-slip risk, decision drift (later evidence contradicts an earlier decision), risk memory (a risk noted in a decision now shows as high-RPN in PFMEA), instability (repeated decision reversals), and cross-project risks (shared suppliers, upstream design churn, dependency slippage). Source attribution for cross-project risks should read e.g. "Cross-project · <ProjectName> · PFMEA".'
   );
   if (selectedStandards.length > 0) {
     lines.push('');

@@ -110,6 +110,18 @@ export interface ToolContext {
   decisions?: DecisionSignal[];      // up to 5 active + any reversed, for drift/risk detection
 }
 
+/**
+ * Signals from a single connected project — used to build cross-project
+ * context for AI Analysis (drift detection, risk propagation, etc.).
+ */
+export interface ConnectedProjectContext {
+  projectId: string;
+  projectName: string;
+  pfmeas?: PFMEASignal[];    // up to 2 most-recent
+  latestBom?: BomSignal;
+  decisions?: DecisionSignal[];  // active decisions + any reversed
+}
+
 export interface AnalyzeProjectInput {
   name: string;
   productType?: string;
@@ -144,6 +156,9 @@ export interface AnalyzeProjectInput {
   // Live signals from per-project tools — fetched on demand just before
   // calling analyzeProject so the AI sees real tool data, not just scores.
   toolContext?: ToolContext;
+  // Signals from connected projects — enables cross-project drift detection,
+  // risk propagation, and supplier-chain awareness in the AI prompt.
+  connectedProjectsContext?: ConnectedProjectContext[];
 }
 
 function buildSnapshot(input: AnalyzeProjectInput) {
@@ -199,7 +214,8 @@ function buildSnapshot(input: AnalyzeProjectInput) {
     standards: Array.isArray(input.standards) ? input.standards : undefined,
     groups,
     excludedSummary: excludedSummary.length > 0 ? excludedSummary : undefined,
-    toolContext: input.toolContext ?? undefined
+    toolContext: input.toolContext ?? undefined,
+    connectedProjectsContext: input.connectedProjectsContext ?? undefined
   };
 }
 

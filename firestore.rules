@@ -375,6 +375,27 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Project Connections — directed edges between projects.
+    // One doc per directed edge: { sourceProjectId, targetProjectId, userId, label?, connectedAtMs }.
+    // Both-ways connections = two docs (one per direction). Owner-isolated.
+    function isValidProjectConnection(data) {
+      return data.keys().hasAll(['sourceProjectId', 'targetProjectId', 'userId', 'connectedAtMs']) &&
+             data.userId == request.auth.uid &&
+             data.sourceProjectId is string && data.sourceProjectId.size() > 0 &&
+             data.targetProjectId is string && data.targetProjectId.size() > 0 &&
+             data.sourceProjectId != data.targetProjectId &&
+             data.connectedAtMs is number &&
+             (!('label' in data) || (data.label is string && data.label.size() <= 80));
+    }
+
+    match /projectConnections/{connectionId} {
+      allow get:    if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list:   if isAuthenticated();
+      allow create: if isAuthenticated() && isValidProjectConnection(request.resource.data);
+      allow update: if false;
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
     // Leads / waitlist captures (ramp-score email grabs + Pricing waitlist signups).
     // Public can create, only admin can read — keeps the list private.
     match /leads/{leadId} {
