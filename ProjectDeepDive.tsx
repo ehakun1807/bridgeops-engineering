@@ -249,6 +249,7 @@ export interface DeepDiveProject {
   endDate?: string;     // ISO 'YYYY-MM-DD'
   infoStatus?: InfoStatus;
   generalInfo?: string;
+  assignees?: string;
   attachments?: ProjectAttachment[];
   // Stage-gate tracking
   currentGate?: ProductGate;
@@ -287,6 +288,7 @@ export interface ProjectDecisionSummary {
 
 const NOTE_MAX = 200;
 const GENERAL_INFO_MAX = 400;
+const ASSIGNEES_MAX = 600;
 const ATTACHMENT_NAME_MAX = 80;
 const GENERAL_INFO_TAB_ID = '__general_info__';
 const AI_ANALYSIS_TAB_ID = '__ai_analysis__';
@@ -668,6 +670,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
   const [endDate, setEndDate] = useState<string>(project.endDate || '');
   const [infoStatus, setInfoStatus] = useState<InfoStatus>(project.infoStatus || 'TBD');
   const [generalInfo, setGeneralInfo] = useState<string>(project.generalInfo || '');
+  const [assignees, setAssignees] = useState<string>(project.assignees || '');
   const [currentGate, setCurrentGate] = useState<ProductGate | ''>(
     migratedProject.currentGate || ''
   );
@@ -735,6 +738,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
     setEndDate(project.endDate || '');
     setInfoStatus(project.infoStatus || 'TBD');
     setGeneralInfo(project.generalInfo || '');
+    setAssignees(project.assignees || '');
     setCurrentGate(mp.currentGate || '');
     setGateTargets(mp.gateTargets || {});
     setAttachments(project.attachments || []);
@@ -1364,6 +1368,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
         endDate,
         infoStatus,
         generalInfo,
+        assignees,
         currentGate: currentGate || null,
         gateTargets,
         attachments,
@@ -1414,6 +1419,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
         endDate,
         infoStatus,
         generalInfo,
+        assignees,
         currentGate: currentGate || null,
         gateTargets,
         attachments,
@@ -1455,6 +1461,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
         endDate,
         infoStatus,
         generalInfo,
+        assignees,
         currentGate: currentGate || undefined,
         gateTargets,
         attachments,
@@ -2022,6 +2029,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
               endDate={endDate}
               infoStatus={infoStatus}
               generalInfo={generalInfo}
+              assignees={assignees}
               currentGate={currentGate}
               gateTargets={gateTargets}
               attachments={attachments}
@@ -2037,6 +2045,9 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
               onChangeStatus={setInfoStatus}
               onChangeGeneralInfo={(v) =>
                 setGeneralInfo(v.length > GENERAL_INFO_MAX ? v.slice(0, GENERAL_INFO_MAX) : v)
+              }
+              onChangeAssignees={(v) =>
+                setAssignees(v.length > ASSIGNEES_MAX ? v.slice(0, ASSIGNEES_MAX) : v)
               }
               onChangeCurrentGate={setCurrentGate}
               onChangeGateTarget={setGateTarget}
@@ -2123,6 +2134,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
                         groupTitle={group.title}
                         standards={projectStandards}
                         gatesEnabled={gatesEnabled}
+                        currentGate={project.currentGate}
                       />
                     )
                   )}
@@ -2298,6 +2310,9 @@ const MetricRow: React.FC<{
   // pickers) inside the deliverables checklist. Driven by templateId at the
   // project level — see `gatesEnabled` in ProjectDeepDive.
   gatesEnabled?: boolean;
+  // The project's active gate — used to highlight current-gate deliverables
+  // and dim items assigned to other gates.
+  currentGate?: ProductGate;
 }> = ({
   item,
   value,
@@ -2323,7 +2338,8 @@ const MetricRow: React.FC<{
   productType,
   groupTitle,
   standards,
-  gatesEnabled = true
+  gatesEnabled = true,
+  currentGate,
 }) => {
   // For bar-kind items with deliverables, derive the effective value from
   // deliverable completion right here so the score chip and band color stay
@@ -2607,6 +2623,7 @@ const MetricRow: React.FC<{
           onSetCustomWaiverReason={onSetCustomWaiverReason}
           readOnly={readOnly}
           gatesEnabled={gatesEnabled}
+          currentGate={currentGate}
         />
       )}
 
@@ -2895,6 +2912,11 @@ const DeliverableChecklist: React.FC<{
   // UI is suppressed — so re-enabling (e.g. switching template back) restores
   // everything as it was. See `gatesEnabled` in ProjectDeepDive.
   gatesEnabled?: boolean;
+  // The project's active gate. When set, items assigned to this gate are
+  // highlighted; items assigned to a different gate are dimmed. Items with
+  // no gate assignment are shown at normal opacity. Has no effect when a
+  // manual gateFilter is active (the user has explicitly picked a filter).
+  currentGate?: ProductGate;
 }> = ({
   templates,
   state,
@@ -2912,7 +2934,8 @@ const DeliverableChecklist: React.FC<{
   onUnwaiveCustom,
   onSetCustomWaiverReason,
   readOnly,
-  gatesEnabled = true
+  gatesEnabled = true,
+  currentGate,
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [draftTitle, setDraftTitle] = useState('');
@@ -3106,12 +3129,16 @@ const DeliverableChecklist: React.FC<{
                   const checked = !waived && checkedSet.has(tmpl.id);
                   const reason = waiverReasons[tmpl.id];
                   const editing = reasonEditingId === tmpl.id;
+                  // Gate-aware dimming: only applies when no manual filter is
+                  // active and the project has a currentGate set.
+                  const isCurrentGate = !gateFilter && currentGate && tmpl.dueBy === currentGate;
+                  const isOtherGate   = !gateFilter && currentGate && tmpl.dueBy && tmpl.dueBy !== currentGate;
                   return (
                     <li
                       key={tmpl.id}
                       className={`group flex flex-col gap-1 px-2 py-1.5 rounded-sm transition-colors ${
-                        waived ? 'bg-amber-50/50' : 'hover:bg-white'
-                      }`}
+                        waived ? 'bg-amber-50/50' : isCurrentGate ? 'bg-blue-50/60 border-l-2 border-blue-400' : 'hover:bg-white'
+                      } ${isOtherGate ? 'opacity-35' : ''}`}
                     >
                       <div className="flex items-start gap-1">
                         <button
@@ -3326,12 +3353,14 @@ const DeliverableChecklist: React.FC<{
                   <ul className="space-y-1">
                     {filteredCustoms.map((c) => {
                       const editing = reasonEditingId === c.id;
+                      const isCurrentGateCustom = !gateFilter && currentGate && c.dueBy === currentGate;
+                      const isOtherGateCustom   = !gateFilter && currentGate && c.dueBy && c.dueBy !== currentGate;
                       return (
                         <li
                           key={c.id}
                           className={`flex flex-col gap-1 px-2 py-1.5 rounded-sm transition-colors group ${
-                            c.waived ? 'bg-amber-50/50' : 'hover:bg-white'
-                          }`}
+                            c.waived ? 'bg-amber-50/50' : isCurrentGateCustom ? 'bg-blue-50/60 border-l-2 border-blue-400' : 'hover:bg-white'
+                          } ${isOtherGateCustom ? 'opacity-35' : ''}`}
                         >
                           <div className="flex items-start gap-2">
                             <button
@@ -3603,6 +3632,7 @@ const GeneralInfoPanel: React.FC<{
   endDate: string;
   infoStatus: InfoStatus;
   generalInfo: string;
+  assignees: string;
   currentGate: ProductGate | '';
   gateTargets: Partial<Record<ProductGate, string>>;
   attachments: ProjectAttachment[];
@@ -3617,6 +3647,7 @@ const GeneralInfoPanel: React.FC<{
   onChangeEndDate: (v: string) => void;
   onChangeStatus: (v: InfoStatus) => void;
   onChangeGeneralInfo: (v: string) => void;
+  onChangeAssignees: (v: string) => void;
   onChangeCurrentGate: (v: ProductGate | '') => void;
   onChangeGateTarget: (gate: ProductGate, date: string) => void;
   onAddAttachment: (name: string, url: string) => void;
@@ -3631,6 +3662,7 @@ const GeneralInfoPanel: React.FC<{
   endDate,
   infoStatus,
   generalInfo,
+  assignees,
   currentGate,
   gateTargets,
   attachments,
@@ -3645,6 +3677,7 @@ const GeneralInfoPanel: React.FC<{
   onChangeEndDate,
   onChangeStatus,
   onChangeGeneralInfo,
+  onChangeAssignees,
   onChangeCurrentGate,
   onChangeGateTarget,
   onAddAttachment,
@@ -3939,6 +3972,31 @@ const GeneralInfoPanel: React.FC<{
               }`}
             >
               {generalInfo.length}/{GENERAL_INFO_MAX}
+            </span>
+          </div>
+        </div>
+
+        {/* Project Team & Roles */}
+        <div className="border-t border-slate-100 pt-6">
+          <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-2">
+            Project Team &amp; Roles
+          </label>
+          <textarea
+            value={assignees}
+            onChange={(e) => onChangeAssignees(e.target.value)}
+            disabled={readOnly}
+            maxLength={ASSIGNEES_MAX}
+            rows={4}
+            placeholder={`List team members and their responsibilities, e.g.\nEran Hakun — NPI Lead, gate sign-off\nSarah Chen — Manufacturing Eng, process validation\nDave Ortiz — Quality, incoming inspection`}
+            className="w-full bg-slate-50 border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-700 placeholder-slate-400 focus:border-blue-500 outline-none disabled:opacity-60 resize-none"
+          />
+          <div className="flex justify-end">
+            <span
+              className={`text-[9px] font-black uppercase tracking-widest mt-1 ${
+                assignees.length >= ASSIGNEES_MAX ? 'text-red-500' : 'text-slate-400'
+              }`}
+            >
+              {assignees.length}/{ASSIGNEES_MAX}
             </span>
           </div>
         </div>

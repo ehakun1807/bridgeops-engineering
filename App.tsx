@@ -164,6 +164,39 @@ const App: React.FC = () => {
               </div>
             </div>
 
+            {/* BridgeOps Intelligence strip */}
+            <div className="bg-slate-950 border-y border-white/5 relative overflow-hidden">
+              <div className="absolute inset-0 blueprint-grid-dark opacity-10 pointer-events-none"></div>
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-8">
+                  <div className="flex-1 max-w-2xl">
+                    <p className="text-blue-400 text-[10px] font-black uppercase tracking-[0.35em] mb-3">BridgeOps Intelligence</p>
+                    <h2 className="text-white text-2xl md:text-3xl font-black tracking-tighter leading-tight uppercase mb-3">
+                      Every engagement runs on<br className="hidden md:block" /> proprietary tooling built in-house.
+                    </h2>
+                    <p className="text-slate-400 text-sm font-medium leading-relaxed mb-5 max-w-xl">
+                      Not spreadsheets. Not off-the-shelf PM tools. A purpose-built intelligence platform that connects RAMP scoring, risk data, BOM changes, and decisions — live, across your entire project.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {['PFMEA', 'BOM Pulse', 'Decision Ledger', 'Takt analysis', 'AI cross-tool scan', 'Process Map', 'Doc Guard'].map((tag) => (
+                        <span key={tag} className="text-[11px] text-slate-500 border border-slate-800 rounded-full px-3 py-1 bg-white/[0.02] font-medium">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => navigateTo('intelligence')}
+                    aria-label="See what's inside BridgeOps Intelligence"
+                    className="flex-shrink-0 flex items-center gap-3 border border-slate-700 text-slate-300 hover:text-white hover:border-blue-500 px-6 py-3 text-[11px] font-black uppercase tracking-[0.2em] transition-all group"
+                  >
+                    See what&apos;s inside
+                    <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <section className="py-20 bg-white border-b border-slate-100">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="bg-slate-900 rounded-sm p-8 md:p-16 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-12 text-left">
