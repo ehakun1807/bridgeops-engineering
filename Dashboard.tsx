@@ -372,6 +372,7 @@ const Dashboard: React.FC = () => {
       endDate: selectedProject.endDate,
       infoStatus: selectedProject.infoStatus,
       generalInfo: selectedProject.generalInfo,
+      assignees: selectedProject.assignees,
       currentGate: selectedProject.currentGate,
       gateTargets: selectedProject.gateTargets,
       attachments: selectedProject.attachments,
