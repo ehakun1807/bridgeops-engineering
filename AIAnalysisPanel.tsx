@@ -38,6 +38,7 @@ import {
   BomSignal,
   TaktSignal,
   DecisionSignal,
+  LessonSignal,
   ConnectedProjectContext
 } from './aiClient';
 import type { ProjectStub } from './projectConnectionsClient.ts';
@@ -237,6 +238,51 @@ async function fetchToolContext(
     }
   } catch (e) {
     console.warn('[AIAnalysisPanel] decisions fetch failed', e);
+  }
+
+  // Lessons & Learned — up to 5 most recent, prioritising open + in-progress.
+  try {
+    const lessonSnap = await getDocs(
+      query(
+        collection(db, 'lessons'),
+        where('userId',    '==', userId),
+        where('projectId', '==', projectId),
+        orderBy('dateMs', 'desc'),
+        limit(10)
+      )
+    );
+    if (!lessonSnap.empty) {
+      const all = lessonSnap.docs.map(d => d.data() as any);
+      // Surface open + in-progress first (highest signal), then closed if space
+      const openOrInProgress = all.filter((l: any) => l.status !== 'closed');
+      const closed           = all.filter((l: any) => l.status === 'closed');
+      const selected         = [...openOrInProgress, ...closed].slice(0, 5);
+      ctx.lessons = selected.map((l: any): LessonSignal => {
+        const actions: any[] = Array.isArray(l.actionItems) ? l.actionItems : [];
+        const mustActions    = actions.filter((a: any) => a.priority === 'must');
+        const openMust       = mustActions.filter((a: any) => !a.done);
+        return {
+          title:       String(l.title       || '').slice(0, 150),
+          dateMs:      Number(l.dateMs      || 0),
+          category:    String(l.category    || 'other'),
+          lessonType:  l.lessonType in ['problem', 'improvement', 'best_practice']
+                         ? l.lessonType : 'problem',
+          status:      l.status in ['open', 'in_progress', 'closed'] ? l.status : 'open',
+          gate:        l.gate ? String(l.gate) : undefined,
+          description: String(l.description || '').slice(0, 300),
+          rootCause:   l.rootCause ? String(l.rootCause).slice(0, 200) : undefined,
+          openMustActions: openMust.slice(0, 3).map((a: any) => ({
+            text:         String(a.text  || '').slice(0, 150),
+            owner:        a.owner ? String(a.owner).slice(0, 60) : undefined,
+            targetDateMs: a.targetDateMs ? Number(a.targetDateMs) : undefined
+          })),
+          totalMust: mustActions.length,
+          totalNice: actions.filter((a: any) => a.priority === 'nice_to_have').length
+        };
+      });
+    }
+  } catch (e) {
+    console.warn('[AIAnalysisPanel] lessons fetch failed', e);
   }
 
   // ---------------------------------------------------------------------------

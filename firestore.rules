@@ -350,6 +350,37 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
+    // Lessons & Learned — one doc per lesson, scoped to userId + projectId.
+    // Always editable (status can move open → in_progress → closed; closed
+    // lessons retained for traceability). Mirrors meetings/decisions posture.
+    // actionItems is a list of maps; we validate the list but not each map's
+    // internal shape (same approach as taktStudies steps — brittle per-map
+    // validation slows iteration).
+    function isValidLesson(data) {
+      return data.keys().hasAll(['userId', 'projectId', 'title', 'description', 'category', 'lessonType', 'status', 'dateMs']) &&
+             data.userId == request.auth.uid &&
+             data.projectId is string && data.projectId.size() > 0 &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 150 &&
+             data.description is string && data.description.size() > 0 && data.description.size() <= 600 &&
+             data.category in ['product', 'process', 'supplier', 'quality', 'safety', 'commercial', 'other'] &&
+             data.lessonType in ['problem', 'improvement', 'best_practice'] &&
+             data.status in ['open', 'in_progress', 'closed'] &&
+             data.dateMs is number &&
+             (!('gate' in data)        || (data.gate is string && data.gate.size() <= 10)) &&
+             (!('rootCause' in data)   || (data.rootCause is string && data.rootCause.size() <= 500)) &&
+             (!('actionItems' in data) || data.actionItems is list);
+    }
+
+    match /lessons/{lessonId} {
+      // Same get + list split as decisions — client passes userId + projectId
+      // filter on list queries so per-user isolation is enforced.
+      allow get: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidLesson(request.resource.data);
+      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidLesson(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
     // Project Activity Feed — Layer 1 project memory.
     // Append-only event log: create is allowed, update + delete are not (immutable
     // audit trail). Scoped to userId + projectId. Client passes both filters on

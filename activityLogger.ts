@@ -44,6 +44,11 @@ export type ActivityEventType =
   | 'decision_deleted'
   // Doc Guard
   | 'doc_guard_run'
+  // Lessons & Learned
+  | 'lesson_created'
+  | 'lesson_updated'
+  | 'lesson_closed'
+  | 'lesson_deleted'
   // AI Analysis
   | 'ai_analysis_run';
 
@@ -55,6 +60,7 @@ export type ActivityTool =
   | 'process_map'
   | 'bom_pulse'
   | 'decisions'
+  | 'lessons'
   | 'doc_guard'
   | 'ai_analysis';
 

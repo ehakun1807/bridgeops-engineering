@@ -247,12 +247,28 @@ interface DecisionSignal {
   gate?: string;
 }
 
+// Mirrors aiClient.ts LessonSignal — inlined per Vercel bundler .ts gotcha.
+interface LessonSignal {
+  title: string;
+  dateMs: number;
+  category: string;
+  lessonType: 'problem' | 'improvement' | 'best_practice';
+  status: 'open' | 'in_progress' | 'closed';
+  gate?: string;
+  description: string;
+  rootCause?: string;
+  openMustActions: Array<{ text: string; owner?: string; targetDateMs?: number }>;
+  totalMust: number;
+  totalNice: number;
+}
+
 interface ToolContext {
   takt?: TaktSignal;
   pfmeas?: PFMEASignal[];
   recentMeetings?: MeetingSignal[];
   latestBom?: BomSignal;
   decisions?: DecisionSignal[];
+  lessons?: LessonSignal[];
 }
 
 // Mirrors aiClient.ts ConnectedProjectContext — inlined per Vercel bundler
@@ -489,6 +505,39 @@ function buildPrompt(p: ProjectInput): string {
           const date = new Date(d.dateMs).toISOString().slice(0, 10);
           lines.push(`  - [REVERSED ${date}] "${d.title}"`);
           if (d.rationale) lines.push(`      Original rationale: ${d.rationale.slice(0, 150)}`);
+        }
+      }
+    }
+
+    // Lessons & Learned
+    if (tc.lessons && tc.lessons.length > 0) {
+      const openLessons  = tc.lessons.filter(l => l.status !== 'closed');
+      const closedLessons = tc.lessons.filter(l => l.status === 'closed');
+      const totalMustPending = tc.lessons.reduce((sum, l) => sum + l.openMustActions.length, 0);
+      lines.push('');
+      lines.push(`### Lessons & Learned (${tc.lessons.length} lesson${tc.lessons.length !== 1 ? 's' : ''}: ${openLessons.length} open/in-progress, ${closedLessons.length} closed)`);
+      lines.push('(Use these for: pattern recognition — do recurring root causes indicate a systemic gap? action tracking — are MUST actions being closed before the next gate? risk foresight — do open lessons point to risks that haven\'t surfaced in PFMEA yet?)');
+      if (totalMustPending > 0) {
+        lines.push(`⚠ ${totalMustPending} MUST action${totalMustPending !== 1 ? 's' : ''} still open — flag if any are overdue relative to the current gate.`);
+      }
+      for (const l of tc.lessons) {
+        const date = new Date(l.dateMs).toISOString().slice(0, 10);
+        const typeLabel = l.lessonType === 'best_practice' ? 'BEST PRACTICE' : l.lessonType.toUpperCase();
+        lines.push(`- [${date}${l.gate ? ` @${l.gate}` : ''} | ${l.category} | ${typeLabel} | ${l.status.toUpperCase()}] "${l.title}"`);
+        lines.push(`    WHAT: ${l.description.slice(0, 250)}`);
+        if (l.rootCause) lines.push(`    ROOT CAUSE: ${l.rootCause.slice(0, 200)}`);
+        if (l.openMustActions.length > 0) {
+          lines.push(`    OPEN MUST ACTIONS (${l.openMustActions.length}):`);
+          for (const a of l.openMustActions) {
+            const due = a.targetDateMs
+              ? ` [due ${new Date(a.targetDateMs).toISOString().slice(0, 10)}]`
+              : '';
+            const owner = a.owner ? ` — ${a.owner}` : '';
+            lines.push(`      • ${a.text.slice(0, 120)}${owner}${due}`);
+          }
+        }
+        if (l.totalNice > 0) {
+          lines.push(`    (+${l.totalNice} nice-to-have action${l.totalNice > 1 ? 's' : ''})`);
         }
       }
     }

@@ -102,12 +102,28 @@ export interface DecisionSignal {
   gate?: string;
 }
 
+export interface LessonSignal {
+  title: string;
+  dateMs: number;
+  category: string;
+  lessonType: 'problem' | 'improvement' | 'best_practice';
+  status: 'open' | 'in_progress' | 'closed';
+  gate?: string;
+  description: string;
+  rootCause?: string;
+  /** MUST actions that are not yet done */
+  openMustActions: Array<{ text: string; owner?: string; targetDateMs?: number }>;
+  totalMust: number;
+  totalNice: number;
+}
+
 export interface ToolContext {
   takt?: TaktSignal;
   pfmeas?: PFMEASignal[];            // up to 3 most-recent
   recentMeetings?: MeetingSignal[];  // up to 5 most-recent
   latestBom?: BomSignal;
   decisions?: DecisionSignal[];      // up to 5 active + any reversed, for drift/risk detection
+  lessons?: LessonSignal[];          // up to 5 most-recent open/in-progress lessons
 }
 
 /**
