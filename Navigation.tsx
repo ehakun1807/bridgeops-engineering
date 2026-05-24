@@ -64,12 +64,6 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate }) => {
 
   return (
     <nav className={`fixed w-full z-50 transition-all duration-500 ${navBackground}`}>
-      {user && isAdminUser(user.email) && (
-        <div className="absolute top-0 right-0 flex items-center gap-1.5 bg-blue-950/80 border-b border-l border-blue-500/30 px-2.5 py-1 pointer-events-none">
-          <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse flex-shrink-0"></div>
-          <span className="text-[8px] font-black uppercase tracking-widest text-blue-400">Intelligence · Live</span>
-        </div>
-      )}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center">
           <button 
@@ -127,7 +121,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate }) => {
 
               {user ? (
                 isAdminUser(user.email) ? (
-                  <div className="flex items-center space-x-6">
+                  <div className="flex items-center space-x-4">
                     <button
                       onClick={() => handleLinkClick('dashboard')}
                       aria-label="Open BridgeOps Intelligence platform"
@@ -136,6 +130,10 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate }) => {
                       <UserIcon size={14} />
                       <span>Intelligence</span>
                     </button>
+                    <div className="flex items-center gap-1 border border-blue-500/30 bg-blue-500/10 px-2 py-1 rounded-sm pointer-events-none">
+                      <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse flex-shrink-0"></div>
+                      <span className="text-[8px] font-black uppercase tracking-widest text-blue-400">Live</span>
+                    </div>
                     <button
                       onClick={handleSignOut}
                       aria-label="Sign out"
