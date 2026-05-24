@@ -426,7 +426,7 @@ const Dashboard: React.FC = () => {
   // ---- Main list view (Active / Archive) --------------------------------
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 text-left">
-      <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
         <div>
           <p className="text-blue-600 font-black uppercase tracking-[0.2em] text-[10px] mb-1">
             BridgeOps Intelligence
@@ -489,8 +489,8 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Intelligence · Live — pinned top-right, above the button row */}
-        <div className="absolute top-0 right-0 flex items-center gap-1.5 bg-white border border-blue-400 px-3 py-1 rounded-bl-sm">
+        {/* Intelligence · Live — fixed to viewport top-right corner, below the nav bar */}
+        <div className="fixed top-[64px] right-0 z-40 flex items-center gap-1.5 bg-white border border-blue-400 border-r-0 border-t-0 px-3 py-1 rounded-bl-md shadow-sm">
           <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse flex-shrink-0"></div>
           <span className="text-[9px] font-black uppercase tracking-widest text-blue-600">
             Intelligence · Live
