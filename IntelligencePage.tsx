@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { ArrowRight, Database, BarChart3, Brain, ShieldCheck, X, Check } from 'lucide-react';
+import { ArrowRight, Database, BarChart3, Brain, ShieldCheck, X, Check, TrendingUp } from 'lucide-react';
 import type { NavigateFn } from './types';
 
 interface IntelligencePageProps {
@@ -186,6 +186,80 @@ const IntelligencePage: React.FC<IntelligencePageProps> = ({ onNavigate }) => {
                 </div>
               );
             })}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Institutional Memory ── */}
+      <section className="bg-white py-24 border-b border-slate-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center space-x-2 mb-4">
+            <div className="w-10 h-[1px] bg-blue-600"></div>
+            <span className="text-[10px] font-black uppercase tracking-widest text-blue-600">Org Learning</span>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
+            <div>
+              <h2 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-tight mb-6">
+                What happens after<br />
+                <span className="text-blue-600">your first three projects.</span>
+              </h2>
+              <p className="text-slate-500 text-base font-medium leading-relaxed mb-6">
+                Most tools reset when a project closes. The lessons stay in someone's head,
+                the risks disappear from the dashboard, and the next team starts from zero.
+              </p>
+              <p className="text-slate-500 text-base font-medium leading-relaxed mb-6">
+                BridgeOps Intelligence is different. Every AI Analysis run is persisted —
+                not discarded. As projects accumulate, the platform starts asking questions
+                no single-project tool can ask: Which risks keep showing up regardless of
+                team or product type? Which gate consistently breaks down? Which supplier
+                relationship keeps generating late-stage changes?
+              </p>
+              <p className="text-slate-900 text-base font-black leading-relaxed uppercase tracking-wide">
+                That's institutional memory as a feature —<br />not a byproduct.
+              </p>
+            </div>
+
+            <div className="space-y-px border border-slate-200 shadow-sm">
+              {[
+                {
+                  stage: 'After project 1',
+                  color: 'bg-slate-100',
+                  labelColor: 'text-slate-500',
+                  title: 'Single-project intelligence',
+                  body: 'AI reads PFMEA, BOM, decisions, and takt together. Risks are surfaced in context, not in isolation. You get a full-program scan in seconds instead of a gate-review deck assembled the night before.',
+                },
+                {
+                  stage: 'After project 3',
+                  color: 'bg-blue-50',
+                  labelColor: 'text-blue-600',
+                  title: 'Patterns begin to emerge',
+                  body: 'The platform cross-references your completed programs and flags what they have in common — recurring risk categories, gates where readiness consistently lags, supplier relationships that keep generating late changes. The org starts learning.',
+                },
+                {
+                  stage: 'After project 5+',
+                  color: 'bg-slate-900',
+                  labelColor: 'text-blue-400',
+                  title: 'Compounding organizational advantage',
+                  body: 'New projects benefit from everything that came before. Risks that would take weeks to surface get flagged in the first review. Process gaps that burned you twice don\'t get a third chance. The platform turns program history into a competitive edge.',
+                  dark: true,
+                },
+              ].map((item) => (
+                <div key={item.stage} className={`p-8 ${item.color}`}>
+                  <div className="flex items-center gap-3 mb-3">
+                    <TrendingUp size={14} className={item.dark ? 'text-blue-400' : 'text-blue-600'} />
+                    <span className={`text-[9px] font-black uppercase tracking-[0.3em] ${item.labelColor}`}>
+                      {item.stage}
+                    </span>
+                  </div>
+                  <h3 className={`text-base font-black uppercase tracking-tight mb-2 ${item.dark ? 'text-white' : 'text-slate-900'}`}>
+                    {item.title}
+                  </h3>
+                  <p className={`text-sm font-medium leading-relaxed ${item.dark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    {item.body}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
