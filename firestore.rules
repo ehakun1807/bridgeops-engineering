@@ -440,6 +440,17 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Org Settings — one doc per user (doc ID = userId).
+    // Stores user-level org configuration: entity alias dictionary for cross-project analysis.
+    // No composite index needed — reads are always by doc ID.
+    match /orgSettings/{userId} {
+      allow get:    if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isAuthenticated() && request.auth.uid == userId;
+      allow delete: if isAdmin();
+      allow list:   if isAdmin();
+    }
+
     // Leads / waitlist captures (ramp-score email grabs + Pricing waitlist signups).
     // Public can create, only admin can read — keeps the list private.
     match /leads/{leadId} {

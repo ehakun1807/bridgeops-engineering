@@ -102,6 +102,9 @@ interface ProjectSnapshot {
   topActions?: AIAction[];
 }
 
+/** canonical name → list of known aliases */
+type EntityAliasMap = Record<string, string[]>;
+
 // ---------------------------------------------------------------------------
 // Gemini response schema
 // ---------------------------------------------------------------------------
@@ -162,10 +165,23 @@ const RESPONSE_SCHEMA = {
 // Prompt builder
 // ---------------------------------------------------------------------------
 
-function buildPrompt(projects: ProjectSnapshot[]): string {
+function buildPrompt(projects: ProjectSnapshot[], entityAliases?: EntityAliasMap): string {
   const lines: string[] = [];
   lines.push('You are an NPI operational intelligence system analyzing cross-project patterns for a hardware engineering organization.');
   lines.push(`You have access to AI Analysis results from ${projects.length} project(s). Your job is to find patterns, recurring risks, and systemic gaps that span multiple projects — things no single-project analysis can surface.`);
+
+  // Entity alias section — inject before snapshots so the AI normalizes names throughout.
+  const aliasEntries = entityAliases ? Object.entries(entityAliases).filter(([, v]) => v.length > 0) : [];
+  if (aliasEntries.length > 0) {
+    lines.push('');
+    lines.push('## Entity Aliases');
+    lines.push('The following names refer to the SAME entity. Treat them as identical when identifying patterns, recurring risks, and recommendations — do NOT count them as separate suppliers, components, or partners:');
+    for (const [canonical, aliases] of aliasEntries) {
+      lines.push(`  - "${canonical}" = ${aliases.map((a) => `"${a}"`).join(' = ')}`);
+    }
+    lines.push('When referencing these entities in your output, always use the canonical name (the first name listed above).');
+  }
+
   lines.push('');
   lines.push('## Project Snapshots');
 
@@ -244,9 +260,11 @@ export default async function handler(req: ReqLike, res: ResLike) {
     return res.status(400).json({ error: 'no project data — run AI Analysis on at least one project first' });
   }
 
+  const entityAliases = (req.body?.entityAliases ?? {}) as EntityAliasMap;
+
   // Cap at 20 projects to keep prompt within token budget.
   const capped = projects.slice(0, 20);
-  const prompt = buildPrompt(capped);
+  const prompt = buildPrompt(capped, entityAliases);
 
   // Retry + fallback ladder — same pattern as all other AI handlers.
   const PRIMARY_MODEL  = 'gemini-2.5-flash';

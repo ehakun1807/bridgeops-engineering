@@ -8,6 +8,7 @@
 
 import { collection, query, where, getDocs, Firestore } from 'firebase/firestore';
 import { User } from 'firebase/auth';
+import { loadEntityAliases, EntityAliasMap } from './orgAliasesClient.ts';
 
 // ---------------------------------------------------------------------------
 // Types — mirror api/org-insights.ts input + output shapes.
@@ -58,6 +59,9 @@ export interface OrgInsightsResult {
   model: string;
 }
 
+// Re-export so Dashboard can use without a second import
+export type { EntityAliasMap };
+
 // ---------------------------------------------------------------------------
 // Load all projectIntelligence docs for the current user from Firestore.
 // Single-field query (userId only) — no composite index required.
@@ -96,7 +100,10 @@ export async function fetchOrgInsights(
   db: Firestore,
   user: User
 ): Promise<OrgInsightsResult> {
-  const snapshots = await loadProjectSnapshots(db, user.uid);
+  const [snapshots, entityAliases] = await Promise.all([
+    loadProjectSnapshots(db, user.uid),
+    loadEntityAliases(db, user.uid)
+  ]);
 
   if (snapshots.length === 0) {
     throw new Error('No AI Analysis results found — run a full project scan on at least one project first.');
@@ -110,7 +117,7 @@ export async function fetchOrgInsights(
       'Content-Type': 'application/json',
       Authorization: `Bearer ${idToken}`
     },
-    body: JSON.stringify({ projects: snapshots })
+    body: JSON.stringify({ projects: snapshots, entityAliases })
   });
 
   if (!res.ok) {

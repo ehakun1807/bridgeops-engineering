@@ -1370,6 +1370,9 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
         await setDoc(doc(db, 'projectIntelligence', project.id), {
           userId: uid,
           projectId: project.id,
+          projectName: projectName.trim() || project.name,
+          currentGate: project.currentGate ?? null,
+          overallScore: overall,
           analysis: result,
           analyzedAtMs: nowMs,
           updatedAt: serverTimestamp()
