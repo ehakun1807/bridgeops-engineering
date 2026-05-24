@@ -489,13 +489,6 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Intelligence · Live — fixed to viewport top-right corner, below the nav bar */}
-        <div className="fixed top-[64px] right-0 z-40 flex items-center gap-1.5 bg-white border border-blue-400 border-r-0 border-t-0 px-3 py-1 rounded-bl-md shadow-sm">
-          <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse flex-shrink-0"></div>
-          <span className="text-[9px] font-black uppercase tracking-widest text-blue-600">
-            Intelligence · Live
-          </span>
-        </div>
       </div>
 
       {/* Org Insights panel */}
