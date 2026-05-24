@@ -45,7 +45,11 @@ import {
   Trash2,
   Wrench,
   Scale,
-  RotateCcw
+  RotateCcw,
+  Brain,
+  ChevronUp,
+  TrendingDown,
+  Lightbulb
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ProjectDeepDive, {
@@ -80,6 +84,7 @@ import {
   PRODUCT_SEGMENT_OTHER
 } from './productSegments.ts';
 import StandardsPicker from './StandardsPicker.tsx';
+import { fetchOrgInsights, OrgInsights } from './orgInsightsClient.ts';
 
 interface ProjectRecord {
   id: string;
@@ -130,6 +135,29 @@ const Dashboard: React.FC = () => {
   // --- UI state ----------------------------------------------------------
   const [activeTab, setActiveTab] = useState<TabKey>('active');
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+
+  // --- Org Insights -------------------------------------------------------
+  const [orgInsightsOpen, setOrgInsightsOpen]       = useState(false);
+  const [orgInsightsLoading, setOrgInsightsLoading] = useState(false);
+  const [orgInsightsError, setOrgInsightsError]     = useState<string | null>(null);
+  const [orgInsights, setOrgInsights]               = useState<OrgInsights | null>(null);
+  const [orgInsightsCount, setOrgInsightsCount]     = useState<number>(0);
+
+  const handleOrgInsights = async () => {
+    if (!user) return;
+    setOrgInsightsLoading(true);
+    setOrgInsightsError(null);
+    setOrgInsightsOpen(true);
+    try {
+      const result = await fetchOrgInsights(db, user);
+      setOrgInsights(result.insights);
+      setOrgInsightsCount(result.projectCount);
+    } catch (err: any) {
+      setOrgInsightsError(err?.message ?? 'Org insights failed — please retry.');
+    } finally {
+      setOrgInsightsLoading(false);
+    }
+  };
 
   // --- New Project dialog ------------------------------------------------
   // `newProjectProductChoice` holds either one of PRODUCT_SEGMENTS or the
@@ -434,6 +462,24 @@ const Dashboard: React.FC = () => {
               Tools
             </span>
           </button>
+          <button
+            onClick={orgInsightsOpen ? () => setOrgInsightsOpen(false) : handleOrgInsights}
+            disabled={orgInsightsLoading}
+            className="bg-white border border-slate-200 text-slate-900 px-6 py-3 rounded-sm shadow-sm flex items-center hover:border-blue-500 hover:text-blue-600 transition-all disabled:opacity-50"
+            title="Cross-project AI analysis — surfaces patterns, recurring risks, and org-level recommendations"
+          >
+            {orgInsightsLoading
+              ? <Loader2 size={16} className="mr-2 animate-spin" />
+              : <Brain size={16} className="mr-2" />
+            }
+            <span className="text-[10px] font-black uppercase tracking-widest">
+              {orgInsightsOpen ? 'Hide Insights' : 'Org Insights'}
+            </span>
+            {orgInsightsOpen
+              ? <ChevronUp size={12} className="ml-1.5" />
+              : null
+            }
+          </button>
           <div className="bg-white border border-blue-500 px-6 py-3 rounded-sm shadow-sm flex items-center gap-2.5">
             <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
             <span className="text-[10px] font-black uppercase tracking-widest text-blue-600">
@@ -442,6 +488,165 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Org Insights panel */}
+      <AnimatePresence>
+        {orgInsightsOpen && (
+          <motion.div
+            key="org-insights"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+            className="mb-10 border border-slate-200 bg-white rounded-sm shadow-sm overflow-hidden"
+          >
+            {/* Header */}
+            <div className="bg-slate-900 px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Brain size={16} className="text-blue-400" />
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-400">
+                    BridgeOps Intelligence · Org Insights
+                  </p>
+                  {orgInsightsCount > 0 && (
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      Cross-project analysis across {orgInsightsCount} project{orgInsightsCount !== 1 ? 's' : ''}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={handleOrgInsights}
+                disabled={orgInsightsLoading}
+                className="text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {orgInsightsLoading ? <Loader2 size={11} className="animate-spin" /> : <Brain size={11} />}
+                Re-analyze
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6">
+              {orgInsightsLoading && (
+                <div className="flex items-center gap-3 text-slate-500 py-8 justify-center">
+                  <Loader2 size={20} className="animate-spin text-blue-500" />
+                  <span className="text-sm font-medium">Scanning across projects…</span>
+                </div>
+              )}
+
+              {orgInsightsError && !orgInsightsLoading && (
+                <div className="flex items-start gap-3 text-red-600 bg-red-50 border border-red-200 rounded-sm p-4">
+                  <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
+                  <p className="text-sm">{orgInsightsError}</p>
+                </div>
+              )}
+
+              {orgInsights && !orgInsightsLoading && (
+                <div className="space-y-8">
+                  {/* Summary */}
+                  {orgInsights.summary && (
+                    <div className="bg-slate-50 border border-slate-200 rounded-sm p-4">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">Summary</p>
+                      <p className="text-sm text-slate-700 leading-relaxed">{orgInsights.summary}</p>
+                    </div>
+                  )}
+
+                  {/* Cross-project patterns */}
+                  {orgInsights.patterns.length > 0 && (
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-3">
+                        Cross-Project Patterns ({orgInsights.patterns.length})
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {orgInsights.patterns.map((pat, i) => (
+                          <div
+                            key={i}
+                            className={`border rounded-sm p-4 ${
+                              pat.severity === 'high'
+                                ? 'border-rose-200 bg-rose-50'
+                                : pat.severity === 'medium'
+                                  ? 'border-amber-200 bg-amber-50'
+                                  : 'border-slate-200 bg-white'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2 mb-1.5">
+                              <p className="text-[11px] font-black uppercase tracking-wide text-slate-800">
+                                {pat.title}
+                              </p>
+                              <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 flex-shrink-0 ${
+                                pat.severity === 'high'
+                                  ? 'bg-rose-600 text-white'
+                                  : pat.severity === 'medium'
+                                    ? 'bg-amber-500 text-white'
+                                    : 'bg-slate-400 text-white'
+                              }`}>
+                                {pat.severity}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-600 leading-relaxed mb-2">{pat.description}</p>
+                            <p className="text-[9px] text-slate-400">
+                              {pat.affectedProjects.join(' · ')}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Recurring risks */}
+                  {orgInsights.recurringRisks.length > 0 && (
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-3">
+                        Recurring Risks
+                      </p>
+                      <div className="space-y-2">
+                        {orgInsights.recurringRisks.map((risk, i) => (
+                          <div key={i} className="flex items-start gap-3 border border-slate-200 rounded-sm p-3">
+                            <TrendingDown size={14} className="text-rose-500 flex-shrink-0 mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold text-slate-800">{risk.description}</p>
+                              <p className="text-[10px] text-slate-400 mt-0.5">
+                                {risk.occurrences} project{risk.occurrences !== 1 ? 's' : ''} · {risk.affectedProjects.join(', ')}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Recommendations */}
+                  {orgInsights.recommendations.length > 0 && (
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-3">
+                        Org-Level Recommendations
+                      </p>
+                      <div className="space-y-2">
+                        {orgInsights.recommendations.map((rec, i) => (
+                          <div key={i} className="flex items-start gap-3 border border-slate-200 rounded-sm p-3">
+                            <Lightbulb size={14} className={`flex-shrink-0 mt-0.5 ${
+                              rec.priority === 'high' ? 'text-rose-500' : rec.priority === 'medium' ? 'text-amber-500' : 'text-slate-400'
+                            }`} />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold text-slate-800">{rec.action}</p>
+                              <p className="text-[10px] text-slate-500 leading-relaxed mt-0.5">{rec.rationale}</p>
+                            </div>
+                            <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 flex-shrink-0 ${
+                              rec.priority === 'high' ? 'bg-rose-600 text-white' : rec.priority === 'medium' ? 'bg-amber-500 text-white' : 'bg-slate-400 text-white'
+                            }`}>
+                              {rec.priority}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Top-level Tools modal — same component used inside ProjectDeepDive */}
       <AdvancedToolsModal isOpen={showTools} onClose={() => setShowTools(false)} />

@@ -427,6 +427,19 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
+    // Project Intelligence — one doc per project (doc ID = projectId).
+    // Stores the latest AI Analysis result + timestamp for the org-learning layer.
+    // Intentionally overwritten on every Analyze run (not an immutable log —
+    // the activity feed already provides the audit trail).
+    match /projectIntelligence/{projectId} {
+      allow get:    if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list:   if isAdmin();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid &&
+                       request.resource.data.keys().hasAll(['userId', 'projectId', 'analyzedAtMs']);
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow delete: if isAdmin();
+    }
+
     // Leads / waitlist captures (ramp-score email grabs + Pricing waitlist signups).
     // Public can create, only admin can read — keeps the list private.
     match /leads/{leadId} {

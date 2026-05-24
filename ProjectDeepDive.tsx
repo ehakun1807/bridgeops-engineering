@@ -55,7 +55,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db, auth } from './firebase.ts';
-import { doc, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { doc, updateDoc, setDoc, getDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import {
   RAMP_GROUPS,
   RampSubItem,
@@ -720,6 +720,9 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
   );
   const [scopeEditorOpen, setScopeEditorOpen] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<AIAnalysis | null>(project.aiAnalysis || null);
+  // Timestamp of the last persisted AI Analysis run (from projectIntelligence collection).
+  // Loaded on mount so the header badge shows even before the user clicks Analyze.
+  const [lastAnalyzedMs, setLastAnalyzedMs] = useState<number | null>(null);
 
   // Project connections — outbound edges from this project.
   const [connections, setConnections] = useState<ProjectConnection[]>([]);
@@ -800,6 +803,17 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
     loadOutboundConnections(project.id).then((conns) => {
       if (!cancelled) { setConnections(conns); setConnectionsLoading(false); }
     }).catch(() => { if (!cancelled) setConnectionsLoading(false); });
+    return () => { cancelled = true; };
+  }, [project.id]);
+
+  // Load last-analyzed timestamp from projectIntelligence on project change.
+  useEffect(() => {
+    let cancelled = false;
+    getDoc(doc(db, 'projectIntelligence', project.id)).then((snap) => {
+      if (!cancelled && snap.exists()) {
+        setLastAnalyzedMs(snap.data().analyzedAtMs ?? null);
+      }
+    }).catch(() => { /* non-fatal */ });
     return () => { cancelled = true; };
   }, [project.id]);
 
@@ -1338,6 +1352,8 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
   const persistAiAnalysis = async (result: AIAnalysis) => {
     setAiAnalysis(result);
     if (readOnly) return;
+    const nowMs = Date.now();
+    // 1. Cache on the project doc (existing behaviour — fast re-open without re-billing Gemini).
     try {
       await updateDoc(doc(db, 'projects', project.id), {
         aiAnalysis: result,
@@ -1345,7 +1361,23 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
       });
     } catch (err: any) {
       console.error('AI analysis save failed:', err);
-      // Non-blocking — user still sees the result in memory.
+    }
+    // 2. Persist to projectIntelligence (org-learning layer — one doc per project,
+    //    always overwritten with the latest result so history accumulates via analyzedAtMs).
+    try {
+      const uid = auth.currentUser?.uid;
+      if (uid) {
+        await setDoc(doc(db, 'projectIntelligence', project.id), {
+          userId: uid,
+          projectId: project.id,
+          analysis: result,
+          analyzedAtMs: nowMs,
+          updatedAt: serverTimestamp()
+        });
+        setLastAnalyzedMs(nowMs);
+      }
+    } catch (err: any) {
+      console.warn('projectIntelligence write failed (non-fatal):', err);
     }
   };
 
@@ -1640,6 +1672,28 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
                   Capacity {project.taktSummary.capacity.toUpperCase()}
                 </span>
               )}
+              {lastAnalyzedMs && (() => {
+                const diffMs = Date.now() - lastAnalyzedMs;
+                const diffMin = Math.floor(diffMs / 60000);
+                const diffHr  = Math.floor(diffMs / 3600000);
+                const diffDay = Math.floor(diffMs / 86400000);
+                const label = diffMin < 1
+                  ? 'just now'
+                  : diffMin < 60
+                    ? `${diffMin}m ago`
+                    : diffHr < 24
+                      ? `${diffHr}h ago`
+                      : `${diffDay}d ago`;
+                return (
+                  <span
+                    className="px-3 py-1 bg-white/10 text-slate-300 flex items-center gap-1.5"
+                    title={`AI full-project scan completed ${new Date(lastAnalyzedMs).toLocaleString()}`}
+                  >
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-400" />
+                    Analyzed {label}
+                  </span>
+                );
+              })()}
             </div>
           </div>
           <div className="md:col-span-4 flex md:justify-end">
