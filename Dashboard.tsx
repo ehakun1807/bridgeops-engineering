@@ -426,7 +426,7 @@ const Dashboard: React.FC = () => {
   // ---- Main list view (Active / Archive) --------------------------------
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 text-left">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+      <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
         <div>
           <p className="text-blue-600 font-black uppercase tracking-[0.2em] text-[10px] mb-1">
             BridgeOps Intelligence
@@ -452,40 +452,49 @@ const Dashboard: React.FC = () => {
               New Project
             </span>
           </button>
-          <button
-            onClick={() => setShowTools(true)}
-            className="bg-white border border-slate-200 text-slate-900 px-6 py-3 rounded-sm shadow-sm flex items-center hover:border-slate-900 hover:text-blue-600 transition-all"
-            title="Alt BOM, Quote Compare, and other utilities"
-          >
-            <Wrench size={16} className="mr-2" />
-            <span className="text-[10px] font-black uppercase tracking-widest">
-              Tools
-            </span>
-          </button>
-          <button
-            onClick={orgInsightsOpen ? () => setOrgInsightsOpen(false) : handleOrgInsights}
-            disabled={orgInsightsLoading}
-            className="bg-white border border-slate-200 text-slate-900 px-6 py-3 rounded-sm shadow-sm flex items-center hover:border-blue-500 hover:text-blue-600 transition-all disabled:opacity-50"
-            title="Cross-project AI analysis — surfaces patterns, recurring risks, and org-level recommendations"
-          >
-            {orgInsightsLoading
-              ? <Loader2 size={16} className="mr-2 animate-spin" />
-              : <Brain size={16} className="mr-2" />
-            }
-            <span className="text-[10px] font-black uppercase tracking-widest">
-              {orgInsightsOpen ? 'Hide Insights' : 'Org Insights'}
-            </span>
-            {orgInsightsOpen
-              ? <ChevronUp size={12} className="ml-1.5" />
-              : null
-            }
-          </button>
-          <div className="bg-white border border-blue-500 px-6 py-3 rounded-sm shadow-sm flex items-center gap-2.5">
-            <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-blue-600">
-              Intelligence · Live
-            </span>
+
+          {/* Tools — with hover tooltip */}
+          <div className="relative group/tools">
+            <button
+              onClick={() => setShowTools(true)}
+              className="bg-white border border-slate-200 text-slate-900 px-6 py-3 rounded-sm shadow-sm flex items-center hover:border-slate-900 hover:text-blue-600 transition-all"
+            >
+              <Wrench size={16} className="mr-2" />
+              <span className="text-[10px] font-black uppercase tracking-widest">Tools</span>
+            </button>
+            <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-slate-900 text-white text-[10px] leading-relaxed rounded px-2.5 py-1.5 opacity-0 group-hover/tools:opacity-100 transition-opacity duration-150 text-center z-50">
+              Alt BOM · Quote Compare · Doc Guard · Entity Tags
+            </div>
           </div>
+
+          {/* Org Insights — with hover tooltip */}
+          <div className="relative group/insights">
+            <button
+              onClick={orgInsightsOpen ? () => setOrgInsightsOpen(false) : handleOrgInsights}
+              disabled={orgInsightsLoading}
+              className="bg-white border border-slate-200 text-slate-900 px-6 py-3 rounded-sm shadow-sm flex items-center hover:border-blue-500 hover:text-blue-600 transition-all disabled:opacity-50"
+            >
+              {orgInsightsLoading
+                ? <Loader2 size={16} className="mr-2 animate-spin" />
+                : <Brain size={16} className="mr-2" />
+              }
+              <span className="text-[10px] font-black uppercase tracking-widest">
+                {orgInsightsOpen ? 'Hide Insights' : 'Org Insights'}
+              </span>
+              {orgInsightsOpen ? <ChevronUp size={12} className="ml-1.5" /> : null}
+            </button>
+            <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 bg-slate-900 text-white text-[10px] leading-relaxed rounded px-2.5 py-1.5 opacity-0 group-hover/insights:opacity-100 transition-opacity duration-150 text-center z-50">
+              Cross-project AI scan — patterns, recurring risks &amp; org-level recommendations
+            </div>
+          </div>
+        </div>
+
+        {/* Intelligence · Live — pinned top-right, above the button row */}
+        <div className="absolute top-0 right-0 flex items-center gap-1.5 bg-white border border-blue-400 px-3 py-1 rounded-bl-sm">
+          <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse flex-shrink-0"></div>
+          <span className="text-[9px] font-black uppercase tracking-widest text-blue-600">
+            Intelligence · Live
+          </span>
         </div>
       </div>
 
