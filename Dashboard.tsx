@@ -49,8 +49,7 @@ import {
   Brain,
   ChevronUp,
   TrendingDown,
-  Lightbulb,
-  Tag
+  Lightbulb
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ProjectDeepDive, {
@@ -86,7 +85,6 @@ import {
 } from './productSegments.ts';
 import StandardsPicker from './StandardsPicker.tsx';
 import { fetchOrgInsights, OrgInsights } from './orgInsightsClient.ts';
-import EntityTagsModal from './EntityTagsModal.tsx';
 
 interface ProjectRecord {
   id: string;
@@ -137,9 +135,6 @@ const Dashboard: React.FC = () => {
   // --- UI state ----------------------------------------------------------
   const [activeTab, setActiveTab] = useState<TabKey>('active');
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-
-  // --- Entity Tags (alias dictionary for org-insights normalization) ------
-  const [entityTagsOpen, setEntityTagsOpen] = useState(false);
 
   // --- Org Insights -------------------------------------------------------
   const [orgInsightsOpen, setOrgInsightsOpen]       = useState(false);
@@ -468,14 +463,6 @@ const Dashboard: React.FC = () => {
             </span>
           </button>
           <button
-            onClick={() => setEntityTagsOpen(true)}
-            className="bg-white border border-slate-200 text-slate-900 px-6 py-3 rounded-sm shadow-sm flex items-center hover:border-indigo-400 hover:text-indigo-600 transition-all"
-            title="Define entity aliases — normalize supplier and component names across projects for better AI pattern detection"
-          >
-            <Tag size={16} className="mr-2" />
-            <span className="text-[10px] font-black uppercase tracking-widest">Entity Tags</span>
-          </button>
-          <button
             onClick={orgInsightsOpen ? () => setOrgInsightsOpen(false) : handleOrgInsights}
             disabled={orgInsightsLoading}
             className="bg-white border border-slate-200 text-slate-900 px-6 py-3 rounded-sm shadow-sm flex items-center hover:border-blue-500 hover:text-blue-600 transition-all disabled:opacity-50"
@@ -664,16 +651,6 @@ const Dashboard: React.FC = () => {
       {/* Top-level Tools modal — same component used inside ProjectDeepDive */}
       <AdvancedToolsModal isOpen={showTools} onClose={() => setShowTools(false)} />
 
-      {/* Entity Tags modal — alias dictionary for org-insights normalization */}
-      <AnimatePresence>
-        {entityTagsOpen && user && (
-          <EntityTagsModal
-            db={db}
-            userId={user.uid}
-            onClose={() => setEntityTagsOpen(false)}
-          />
-        )}
-      </AnimatePresence>
 
       {/* Tabs */}
       <div className="flex border-b border-slate-200 mb-10 overflow-x-auto">
