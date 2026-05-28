@@ -389,10 +389,10 @@ const ProductBomTool: React.FC<ProductBomToolProps> = ({
           <Boxes size={20} className="text-slate-300" />
           <div>
             <p className="text-[9px] font-black uppercase tracking-[0.3em] text-white/70 mb-1">
-              Tool · Live pulse on BOM evolution & ripple impact
+              Tool · BOM revisions & ECO change control pulse
             </p>
             <h3 className="text-lg font-black uppercase tracking-tight leading-tight">
-              BOM Pulse
+              ECO Pulse
             </h3>
           </div>
         </div>
@@ -417,7 +417,7 @@ const ProductBomTool: React.FC<ProductBomToolProps> = ({
                 onClick={() => setMode({ kind: 'new' })}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow"
               >
-                <Plus size={12} /> Upload BOM
+                <Plus size={12} /> BOM / ECO
               </button>
             )}
           </div>
@@ -570,11 +570,10 @@ const BomList: React.FC<BomListProps> = ({
       <div className="px-6 py-14 text-center">
         <Boxes size={32} className="mx-auto text-slate-300 mb-3" />
         <p className="text-sm text-slate-600 mb-1 font-semibold">
-          No BOMs uploaded yet.
+          No entries yet.
         </p>
         <p className="text-[11px] text-slate-400 mb-4">
-          Upload your first BOM (xlsx or csv) to start tracking revisions.
-          Each subsequent upload auto-diffs against the previous one.
+          Log a BOM revision, an ECO event, or both. Each BOM upload auto-diffs against the previous one.
         </p>
         {!readOnly && (
           <button
@@ -582,7 +581,7 @@ const BomList: React.FC<BomListProps> = ({
             onClick={onUploadFirst}
             className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 text-[10px] font-black uppercase tracking-widest inline-flex items-center gap-2 shadow"
           >
-            <Upload size={12} /> Upload first BOM
+            <Plus size={12} /> Add first entry
           </button>
         )}
       </div>

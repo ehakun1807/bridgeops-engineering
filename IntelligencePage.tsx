@@ -13,7 +13,7 @@ const PILLARS = [
     eyebrow: 'Pillar 01',
     title: 'Structured capture across the full NPI lifecycle',
     body: 'Every engineering discipline has a purpose-built workspace. PFMEA, BOM revisions, takt studies, decision records, process maps, meetings, document audits — data is structured from first entry, not reverse-engineered from spreadsheets at gate review.',
-    tools: ['PFMEA', 'BOM Pulse', 'Takt Studies', 'Decision Ledger', 'Process Map', 'Doc Guard'],
+    tools: ['PFMEA', 'ECO Pulse', 'Takt Studies', 'Decision Ledger', 'Process Map', 'Doc Guard'],
   },
   {
     icon: BarChart3,

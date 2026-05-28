@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // AI Analysis panel — utility tab on ProjectDeepDive.
-// Fetches live tool signals (PFMEA, BOM Pulse, Meetings, Takt) from Firestore
+// Fetches live tool signals (PFMEA, ECO Pulse, Meetings, Takt) from Firestore
 // just before calling /api/ai-analyze, so the AI sees a full YTD snapshot.
 // Caches last result on the project doc so reopens don't re-bill Gemini.
 // ---------------------------------------------------------------------------
@@ -727,7 +727,7 @@ const AIAnalysisPanel: React.FC<AIAnalysisPanelProps> = ({
 
             {/* Disclaimer */}
             <div className="pt-4 border-t border-slate-100 text-[10px] text-slate-400 leading-relaxed">
-              AI-generated from your current project state including RAMP scores, PFMEA, BOM Pulse, meetings, and takt data. Use as a starting point — always verify with subject-matter experts.
+              AI-generated from your current project state including RAMP scores, PFMEA, ECO Pulse, meetings, and takt data. Use as a starting point — always verify with subject-matter experts.
             </div>
           </motion.div>
         )}

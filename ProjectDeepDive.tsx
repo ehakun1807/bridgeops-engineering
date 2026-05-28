@@ -379,8 +379,8 @@ const PROJECT_TOOLS: ProjectToolEntry[] = [
   },
   {
     id: PRODUCT_BOM_TAB_ID,
-    label: 'BOM Pulse',
-    description: 'Live pulse on BOM evolution — diff every revision, AI-detect the ripple on readiness',
+    label: 'ECO Pulse',
+    description: 'BOM revisions & ECO change control — diff every revision, AI-detect the ripple on readiness',
     icon: Boxes,
     iconActiveClass: 'text-amber-600',
     tileBg: 'bg-amber-50 border-amber-200',
