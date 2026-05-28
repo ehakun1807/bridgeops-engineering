@@ -796,13 +796,17 @@ const BomUploadForm: React.FC<BomUploadFormProps> = ({
     if (f) onPickFile(f);
   };
 
+  const hasBom    = lines.length > 0;
+  const hasEco    = ecoExpanded && ecoRef.trim().length > 0;
+  const canSave   = hasBom || hasEco || reasonForChange.trim().length > 0;
+
   const save = async () => {
-    if (!file || lines.length === 0) return;
+    if (!canSave) return;
     setSaving(true);
     setSaveError(null);
     try {
       const ecoPayload: EcoContext | undefined =
-        ecoExpanded && ecoRef.trim()
+        hasEco
           ? {
               ref:      ecoRef.slice(0, ECO_REF_MAX).trim(),
               title:    ecoTitle.slice(0, ECO_TITLE_MAX).trim(),
@@ -812,19 +816,23 @@ const BomUploadForm: React.FC<BomUploadFormProps> = ({
             }
           : undefined;
 
+      const label = versionLabel.slice(0, VERSION_MAX).trim()
+        || (file ? file.name.replace(/\.(xlsx|xls|csv)$/i, '') : '')
+        || (ecoPayload ? ecoPayload.ref : 'Manual entry');
+
       const payload: Omit<ProductBom, 'id'> = {
         userId,
         projectId,
-        fileName: file.name,
-        versionLabel: versionLabel.slice(0, VERSION_MAX).trim() || file.name.replace(/\.(xlsx|xls|csv)$/i, ''),
+        fileName:        file ? file.name : '',
+        versionLabel:    label,
         effectiveDateMs: msFromDateInputValue(effectiveDate),
         reasonForChange: reasonForChange.slice(0, REASON_MAX).trim(),
-        uploadedAtMs: Date.now(),
-        uploadedAtGate: currentGate,
-        source: 'upload',
-        columnMap: mapping,
+        uploadedAtMs:    Date.now(),
+        uploadedAtGate:  currentGate,
+        source:          file ? 'upload' : 'manual',
+        columnMap:       mapping,
         lines,
-        totalLines: lines.length,
+        totalLines:      lines.length,
         ...(ecoPayload ? { eco: ecoPayload } : {}),
       };
       await addDoc(collection(db, 'productBoms'), {
@@ -836,24 +844,25 @@ const BomUploadForm: React.FC<BomUploadFormProps> = ({
       const ecoDetail = ecoPayload
         ? `${ecoPayload.ref} · ${ECO_STATUS_LABELS[ecoPayload.status]}${ecoPayload.blocking ? ' · ⚠ BLOCKING' : ''}`
         : null;
+      const eventType = ecoPayload ? 'eco_flagged' : 'bom_uploaded';
       logActivity({
         userId,
         projectId,
-        eventType: ecoPayload ? 'eco_flagged' : 'bom_uploaded',
+        eventType,
         tool: 'bom_pulse',
         title: ecoPayload
-          ? `BOM uploaded: ${payload.versionLabel} [${ecoPayload.ref}]`
-          : `BOM uploaded: ${payload.versionLabel}`,
+          ? (hasBom ? `BOM uploaded: ${label} [${ecoPayload.ref}]` : `ECO logged: ${ecoPayload.ref}`)
+          : `BOM uploaded: ${label}`,
         detail: ecoDetail
           ?? (payload.reasonForChange
             ? payload.reasonForChange.slice(0, 120)
-            : `${lines.length} line${lines.length !== 1 ? 's' : ''} · ${file.name}`),
+            : `${lines.length} line${lines.length !== 1 ? 's' : ''} · ${file?.name ?? ''}`),
         metadata: {
           lineCount: lines.length,
           gate: currentGate ?? '',
           ...(ecoPayload ? {
-            ecoRef:     ecoPayload.ref,
-            ecoStatus:  ecoPayload.status,
+            ecoRef:      ecoPayload.ref,
+            ecoStatus:   ecoPayload.status,
             ecoBlocking: ecoPayload.blocking,
           } : {}),
         },
@@ -870,7 +879,7 @@ const BomUploadForm: React.FC<BomUploadFormProps> = ({
 
   return (
     <div className="px-6 py-6 space-y-6">
-      {/* Back + title */}
+      {/* Back + baseline hint */}
       <div className="flex items-center justify-between">
         <button
           type="button"
@@ -879,262 +888,282 @@ const BomUploadForm: React.FC<BomUploadFormProps> = ({
         >
           <ArrowLeft size={12} /> Back to list
         </button>
-        <p className="text-[11px] text-slate-500">
-          {latestPrior
-            ? `Previous BOM: ${latestPrior.versionLabel || latestPrior.fileName} (${latestPrior.totalLines} lines)`
-            : 'No prior BOM — this will be the baseline.'}
-        </p>
+        {latestPrior && (
+          <p className="text-[11px] text-slate-500">
+            Previous BOM: {latestPrior.versionLabel || latestPrior.fileName} ({latestPrior.totalLines} lines)
+          </p>
+        )}
       </div>
 
-      {/* File pick */}
-      {!parseResult ? (
-        <div>
-          <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-            onDrop={handleDrop}
-            className="border-2 border-dashed border-slate-300 rounded-md p-10 text-center hover:border-blue-400 transition-colors cursor-pointer bg-slate-50"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Upload size={28} className="mx-auto text-slate-400 mb-2" />
-            <p className="text-sm text-slate-700 font-semibold">
-              Drop a BOM file here, or click to browse
-            </p>
-            <p className="text-[11px] text-slate-500 mt-1">
-              Accepts .xlsx, .xls, .csv (≤10MB)
-            </p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              onChange={handleSelect}
-              className="hidden"
-            />
+      {/* Metadata — always visible, no file trigger */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <label className="block">
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+            Version Label
+          </span>
+          <input
+            type="text"
+            value={versionLabel}
+            maxLength={VERSION_MAX}
+            onChange={(e) => setVersionLabel(e.target.value)}
+            placeholder="e.g. Rev A · Pre-CDR · EVT-2"
+            className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm"
+          />
+        </label>
+        <label className="block">
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+            Effective Date
+          </span>
+          <input
+            type="date"
+            value={effectiveDate}
+            onChange={(e) => setEffectiveDate(e.target.value)}
+            className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm"
+          />
+          <span className="text-[10px] text-slate-400">
+            When this change goes into effect (defaults to today).
+          </span>
+        </label>
+        <label className="block md:col-span-2">
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+            Reason for Change
+          </span>
+          <textarea
+            value={reasonForChange}
+            maxLength={REASON_MAX}
+            onChange={(e) => setReasonForChange(e.target.value)}
+            placeholder="ECO-1234 · supplier swap due to lead-time risk on STM32F407 / FUSA non-conformance fix / cost reduction on R-value passives, etc."
+            rows={2}
+            className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm"
+          />
+          <div className="flex justify-between items-center mt-0.5">
+            <span className="text-[10px] text-slate-400">
+              Threaded into the AI Impact prompt — be specific.
+            </span>
+            <span className="text-[10px] text-slate-400 tabular-nums">
+              {reasonForChange.length}/{REASON_MAX}
+            </span>
           </div>
+        </label>
+      </div>
+
+      {/* ECO / Change Control context — always visible, collapsible */}
+      <div className="border border-slate-200 rounded-md overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setEcoExpanded((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <GitBranch size={13} className={ecoExpanded && ecoRef.trim() ? 'text-amber-500' : 'text-slate-400'} />
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">
+              ECO / Change Control
+            </span>
+            {ecoRef.trim() && (
+              <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                ecoBlocking
+                  ? 'bg-rose-100 text-rose-600 border border-rose-200'
+                  : 'bg-amber-50 text-amber-600 border border-amber-200'
+              }`}>
+                {ecoRef.trim()}{ecoBlocking ? ' · Blocking' : ''}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1 text-[10px] text-slate-400">
+            {!ecoExpanded && <span>Optional — log ECO without uploading a file</span>}
+            {ecoExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          </div>
+        </button>
+        {ecoExpanded && (
+          <div className="px-4 py-4 space-y-4 bg-white">
+            <p className="text-[10px] text-slate-400">
+              BridgeOps doesn't manage ECOs — your PLM does. Log the ECO reference here so it becomes
+              a project event and the AI can flag design-stability risk at the current gate.
+              A BOM file attachment is not required.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label className="block">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                  ECO Reference <span className="text-slate-400 font-normal normal-case">(from PLM)</span>
+                </span>
+                <input
+                  type="text"
+                  value={ecoRef}
+                  maxLength={ECO_REF_MAX}
+                  onChange={(e) => setEcoRef(e.target.value)}
+                  placeholder="e.g. ECO-2024-123"
+                  className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm font-mono"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                  Status
+                </span>
+                <select
+                  value={ecoStatus}
+                  onChange={(e) => setEcoStatus(e.target.value as EcoStatus)}
+                  className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm bg-white"
+                >
+                  {(Object.keys(ECO_STATUS_LABELS) as EcoStatus[]).map((s) => (
+                    <option key={s} value={s}>{ECO_STATUS_LABELS[s]}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block md:col-span-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                  ECO Title / Summary
+                </span>
+                <input
+                  type="text"
+                  value={ecoTitle}
+                  maxLength={ECO_TITLE_MAX}
+                  onChange={(e) => setEcoTitle(e.target.value)}
+                  placeholder="Brief description of what the ECO changes"
+                  className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                  Area Affected
+                </span>
+                <select
+                  value={ecoArea}
+                  onChange={(e) => setEcoArea(e.target.value as EcoArea)}
+                  className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm bg-white"
+                >
+                  {(Object.keys(ECO_AREA_LABELS) as EcoArea[]).map((a) => (
+                    <option key={a} value={a}>{ECO_AREA_LABELS[a]}</option>
+                  ))}
+                </select>
+              </label>
+              <div className="flex items-center gap-3 pt-5">
+                <button
+                  type="button"
+                  onClick={() => setEcoBlocking((v) => !v)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded border text-[10px] font-black uppercase tracking-widest transition-colors ${
+                    ecoBlocking
+                      ? 'bg-rose-50 border-rose-300 text-rose-600'
+                      : 'bg-white border-slate-300 text-slate-500 hover:border-slate-400'
+                  }`}
+                >
+                  <ShieldCheck size={12} />
+                  {ecoBlocking ? 'Blocking gate ✓' : 'Mark as blocking gate'}
+                </button>
+                <span className="text-[10px] text-slate-400">
+                  Flags the ECO as blocking a gate deliverable
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* BOM File — optional attachment */}
+      <div className="border border-slate-200 rounded-md overflow-hidden">
+        <div className="px-4 py-3 bg-slate-50 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Upload size={13} className={file ? 'text-blue-500' : 'text-slate-400'} />
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">
+              Attach BOM File
+            </span>
+            {file && (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-200">
+                {file.name} · {lines.length} lines
+              </span>
+            )}
+          </div>
+          <span className="text-[10px] text-slate-400">Optional</span>
+        </div>
+        <div className="px-4 py-4 bg-white space-y-3">
+          {!parseResult ? (
+            <div
+              onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+              onDrop={handleDrop}
+              className="border-2 border-dashed border-slate-300 rounded-md p-6 text-center hover:border-blue-400 transition-colors cursor-pointer bg-slate-50"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload size={20} className="mx-auto text-slate-400 mb-1" />
+              <p className="text-sm text-slate-600 font-medium">Drop a BOM file here, or click to browse</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Accepts .xlsx, .xls, .csv (≤10MB)</p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleSelect}
+                className="hidden"
+              />
+            </div>
+          ) : (
+            <div className="text-[11px] text-slate-500 flex items-center gap-2">
+              <FileText size={13} className="text-blue-400" />
+              <span className="font-mono">{file?.name}</span>
+              <span>· {lines.length} lines parsed</span>
+              <button
+                type="button"
+                onClick={() => { setFile(null); setParseResult(null); setParseError(null); setMapping({}); }}
+                className="ml-auto text-slate-400 hover:text-rose-500 transition-colors"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          )}
           {parsing && (
-            <div className="mt-3 flex items-center gap-2 text-sm text-slate-500">
+            <div className="flex items-center gap-2 text-sm text-slate-500">
               <Loader2 size={14} className="animate-spin" /> Parsing {file?.name}…
             </div>
           )}
           {parseError && (
-            <div className="mt-3 flex items-start gap-2 text-sm text-rose-600">
+            <div className="flex items-start gap-2 text-sm text-rose-600">
               <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
               <span>{parseError}</span>
             </div>
           )}
         </div>
-      ) : (
-        <>
-          {/* Metadata */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <label className="block">
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                Version Label
-              </span>
-              <input
-                type="text"
-                value={versionLabel}
-                maxLength={VERSION_MAX}
-                onChange={(e) => setVersionLabel(e.target.value)}
-                placeholder={'e.g. Rev A · Pre-CDR · EVT-2'}
-                className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm"
-              />
-            </label>
-            <label className="block">
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                Effective Date
-              </span>
-              <input
-                type="date"
-                value={effectiveDate}
-                onChange={(e) => setEffectiveDate(e.target.value)}
-                className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm"
-              />
-              <span className="text-[10px] text-slate-400">
-                When this revision goes into effect (defaults to today; backdate for ECO-effective releases).
-              </span>
-            </label>
-            <label className="block md:col-span-2">
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                Reason for Change
-              </span>
-              <textarea
-                value={reasonForChange}
-                maxLength={REASON_MAX}
-                onChange={(e) => setReasonForChange(e.target.value)}
-                placeholder="ECO-1234 · supplier swap due to lead-time risk on STM32F407 / FUSA non-conformance fix / cost reduction on R-value passives, etc."
-                rows={2}
-                className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm"
-              />
-              <div className="flex justify-between items-center mt-0.5">
-                <span className="text-[10px] text-slate-400">
-                  Threaded into the AI Impact prompt — be specific.
-                </span>
-                <span className="text-[10px] text-slate-400 tabular-nums">
-                  {reasonForChange.length}/{REASON_MAX}
-                </span>
-              </div>
-            </label>
-            <div className="text-[11px] text-slate-500 self-start md:col-span-2">
-              File: <span className="font-mono">{file?.name}</span> · {lines.length} lines parsed
-            </div>
-          </div>
+      </div>
 
-          {/* ECO / Change Control context */}
-          <div className="border border-slate-200 rounded-md overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setEcoExpanded((v) => !v)}
-              className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <GitBranch size={13} className={ecoExpanded && ecoRef.trim() ? 'text-amber-500' : 'text-slate-400'} />
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">
-                  ECO / Change Control
-                </span>
-                {ecoExpanded && ecoRef.trim() && (
-                  <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
-                    ecoBlocking
-                      ? 'bg-rose-100 text-rose-600 border border-rose-200'
-                      : 'bg-amber-50 text-amber-600 border border-amber-200'
-                  }`}>
-                    {ecoRef.trim()}{ecoBlocking ? ' · Blocking' : ''}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-1 text-[10px] text-slate-400">
-                {!ecoExpanded && <span>Optional</span>}
-                {ecoExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-              </div>
-            </button>
-            {ecoExpanded && (
-              <div className="px-4 py-4 space-y-4 bg-white">
-                <p className="text-[10px] text-slate-400">
-                  BridgeOps doesn't manage ECOs — your PLM does. Add the ECO reference here so the
-                  AI can flag design-stability risk at the current gate.
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <label className="block">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                      ECO Reference <span className="text-slate-400 font-normal normal-case">(from PLM)</span>
-                    </span>
-                    <input
-                      type="text"
-                      value={ecoRef}
-                      maxLength={ECO_REF_MAX}
-                      onChange={(e) => setEcoRef(e.target.value)}
-                      placeholder="e.g. ECO-2024-123"
-                      className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm font-mono"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                      Status
-                    </span>
-                    <select
-                      value={ecoStatus}
-                      onChange={(e) => setEcoStatus(e.target.value as EcoStatus)}
-                      className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm bg-white"
-                    >
-                      {(Object.keys(ECO_STATUS_LABELS) as EcoStatus[]).map((s) => (
-                        <option key={s} value={s}>{ECO_STATUS_LABELS[s]}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="block md:col-span-2">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                      ECO Title / Summary
-                    </span>
-                    <input
-                      type="text"
-                      value={ecoTitle}
-                      maxLength={ECO_TITLE_MAX}
-                      onChange={(e) => setEcoTitle(e.target.value)}
-                      placeholder="Brief description of what the ECO changes"
-                      className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                      Area Affected
-                    </span>
-                    <select
-                      value={ecoArea}
-                      onChange={(e) => setEcoArea(e.target.value as EcoArea)}
-                      className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm bg-white"
-                    >
-                      {(Object.keys(ECO_AREA_LABELS) as EcoArea[]).map((a) => (
-                        <option key={a} value={a}>{ECO_AREA_LABELS[a]}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <div className="flex items-center gap-3 pt-5">
-                    <button
-                      type="button"
-                      onClick={() => setEcoBlocking((v) => !v)}
-                      className={`flex items-center gap-2 px-3 py-2 rounded border text-[10px] font-black uppercase tracking-widest transition-colors ${
-                        ecoBlocking
-                          ? 'bg-rose-50 border-rose-300 text-rose-600'
-                          : 'bg-white border-slate-300 text-slate-500 hover:border-slate-400'
-                      }`}
-                    >
-                      <ShieldCheck size={12} />
-                      {ecoBlocking ? 'Blocking gate ✓' : 'Mark as blocking gate'}
-                    </button>
-                    <span className="text-[10px] text-slate-400">
-                      Flags the ECO as blocking a gate deliverable
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Column mapping panel */}
-          <ColumnMappingPanel
-            headers={parseResult.headers}
-            mapping={mapping}
-            warnings={parseResult.warnings}
-            onChange={setMapping}
-          />
-
-          {/* Preview diff */}
-          {previewDiff && (
-            <PreviewDiffPanel
-              diff={previewDiff}
-              baselineLabel={latestPrior?.versionLabel || latestPrior?.fileName || 'baseline'}
-            />
-          )}
-
-          {/* Save controls */}
-          {saveError && (
-            <div className="flex items-start gap-2 text-sm text-rose-600">
-              <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
-              <span>{saveError}</span>
-            </div>
-          )}
-          <div className="flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={onCancel}
-              className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-600 hover:text-slate-900"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={save}
-              disabled={saving || lines.length === 0 || (!mapping.internalPn && !mapping.mpn)}
-              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white px-5 py-2 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow"
-            >
-              {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-              Save BOM
-            </button>
-          </div>
-        </>
+      {/* Column mapping panel — only when file parsed */}
+      {parseResult && (
+        <ColumnMappingPanel
+          headers={parseResult.headers}
+          mapping={mapping}
+          warnings={parseResult.warnings}
+          onChange={setMapping}
+        />
       )}
+
+      {/* Preview diff — only when file parsed + prior exists */}
+      {previewDiff && (
+        <PreviewDiffPanel
+          diff={previewDiff}
+          baselineLabel={latestPrior?.versionLabel || latestPrior?.fileName || 'baseline'}
+        />
+      )}
+
+      {/* Save controls */}
+      {saveError && (
+        <div className="flex items-start gap-2 text-sm text-rose-600">
+          <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
+          <span>{saveError}</span>
+        </div>
+      )}
+      <div className="flex items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-600 hover:text-slate-900"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={save}
+          disabled={saving || !canSave}
+          className="bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white px-5 py-2 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow"
+        >
+          {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+          {hasBom ? 'Save BOM' : hasEco ? 'Log ECO Event' : 'Save'}
+        </button>
+      </div>
     </div>
   );
 };
