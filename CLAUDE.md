@@ -512,17 +512,29 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Entity resolution: user-managed alias dictionary.** Closes the cross-project supplier/component name normalization gap. If two projects call the same supplier "ACME Corp" and "Acme Electronics" respectively, the AI previously treated them as unrelated.
   - **`orgAliasesClient.ts` (new file).** `loadEntityAliases(db, userId)` reads `orgSettings/{userId}.entityAliases` (non-fatal, returns `{}` on miss). `saveEntityAliases(db, userId, aliases)` writes with `merge: true`. `EntityAliasMap = Record<canonical, string[]>`.
-  - **`EntityTagsModal.tsx` (new file, ~290 lines).** Dashboard modal for managing the alias dictionary. Features: add canonical entity names, expand each entity to add/remove alias chips, save to Firestore. Auto-closes on outside click / Escape. Sorted alphabetically. Save confirmation inline ("Aliases will apply on next Org Insights run."). Indigo palette (consistent with Decision Ledger / intelligence brand).
-  - **`orgInsightsClient.ts`** — `fetchOrgInsights` now also calls `loadEntityAliases` in parallel with `loadProjectSnapshots` (via `Promise.all`), and includes `entityAliases` in the POST body to `/api/org-insights`. Added `EntityAliasMap` re-export so Dashboard imports don't need a second file.
-  - **`api/org-insights.ts`** — `buildPrompt` now accepts optional `EntityAliasMap`. When aliases exist, an "Entity Aliases" section is prepended before the project snapshots: `"ACME Corp" = "Acme" = "Acme Electronics"`. Instructs the AI to use the canonical name in all output and treat them as identical when finding patterns. Handler extracts `entityAliases` from `req.body` (defaults to `{}`). Approach: let the AI do normalization in its reasoning rather than running string replacement on snapshot text — cleaner, handles partial matches and context.
-  - **`firestore.rules`** — Added `match /orgSettings/{userId}` block: owner `get`/`create`/`update`, admin `list`/`delete`. No composite index needed (reads by doc ID only). **Same multi-DB deploy lie applies** — paste rules into Console + verify "Last published" moves.
-  - **`Dashboard.tsx`** — Added `Tag` icon import, `EntityTagsModal` import, `entityTagsOpen` state, "Entity Tags" button in the header (indigo hover, next to Org Insights), and `<AnimatePresence>` + `<EntityTagsModal>` modal mount (only rendered when `user` is set).
+  - **`EntityTagsTool.tsx` (new file, ~270 lines).** Self-contained alias editor, no props, imports `db`/`auth` from `firebase.ts` directly (same pattern as BOMAnalyzerTool / DocGuardTool). Renders inline inside `AdvancedToolsModal` — no overlay wrapper. Features: add canonical names, expand to add/remove alias chips, save button with confirmation. Added as the 4th tile in `AdvancedToolsModal` (Tag icon, "Entity Tags" label).
+  - **`EntityTagsModal.tsx` (dead code).** Was the original full-screen overlay version with `db`/`userId` props. Superseded when UX was moved into the Tools modal. Left on disk, doesn't affect build.
+  - **`AdvancedToolsModal.tsx`** — Added `Tag` icon + `EntityTagsTool` import, 4th tile (same inline-style pattern as existing 3 tiles), title switch case `'Entity Tags'`, render branch `selectedTool === 'entity-tags'`.
+  - **`orgInsightsClient.ts`** — `fetchOrgInsights` now also calls `loadEntityAliases` in parallel with `loadProjectSnapshots` (via `Promise.all`), and includes `entityAliases` in the POST body to `/api/org-insights`. Added `EntityAliasMap` re-export.
+  - **`api/org-insights.ts`** — `buildPrompt` accepts optional `EntityAliasMap`. When aliases exist, an "Entity Aliases" section is prepended: `"ACME Corp" = "Acme" = "Acme Electronics"`. AI does the normalization in its reasoning — no string replacement on snapshot text. Handler extracts `entityAliases` from `req.body` (defaults to `{}`).
+  - **`firestore.rules`** — Added `match /orgSettings/{userId}` block: owner `get`/`create`/`update`, admin `list`/`delete`. No composite index needed. **Same multi-DB deploy lie applies.**
+  - **`Dashboard.tsx`** — Removed standalone "Entity Tags" button (UX moved into Tools modal). Kept Org Insights button + hover tooltip.
   - **`tsc --noEmit` clean** across all changed/new files.
 
 - **Push to Vercel.** Repository had a stale `index.lock` in `.git/` that blocked `git add` from the sandbox. User must run `git push` manually from their terminal: `cd ~/Downloads/bridgeops-engineering-main && git add -A && git commit -m "Entity resolution, projectIntelligence fixes, org-insights deploy" && git push`. Once pushed, `/api/org-insights` will be live and the Org Insights button will work in prod.
 
 - **Open follow-ups (after today):**
-  1. **`git push`** — run from terminal (`cd ~/Downloads/bridgeops-engineering-main && git add -A && git commit -m "..." && git push`) to deploy `api/org-insights`, entity tags, and all today's fixes to prod.
-  2. **Deploy `firestore.rules`** — paste updated rules (now including `orgSettings` block) into Firebase Console + verify "Last published" moves. Without this, `EntityTagsModal` saves will 403.
+  1. **`git push`** — run from terminal to deploy `api/org-insights`, entity tags, and all today's fixes to prod.
+  2. **Deploy `firestore.rules`** — paste updated rules (now including `orgSettings` block) into Firebase Console + verify "Last published" moves. Without this, Entity Tags saves will 403.
   3. **Vercel Cron for org-insights auto-refresh.** Deferred — revisit at 5+ projects.
   4. **Carry-over** — social proof quotes, MedTech language, RampScore → Discovery Call, SEO meta tags, NEW badge, end-of-beta cleanup, per-UID rate limiting, Sentry, mobile lockout.
+
+### 2026-05-24 (continued 2) — Intelligence · Live badge + UI polish
+
+- **"Intelligence · Live" badge — final position.** Three failed attempts to find the right spot before landing on the correct solution. History:
+  - **Attempt 1** (prior session): Badge in the Dashboard button row — user said "location is not good."
+  - **Attempt 2**: `absolute` inside header flex div — appeared centered above buttons (flex div was centered, not page-wide).
+  - **Attempt 3**: `fixed top-[64px] right-0` in `Dashboard.tsx` — appeared below nav in a floating strip; user still not happy.
+  - **Attempt 4**: `absolute top-0 right-0` inside `<nav>` (Navigation.tsx) — rendered in the nav's top corner as a thin strip above the nav content; user said "Not good, follow the arrow."
+  - **Final (Attempt 5)**: Inline element between the blue "Intelligence" button and the LogOut icon in `Navigation.tsx`'s admin-right section. Small pulsing `● Live` pill (`border border-blue-500/30 bg-blue-500/10 px-2 py-1 rounded-sm`). Sits naturally in the nav bar's right content area, visually attached to the Intelligence button context. `pointer-events-none` so it doesn't interfere with the logout button click target. Removed the `fixed` div from `Dashboard.tsx` entirely.
+- **Key lesson:** Badge positioning inside a `max-w-7xl mx-auto` flex container never reaches the true viewport corner — only `fixed` or `absolute` on a `fixed w-full` ancestor achieves that. But the user actually wanted it inline in the nav, not in the geometric corner of the viewport. "Right-up close to the page corner" referred to the nav's right side, not coordinates.

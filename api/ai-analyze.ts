@@ -232,6 +232,13 @@ interface BomSignal {
     costDelta: number;
   };
   aiImpactNarrative?: string;
+  eco?: {
+    ref: string;
+    title?: string;
+    status: string;
+    area: string;
+    blocking: boolean;
+  };
 }
 
 interface DecisionSignal {
@@ -262,6 +269,23 @@ interface LessonSignal {
   totalNice: number;
 }
 
+// Mirrors aiClient.ts ControlPlanSignal — inlined per Vercel bundler .ts gotcha.
+interface ControlPlanSignal {
+  title: string;
+  planType: 'prototype' | 'pre_launch' | 'production';
+  dateMs: number;
+  totalItems: number;
+  criticalCount: number;
+  significantCount: number;
+  topItems: Array<{
+    processStep: string;
+    characteristic?: string;
+    specialClass: string;
+    controlMethod?: string;
+    reactionPlan?: string;
+  }>;
+}
+
 interface ToolContext {
   takt?: TaktSignal;
   pfmeas?: PFMEASignal[];
@@ -269,6 +293,7 @@ interface ToolContext {
   latestBom?: BomSignal;
   decisions?: DecisionSignal[];
   lessons?: LessonSignal[];
+  controlPlan?: ControlPlanSignal;
 }
 
 // Mirrors aiClient.ts ConnectedProjectContext — inlined per Vercel bundler
@@ -478,6 +503,17 @@ function buildPrompt(p: ProjectInput): string {
       if (b.aiImpactNarrative) {
         lines.push(`- Prior AI impact assessment: "${b.aiImpactNarrative.slice(0, 400)}${b.aiImpactNarrative.length > 400 ? '…' : ''}"`);
       }
+      if (b.eco) {
+        const ecoStatus = b.eco.status.replace('_', ' ');
+        lines.push(`- ECO reference: ${b.eco.ref}${b.eco.title ? ` — "${b.eco.title}"` : ''}`);
+        lines.push(`  Status: ${ecoStatus} | Area: ${b.eco.area}${b.eco.blocking ? ' | ⚠ BLOCKING GATE DELIVERABLE' : ''}`);
+        if (b.eco.status === 'open' || b.eco.status === 'under_review') {
+          lines.push(`  ⚠ ECO is not yet implemented — design may not be frozen. Flag any gate readiness items that depend on this change.`);
+        }
+        if (b.eco.blocking) {
+          lines.push(`  ⚠⚠ This ECO is explicitly flagged as blocking a gate deliverable — escalate in topActions.`);
+        }
+      }
     }
 
     if (tc!.decisions && tc!.decisions.length > 0) {
@@ -539,6 +575,32 @@ function buildPrompt(p: ProjectInput): string {
         if (l.totalNice > 0) {
           lines.push(`    (+${l.totalNice} nice-to-have action${l.totalNice > 1 ? 's' : ''})`);
         }
+      }
+    }
+
+    // Control Plan
+    const cp = tc.controlPlan;
+    if (cp) {
+      const planTypeLabel = cp.planType === 'pre_launch' ? 'Pre-Launch' : cp.planType === 'production' ? 'Production' : 'Prototype';
+      const cpDate = new Date(cp.dateMs).toISOString().slice(0, 10);
+      lines.push('');
+      lines.push(`### Control Plan (${planTypeLabel}, rev ${cpDate}: ${cp.totalItems} control item${cp.totalItems !== 1 ? 's' : ''})`);
+      lines.push('(Use for: gate-readiness — is a Production Control Plan in place before PRR/MP? critical characteristic coverage — are all SC/CC items controlled? reaction plan gaps — do high-severity PFMEA risks have a corresponding control method and reaction plan here?)');
+      if (cp.criticalCount > 0 || cp.significantCount > 0) {
+        lines.push(`⚠ ${cp.criticalCount} Critical characteristic${cp.criticalCount !== 1 ? 's' : ''}, ${cp.significantCount} Significant characteristic${cp.significantCount !== 1 ? 's' : ''} — verify controls are adequate.`);
+      }
+      if (cp.topItems.length > 0) {
+        lines.push('Top control items (critical/significant first):');
+        for (const item of cp.topItems) {
+          const cls = item.specialClass === 'critical' ? 'CC' : item.specialClass === 'significant' ? 'SC' : '';
+          const char = item.characteristic ? ` | ${item.characteristic.slice(0, 60)}` : '';
+          lines.push(`  - [${item.processStep.slice(0, 60)}]${char}${cls ? ` (${cls})` : ''}`);
+          if (item.controlMethod) lines.push(`    Control: ${item.controlMethod.slice(0, 100)}`);
+          if (item.reactionPlan)  lines.push(`    Reaction: ${item.reactionPlan.slice(0, 100)}`);
+        }
+      }
+      if (cp.planType !== 'production') {
+        lines.push(`⚠ Current plan type is ${planTypeLabel} — a Production Control Plan is typically required before MP gate.`);
       }
     }
   }

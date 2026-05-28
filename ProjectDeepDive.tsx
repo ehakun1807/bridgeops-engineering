@@ -79,6 +79,7 @@ import ProcessMapTool from './ProcessMapTool.tsx';
 import ProductBomTool from './ProductBomTool.tsx';
 import DecisionLedgerTool from './DecisionLedgerTool.tsx';
 import LessonsLearnedTool from './LessonsLearnedTool.tsx';
+import ControlPlanTool from './ControlPlanTool.tsx';
 import ActivityFeedPanel from './ActivityFeedPanel.tsx';
 import ScopeEditor from './ScopeEditor.tsx';
 import CoachPanel from './CoachPanel.tsx';
@@ -316,6 +317,7 @@ const PROCESS_MAP_TAB_ID = '__process_map__';
 const PRODUCT_BOM_TAB_ID    = '__product_bom__';
 const DECISION_LEDGER_TAB_ID = '__decisions__';
 const LESSONS_TAB_ID         = '__lessons__';
+const CONTROL_PLAN_TAB_ID    = '__control_plan__';
 
 // ---------------------------------------------------------------------------
 // Project Tools registry — sub-app surfaces that live inside the deep-dive
@@ -401,6 +403,15 @@ const PROJECT_TOOLS: ProjectToolEntry[] = [
     iconActiveClass: 'text-teal-600',
     tileBg: 'bg-teal-50 border-teal-200',
     tileIcon: 'text-teal-700'
+  },
+  {
+    id: CONTROL_PLAN_TAB_ID,
+    label: 'Control Plan',
+    description: 'AIAG-aligned process controls — link Process Map steps and PFMEA risks to drive quality at the source',
+    icon: ClipboardList,
+    iconActiveClass: 'text-orange-600',
+    tileBg: 'bg-orange-50 border-orange-200',
+    tileIcon: 'text-orange-700'
   }
 ];
 const HISTORY_TAB_ID = '__history__';
@@ -2165,6 +2176,21 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
           >
             <LessonsLearnedTool
+              projectId={project.id}
+              projectName={projectName}
+              currentGate={currentGate}
+              readOnly={readOnly}
+            />
+          </motion.div>
+        ) : activeGroupId === CONTROL_PLAN_TAB_ID ? (
+          <motion.div
+            key={CONTROL_PLAN_TAB_ID}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <ControlPlanTool
               projectId={project.id}
               projectName={projectName}
               currentGate={currentGate}

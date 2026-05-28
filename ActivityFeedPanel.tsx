@@ -34,7 +34,8 @@ import {
   AlertTriangle,
   RefreshCw,
   Link2,
-  Lightbulb
+  Lightbulb,
+  ClipboardList
 } from 'lucide-react';
 import { db, auth } from './firebase.ts';
 import {
@@ -71,8 +72,9 @@ const TOOL_META: Record<ActivityTool, {
   process_map:  { label: 'Process Map', icon: Workflow,     dotClass: 'bg-blue-400',    textClass: 'text-blue-700',    bgClass: 'bg-blue-50',     borderClass: 'border-blue-200'    },
   bom_pulse:    { label: 'BOM Pulse',   icon: Boxes,        dotClass: 'bg-amber-400',   textClass: 'text-amber-700',   bgClass: 'bg-amber-50',    borderClass: 'border-amber-200'   },
   decisions:    { label: 'Decisions',       icon: Scale,        dotClass: 'bg-indigo-400',  textClass: 'text-indigo-700',  bgClass: 'bg-indigo-50',   borderClass: 'border-indigo-200'  },
-  lessons:      { label: 'Lessons & Learned', icon: Lightbulb,  dotClass: 'bg-teal-500',    textClass: 'text-teal-700',    bgClass: 'bg-teal-50',     borderClass: 'border-teal-200'    },
-  doc_guard:    { label: 'Doc Guard',        icon: FileText,    dotClass: 'bg-slate-400',   textClass: 'text-slate-700',   bgClass: 'bg-slate-50',    borderClass: 'border-slate-200'   },
+  lessons:      { label: 'Lessons & Learned', icon: Lightbulb,     dotClass: 'bg-teal-500',    textClass: 'text-teal-700',    bgClass: 'bg-teal-50',     borderClass: 'border-teal-200'    },
+  control_plan: { label: 'Control Plan',      icon: ClipboardList, dotClass: 'bg-orange-400',  textClass: 'text-orange-700',  bgClass: 'bg-orange-50',   borderClass: 'border-orange-200'  },
+  doc_guard:    { label: 'Doc Guard',         icon: FileText,      dotClass: 'bg-slate-400',   textClass: 'text-slate-700',   bgClass: 'bg-slate-50',    borderClass: 'border-slate-200'   },
   ai_analysis:  { label: 'AI Analysis', icon: Sparkles,     dotClass: 'bg-blue-500',    textClass: 'text-blue-700',    bgClass: 'bg-blue-50',     borderClass: 'border-blue-200'    },
 };
 
@@ -80,6 +82,7 @@ const HIGH_SIGNAL_EVENTS = new Set<ActivityEventType>([
   'takt_study_completed',
   'pfmea_risk_high',
   'bom_impact_analyzed',
+  'eco_flagged',
   'decision_reversed',
   'ai_analysis_run',
 ]);

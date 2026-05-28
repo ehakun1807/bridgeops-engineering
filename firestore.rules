@@ -381,6 +381,34 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
+    // Control Plan — per-project AIAG-aligned process control document.
+    // Always editable (update allowed). Cross-links to Process Map steps and
+    // PFMEA risks are stored as IDs on each ControlItem and validated loosely
+    // (same approach as taktStudies steps — brittle per-item validation slows
+    // iteration). items is a list of maps; we validate the list, not each map.
+    function isValidControlPlan(data) {
+      return data.keys().hasAll(['userId', 'projectId', 'title', 'planType', 'dateMs']) &&
+             data.userId == request.auth.uid &&
+             data.projectId is string && data.projectId.size() > 0 &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+             data.planType in ['prototype', 'pre_launch', 'production'] &&
+             data.dateMs is number &&
+             (!('partDescription' in data)  || data.partDescription is string && data.partDescription.size() <= 200) &&
+             (!('revisionLevel' in data)    || data.revisionLevel is string && data.revisionLevel.size() <= 20) &&
+             (!('participants' in data)     || data.participants is string && data.participants.size() <= 500) &&
+             (!('items' in data)            || data.items is list);
+    }
+
+    match /controlPlans/{controlPlanId} {
+      // Same get + list split as meetings / lessons — client passes userId +
+      // projectId filter on list queries for per-user isolation.
+      allow get: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidControlPlan(request.resource.data);
+      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidControlPlan(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
     // Project Activity Feed — Layer 1 project memory.
     // Append-only event log: create is allowed, update + delete are not (immutable
     // audit trail). Scoped to userId + projectId. Client passes both filters on

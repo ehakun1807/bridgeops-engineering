@@ -51,7 +51,9 @@ import {
   FileText,
   Building2,
   Hash,
-  X
+  X,
+  GitBranch,
+  ShieldCheck
 } from 'lucide-react';
 import { db, auth } from './firebase.ts';
 import { logActivity } from './activityLogger.ts';
@@ -123,6 +125,8 @@ export interface ProductBom {
    */
   source: 'upload' | 'plm' | 'manual';
   externalId?: string;              // PLM-side BOM doc id when source='plm'
+  /** Optional ECO / change-control context. Populated on the upload form. */
+  eco?: EcoContext;
   columnMap: ColumnMapping;
   lines: BomLine[];
   totalLines: number;
@@ -140,6 +144,41 @@ export interface SavedImpactAnalysis {
   newRisks: BomImpactAnalysis['newRisks'];
   topActions: BomImpactAnalysis['topActions'];
 }
+
+// ---------------------------------------------------------------------------
+// ECO / Change Control context — lightweight PLM-awareness layer.
+// BridgeOps doesn't manage ECOs; it monitors ECO health as a readiness signal.
+// The PLM owns the ECO. We just capture the reference + impact status so the
+// AI can reason about design stability at the current gate.
+// ---------------------------------------------------------------------------
+export type EcoStatus = 'open' | 'under_review' | 'approved' | 'implemented';
+export type EcoArea  = 'bom' | 'process' | 'design' | 'documentation' | 'multiple';
+
+export interface EcoContext {
+  ref: string;          // ECO number from PLM, e.g. "ECO-2024-123"
+  title: string;        // short description ≤150 char
+  status: EcoStatus;
+  area: EcoArea;
+  blocking: boolean;    // is this ECO blocking a gate deliverable?
+}
+
+const ECO_REF_MAX   = 50;
+const ECO_TITLE_MAX = 150;
+
+const ECO_STATUS_LABELS: Record<EcoStatus, string> = {
+  open:         'Open',
+  under_review: 'Under Review',
+  approved:     'Approved',
+  implemented:  'Implemented',
+};
+
+const ECO_AREA_LABELS: Record<EcoArea, string> = {
+  bom:           'BOM',
+  process:       'Process',
+  design:        'Design',
+  documentation: 'Documentation',
+  multiple:      'Multiple Areas',
+};
 
 const VERSION_MAX = 60;
 const REASON_MAX = 500;
@@ -616,6 +655,18 @@ const BomList: React.FC<BomListProps> = ({
                     {b.source}
                   </span>
                 )}
+                {b.eco && (
+                  <span className={`inline-flex items-center gap-1 border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest ${
+                    b.eco.blocking
+                      ? 'border-rose-300 bg-rose-50 text-rose-600'
+                      : b.eco.status === 'implemented'
+                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                        : 'border-amber-200 bg-amber-50 text-amber-600'
+                  }`}>
+                    <GitBranch size={9} />
+                    {b.eco.ref}{b.eco.blocking ? ' · Blocking' : ` · ${ECO_STATUS_LABELS[b.eco.status]}`}
+                  </span>
+                )}
               </div>
               <p className="text-sm font-bold text-slate-900 mt-1 truncate">
                 {b.versionLabel || b.fileName}
@@ -686,6 +737,13 @@ const BomUploadForm: React.FC<BomUploadFormProps> = ({
   // Effective date defaults to today; user can backdate for ECO-effective uploads.
   const [effectiveDate, setEffectiveDate] = useState<string>(todayDateInputValue());
   const [reasonForChange, setReasonForChange] = useState('');
+  // ECO context — optional, collapsible
+  const [ecoExpanded, setEcoExpanded] = useState(false);
+  const [ecoRef, setEcoRef]         = useState('');
+  const [ecoTitle, setEcoTitle]     = useState('');
+  const [ecoStatus, setEcoStatus]   = useState<EcoStatus>('open');
+  const [ecoArea, setEcoArea]       = useState<EcoArea>('bom');
+  const [ecoBlocking, setEcoBlocking] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -743,6 +801,17 @@ const BomUploadForm: React.FC<BomUploadFormProps> = ({
     setSaving(true);
     setSaveError(null);
     try {
+      const ecoPayload: EcoContext | undefined =
+        ecoExpanded && ecoRef.trim()
+          ? {
+              ref:      ecoRef.slice(0, ECO_REF_MAX).trim(),
+              title:    ecoTitle.slice(0, ECO_TITLE_MAX).trim(),
+              status:   ecoStatus,
+              area:     ecoArea,
+              blocking: ecoBlocking,
+            }
+          : undefined;
+
       const payload: Omit<ProductBom, 'id'> = {
         userId,
         projectId,
@@ -755,7 +824,8 @@ const BomUploadForm: React.FC<BomUploadFormProps> = ({
         source: 'upload',
         columnMap: mapping,
         lines,
-        totalLines: lines.length
+        totalLines: lines.length,
+        ...(ecoPayload ? { eco: ecoPayload } : {}),
       };
       await addDoc(collection(db, 'productBoms'), {
         ...stripUndefined(payload),
@@ -763,16 +833,30 @@ const BomUploadForm: React.FC<BomUploadFormProps> = ({
         updatedAt: serverTimestamp()
       });
       // Log activity (fire-and-forget)
+      const ecoDetail = ecoPayload
+        ? `${ecoPayload.ref} · ${ECO_STATUS_LABELS[ecoPayload.status]}${ecoPayload.blocking ? ' · ⚠ BLOCKING' : ''}`
+        : null;
       logActivity({
         userId,
         projectId,
-        eventType: 'bom_uploaded',
+        eventType: ecoPayload ? 'eco_flagged' : 'bom_uploaded',
         tool: 'bom_pulse',
-        title: `BOM uploaded: ${payload.versionLabel}`,
-        detail: payload.reasonForChange
-          ? payload.reasonForChange.slice(0, 120)
-          : `${lines.length} line${lines.length !== 1 ? 's' : ''} · ${file.name}`,
-        metadata: { lineCount: lines.length, gate: currentGate ?? '' },
+        title: ecoPayload
+          ? `BOM uploaded: ${payload.versionLabel} [${ecoPayload.ref}]`
+          : `BOM uploaded: ${payload.versionLabel}`,
+        detail: ecoDetail
+          ?? (payload.reasonForChange
+            ? payload.reasonForChange.slice(0, 120)
+            : `${lines.length} line${lines.length !== 1 ? 's' : ''} · ${file.name}`),
+        metadata: {
+          lineCount: lines.length,
+          gate: currentGate ?? '',
+          ...(ecoPayload ? {
+            ecoRef:     ecoPayload.ref,
+            ecoStatus:  ecoPayload.status,
+            ecoBlocking: ecoPayload.blocking,
+          } : {}),
+        },
         timestampMs: Date.now(),
       });
       onSaved(mapping);
@@ -896,6 +980,116 @@ const BomUploadForm: React.FC<BomUploadFormProps> = ({
             <div className="text-[11px] text-slate-500 self-start md:col-span-2">
               File: <span className="font-mono">{file?.name}</span> · {lines.length} lines parsed
             </div>
+          </div>
+
+          {/* ECO / Change Control context */}
+          <div className="border border-slate-200 rounded-md overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setEcoExpanded((v) => !v)}
+              className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <GitBranch size={13} className={ecoExpanded && ecoRef.trim() ? 'text-amber-500' : 'text-slate-400'} />
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">
+                  ECO / Change Control
+                </span>
+                {ecoExpanded && ecoRef.trim() && (
+                  <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                    ecoBlocking
+                      ? 'bg-rose-100 text-rose-600 border border-rose-200'
+                      : 'bg-amber-50 text-amber-600 border border-amber-200'
+                  }`}>
+                    {ecoRef.trim()}{ecoBlocking ? ' · Blocking' : ''}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1 text-[10px] text-slate-400">
+                {!ecoExpanded && <span>Optional</span>}
+                {ecoExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+              </div>
+            </button>
+            {ecoExpanded && (
+              <div className="px-4 py-4 space-y-4 bg-white">
+                <p className="text-[10px] text-slate-400">
+                  BridgeOps doesn't manage ECOs — your PLM does. Add the ECO reference here so the
+                  AI can flag design-stability risk at the current gate.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <label className="block">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                      ECO Reference <span className="text-slate-400 font-normal normal-case">(from PLM)</span>
+                    </span>
+                    <input
+                      type="text"
+                      value={ecoRef}
+                      maxLength={ECO_REF_MAX}
+                      onChange={(e) => setEcoRef(e.target.value)}
+                      placeholder="e.g. ECO-2024-123"
+                      className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm font-mono"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                      Status
+                    </span>
+                    <select
+                      value={ecoStatus}
+                      onChange={(e) => setEcoStatus(e.target.value as EcoStatus)}
+                      className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm bg-white"
+                    >
+                      {(Object.keys(ECO_STATUS_LABELS) as EcoStatus[]).map((s) => (
+                        <option key={s} value={s}>{ECO_STATUS_LABELS[s]}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block md:col-span-2">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                      ECO Title / Summary
+                    </span>
+                    <input
+                      type="text"
+                      value={ecoTitle}
+                      maxLength={ECO_TITLE_MAX}
+                      onChange={(e) => setEcoTitle(e.target.value)}
+                      placeholder="Brief description of what the ECO changes"
+                      className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                      Area Affected
+                    </span>
+                    <select
+                      value={ecoArea}
+                      onChange={(e) => setEcoArea(e.target.value as EcoArea)}
+                      className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm bg-white"
+                    >
+                      {(Object.keys(ECO_AREA_LABELS) as EcoArea[]).map((a) => (
+                        <option key={a} value={a}>{ECO_AREA_LABELS[a]}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="flex items-center gap-3 pt-5">
+                    <button
+                      type="button"
+                      onClick={() => setEcoBlocking((v) => !v)}
+                      className={`flex items-center gap-2 px-3 py-2 rounded border text-[10px] font-black uppercase tracking-widest transition-colors ${
+                        ecoBlocking
+                          ? 'bg-rose-50 border-rose-300 text-rose-600'
+                          : 'bg-white border-slate-300 text-slate-500 hover:border-slate-400'
+                      }`}
+                    >
+                      <ShieldCheck size={12} />
+                      {ecoBlocking ? 'Blocking gate ✓' : 'Mark as blocking gate'}
+                    </button>
+                    <span className="text-[10px] text-slate-400">
+                      Flags the ECO as blocking a gate deliverable
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Column mapping panel */}
@@ -1472,6 +1666,49 @@ const BomView: React.FC<BomViewProps> = ({
               Reason for change
             </p>
             <p className="text-sm text-slate-700 whitespace-pre-line">{bom.reasonForChange}</p>
+          </div>
+        )}
+        {bom.eco && (
+          <div className={`mt-2 border-l-2 px-3 py-2 rounded-r flex items-start gap-3 ${
+            bom.eco.blocking
+              ? 'border-rose-400 bg-rose-50'
+              : bom.eco.status === 'implemented'
+                ? 'border-emerald-300 bg-emerald-50'
+                : 'border-amber-300 bg-amber-50'
+          }`}>
+            <GitBranch size={14} className={
+              bom.eco.blocking ? 'text-rose-500 mt-0.5 flex-shrink-0'
+              : bom.eco.status === 'implemented' ? 'text-emerald-600 mt-0.5 flex-shrink-0'
+              : 'text-amber-600 mt-0.5 flex-shrink-0'
+            } />
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">
+                  ECO / Change Control
+                </span>
+                <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border ${
+                  bom.eco.blocking
+                    ? 'border-rose-300 bg-rose-100 text-rose-600'
+                    : bom.eco.status === 'implemented'
+                      ? 'border-emerald-200 bg-emerald-100 text-emerald-700'
+                      : 'border-amber-200 bg-amber-100 text-amber-600'
+                }`}>
+                  {ECO_STATUS_LABELS[bom.eco.status]}
+                </span>
+                {bom.eco.blocking && (
+                  <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border border-rose-400 bg-rose-100 text-rose-700">
+                    ⚠ Blocking gate
+                  </span>
+                )}
+              </div>
+              <p className="text-sm font-bold text-slate-800 mt-0.5">
+                {bom.eco.ref}
+                {bom.eco.title && <span className="font-normal text-slate-600"> — {bom.eco.title}</span>}
+              </p>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Area: {ECO_AREA_LABELS[bom.eco.area]}
+              </p>
+            </div>
           </div>
         )}
         <p className="text-[11px] text-slate-400 mt-1 font-mono">{bom.fileName}</p>

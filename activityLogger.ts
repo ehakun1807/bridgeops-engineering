@@ -37,6 +37,7 @@ export type ActivityEventType =
   // BOM Pulse
   | 'bom_uploaded'
   | 'bom_impact_analyzed'
+  | 'eco_flagged'          // synthetic: BOM upload that carries an ECO reference
   // Decision Ledger
   | 'decision_created'
   | 'decision_updated'
@@ -49,6 +50,10 @@ export type ActivityEventType =
   | 'lesson_updated'
   | 'lesson_closed'
   | 'lesson_deleted'
+  // Control Plan
+  | 'control_plan_created'
+  | 'control_plan_updated'
+  | 'control_plan_deleted'
   // AI Analysis
   | 'ai_analysis_run';
 
@@ -61,6 +66,7 @@ export type ActivityTool =
   | 'bom_pulse'
   | 'decisions'
   | 'lessons'
+  | 'control_plan'
   | 'doc_guard'
   | 'ai_analysis';
 

@@ -77,6 +77,14 @@ export interface BomSignal {
   };
   /** First 400 chars of any persisted AI impact narrative. */
   aiImpactNarrative?: string;
+  /** ECO / change-control context attached to this BOM revision. */
+  eco?: {
+    ref: string;
+    title?: string;
+    status: string;   // 'open' | 'under_review' | 'approved' | 'implemented'
+    area: string;     // 'bom' | 'process' | 'design' | 'documentation' | 'multiple'
+    blocking: boolean;
+  };
 }
 
 export interface TaktSignal {
@@ -117,6 +125,23 @@ export interface LessonSignal {
   totalNice: number;
 }
 
+export interface ControlPlanSignal {
+  title: string;
+  planType: 'prototype' | 'pre_launch' | 'production';
+  dateMs: number;
+  totalItems: number;
+  criticalCount: number;    // items with specialClass === 'critical'
+  significantCount: number; // items with specialClass === 'significant'
+  /** Up to 5 highest-risk items (critical first, then significant). */
+  topItems: Array<{
+    processStep: string;
+    characteristic?: string;
+    specialClass: string;
+    controlMethod?: string;
+    reactionPlan?: string;
+  }>;
+}
+
 export interface ToolContext {
   takt?: TaktSignal;
   pfmeas?: PFMEASignal[];            // up to 3 most-recent
@@ -124,6 +149,7 @@ export interface ToolContext {
   latestBom?: BomSignal;
   decisions?: DecisionSignal[];      // up to 5 active + any reversed, for drift/risk detection
   lessons?: LessonSignal[];          // up to 5 most-recent open/in-progress lessons
+  controlPlan?: ControlPlanSignal;   // most-recent production plan (or pre_launch if none)
 }
 
 /**

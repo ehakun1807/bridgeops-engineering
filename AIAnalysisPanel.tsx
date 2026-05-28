@@ -39,6 +39,7 @@ import {
   TaktSignal,
   DecisionSignal,
   LessonSignal,
+  ControlPlanSignal,
   ConnectedProjectContext
 } from './aiClient';
 import type { ProjectStub } from './projectConnectionsClient.ts';
@@ -201,6 +202,15 @@ async function fetchToolContext(
       if (ia?.narrative) {
         bom.aiImpactNarrative = String(ia.narrative).slice(0, 400);
       }
+      if (data.eco?.ref) {
+        bom.eco = {
+          ref:      String(data.eco.ref),
+          title:    data.eco.title ? String(data.eco.title) : undefined,
+          status:   String(data.eco.status || 'open'),
+          area:     String(data.eco.area || 'bom'),
+          blocking: Boolean(data.eco.blocking),
+        };
+      }
       ctx.latestBom = bom;
     }
   } catch (e) {
@@ -283,6 +293,50 @@ async function fetchToolContext(
     }
   } catch (e) {
     console.warn('[AIAnalysisPanel] lessons fetch failed', e);
+  }
+
+  // Control Plan — most-recent production plan (or pre-launch if none).
+  try {
+    const cpSnap = await getDocs(
+      query(
+        collection(db, 'controlPlans'),
+        where('userId', '==', userId),
+        where('projectId', '==', projectId),
+        orderBy('dateMs', 'desc'),
+        limit(5)
+      )
+    );
+    if (!cpSnap.empty) {
+      // Prefer a production plan; fall back to most-recent if none.
+      const all = cpSnap.docs.map(d => d.data() as any);
+      const cp = all.find((d: any) => d.planType === 'production') ?? all[0];
+      const items: any[] = Array.isArray(cp.items) ? cp.items : [];
+      const critical    = items.filter((i: any) => i.specialClass === 'critical');
+      const significant = items.filter((i: any) => i.specialClass === 'significant');
+      // Top items: critical first, then significant, up to 5 total.
+      const topRaw = [...critical, ...significant].slice(0, 5);
+      ctx.controlPlan = {
+        title:            String(cp.title || 'Untitled'),
+        planType:         cp.planType in ['prototype', 'pre_launch', 'production'] ? cp.planType : 'prototype',
+        dateMs:           Number(cp.dateMs || 0),
+        totalItems:       items.length,
+        criticalCount:    critical.length,
+        significantCount: significant.length,
+        topItems:         topRaw.map((i: any): ControlPlanSignal['topItems'][number] => ({
+          processStep:      String(i.processStep || '').slice(0, 80),
+          characteristic:   i.productCharacteristic
+                              ? String(i.productCharacteristic).slice(0, 80)
+                              : i.processCharacteristic
+                                ? String(i.processCharacteristic).slice(0, 80)
+                                : undefined,
+          specialClass:     String(i.specialClass || 'none'),
+          controlMethod:    i.controlMethod ? String(i.controlMethod).slice(0, 100) : undefined,
+          reactionPlan:     i.reactionPlan  ? String(i.reactionPlan).slice(0, 100)  : undefined,
+        }))
+      } satisfies ControlPlanSignal;
+    }
+  } catch (e) {
+    console.warn('[AIAnalysisPanel] controlPlans fetch failed', e);
   }
 
   // ---------------------------------------------------------------------------
@@ -371,6 +425,15 @@ async function fetchToolContext(
             }
             if (data.impactAnalysis?.narrative) {
               bom.aiImpactNarrative = String(data.impactAnalysis.narrative).slice(0, 300);
+            }
+            if (data.eco?.ref) {
+              bom.eco = {
+                ref:      String(data.eco.ref),
+                title:    data.eco.title ? String(data.eco.title) : undefined,
+                status:   String(data.eco.status || 'open'),
+                area:     String(data.eco.area || 'bom'),
+                blocking: Boolean(data.eco.blocking),
+              };
             }
             connCtx.latestBom = bom;
           }
