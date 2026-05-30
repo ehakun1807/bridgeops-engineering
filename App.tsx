@@ -103,7 +103,13 @@ const App: React.FC = () => {
   const [currentView, navigateTo] = useHashRoute();
   const [authUser, setAuthUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [contactSource, setContactSource] = useState<'intelligence' | undefined>(undefined);
   const linkedInUrl = "https://www.linkedin.com/in/eran-hakun-81a80a1b";
+
+  const navigateToContact = (source?: 'intelligence') => {
+    setContactSource(source);
+    navigateTo('contact');
+  };
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
@@ -333,7 +339,7 @@ const App: React.FC = () => {
       case 'contact':
         return (
           <div className="pt-24 min-h-screen bg-slate-50">
-            <ContactForm />
+            <ContactForm source={contactSource} />
           </div>
         );
       case 'ramp_score':
@@ -360,7 +366,7 @@ const App: React.FC = () => {
         return (
           <div className="pt-24 min-h-screen">
             <Suspense fallback={<ViewLoader />}>
-              <IntelligencePage onNavigate={navigateTo} />
+              <IntelligencePage onNavigate={navigateTo} onRequestAccess={() => navigateToContact('intelligence')} />
             </Suspense>
           </div>
         );

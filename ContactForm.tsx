@@ -2,7 +2,12 @@
 import React, { useState } from 'react';
 import { Send, Mail, MessageSquare, MapPin, MessageCircle, Linkedin, CheckCircle2, ArrowRight } from 'lucide-react';
 
-const ContactForm: React.FC = () => {
+interface ContactFormProps {
+  source?: 'intelligence';
+}
+
+const ContactForm: React.FC<ContactFormProps> = ({ source }) => {
+  const isIntelligence = source === 'intelligence';
   const [formState, setFormState] = useState({ name: '', email: '', company: '', message: '' });
   const [submitted, setSubmitted] = useState(false);
 
@@ -29,7 +34,7 @@ const ContactForm: React.FC = () => {
           email: formState.email,
           company: formState.company,
           message: formState.message,
-          _subject: `New BridgeOps Inquiry from ${formState.name}`,
+          _subject: isIntelligence ? `Intelligence Access Request from ${formState.name}` : `New BridgeOps Inquiry from ${formState.name}`,
           _template: 'table', // Makes the email look professional
           _captcha: 'false'   // Disables captcha for smoother UX
         })
@@ -78,7 +83,7 @@ Sent via BridgeOps Website`;
               <CheckCircle2 size={32} />
             </div>
             <h3 className="text-2xl font-black text-white mb-4 relative z-10 uppercase tracking-tighter">Transmission Successful</h3>
-            <p className="text-slate-400 mb-8 text-base relative z-10">Your inquiry has been received. Our engineering team will review the details and contact you shortly.</p>
+            <p className="text-slate-400 mb-8 text-base relative z-10">{isIntelligence ? "Access request received. I review each program personally and will be in touch within 48 hours." : "Your inquiry has been received. Our engineering team will review the details and contact you shortly."}</p>
             
             <div className="flex flex-col items-center space-y-6 relative z-10">
               <button 
@@ -104,8 +109,8 @@ Sent via BridgeOps Website`;
               <div className="inline-block bg-blue-600 px-3 py-1 mb-6">
                 <span className="text-[9px] font-black uppercase tracking-widest text-white">Direct Line</span>
               </div>
-              <h2 className="text-3xl font-black mb-6 leading-tight uppercase tracking-tighter">Engineering <br/><span className="text-blue-500 text-4xl italic">Advisory</span></h2>
-              <p className="text-slate-400 text-base mb-10 font-medium leading-relaxed">Let's discuss how we can stabilize your production line and improve your gross margins.</p>
+              <h2 className="text-3xl font-black mb-6 leading-tight uppercase tracking-tighter">{isIntelligence ? <>Intelligence <br/><span className="text-blue-500 text-4xl italic">Access</span></> : <>Engineering <br/><span className="text-blue-500 text-4xl italic">Advisory</span></>}</h2>
+              <p className="text-slate-400 text-base mb-10 font-medium leading-relaxed">{isIntelligence ? "Access is invitation-only. I run a curated cohort of licensed organizations — tell me about your NPI program and I'll be in touch." : "Let's discuss how we can stabilize your production line and improve your gross margins."}</p>
               <div className="space-y-8">
                 <a 
                   href="mailto:eran@bridgeops-engineering.com"
@@ -161,8 +166,8 @@ Sent via BridgeOps Website`;
           </div>
           <div className="lg:w-2/3 p-10 lg:p-16 bg-white">
             <div className="mb-10 text-left">
-              <h3 className="text-3xl font-black text-slate-900 mb-2 tracking-tighter uppercase">Inquiry Form</h3>
-              <p className="text-sm text-slate-500 font-medium">Submit your operational challenges for a professional review.</p>
+              <h3 className="text-3xl font-black text-slate-900 mb-2 tracking-tighter uppercase">{isIntelligence ? 'Request Access' : 'Inquiry Form'}</h3>
+              <p className="text-sm text-slate-500 font-medium">{isIntelligence ? "Tell me about your NPI program. I review each request personally." : "Submit your operational challenges for a professional review."}</p>
             </div>
             <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-10 text-left">
               <div className="space-y-3">
@@ -185,9 +190,9 @@ Sent via BridgeOps Website`;
               </div>
               <div className="space-y-3 md:col-span-2">
                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center">
-                   <div className="w-3 h-[1px] bg-blue-600 mr-2"></div>Operational Challenge
+                   <div className="w-3 h-[1px] bg-blue-600 mr-2"></div>{isIntelligence ? 'Your NPI Program' : 'Operational Challenge'}
                 </label>
-                <textarea required rows={3} className="w-full bg-slate-50 border-b-2 border-slate-200 px-4 py-2.5 focus:outline-none focus:border-blue-600 transition-all font-bold text-sm text-slate-800 resize-none" placeholder="Describe your current bottleneck..." value={formState.message} onChange={(e) => setFormState({...formState, message: e.target.value})}></textarea>
+                <textarea required rows={3} className="w-full bg-slate-50 border-b-2 border-slate-200 px-4 py-2.5 focus:outline-none focus:border-blue-600 transition-all font-bold text-sm text-slate-800 resize-none" placeholder={isIntelligence ? "Product type, current gate, team size — and what's driving the interest. I review each request personally." : "Describe your current bottleneck..."} value={formState.message} onChange={(e) => setFormState({...formState, message: e.target.value})}></textarea>
               </div>
               
               {error && (

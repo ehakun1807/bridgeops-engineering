@@ -5,6 +5,7 @@ import type { NavigateFn } from './types';
 
 interface IntelligencePageProps {
   onNavigate: NavigateFn;
+  onRequestAccess: () => void;
 }
 
 const PILLARS = [
@@ -53,7 +54,7 @@ const ALONGSIDE = [
   'QMS / eQMS platforms',
 ];
 
-const IntelligencePage: React.FC<IntelligencePageProps> = ({ onNavigate }) => {
+const IntelligencePage: React.FC<IntelligencePageProps> = ({ onNavigate, onRequestAccess }) => {
   return (
     <div className="min-h-screen text-left">
 
@@ -81,7 +82,7 @@ const IntelligencePage: React.FC<IntelligencePageProps> = ({ onNavigate }) => {
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <button
-                onClick={() => onNavigate('contact')}
+                onClick={onRequestAccess}
                 aria-label="Request early access to BridgeOps Intelligence"
                 className="bg-blue-600 hover:bg-blue-700 text-white px-10 py-5 font-black uppercase tracking-[0.2em] text-xs transition-all shadow-2xl shadow-blue-500/20 flex items-center group w-fit"
               >
@@ -323,7 +324,7 @@ const IntelligencePage: React.FC<IntelligencePageProps> = ({ onNavigate }) => {
             </div>
             <div className="relative z-10 flex flex-col gap-4 w-full md:w-auto">
               <button
-                onClick={() => onNavigate('contact')}
+                onClick={onRequestAccess}
                 aria-label="Request access to BridgeOps Intelligence"
                 className="bg-blue-600 hover:bg-blue-700 text-white px-12 py-5 font-black uppercase tracking-[0.2em] text-xs transition-all shadow-2xl shadow-blue-500/20 flex items-center justify-center group"
               >
