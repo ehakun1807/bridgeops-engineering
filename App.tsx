@@ -111,6 +111,11 @@ const App: React.FC = () => {
     navigateTo('contact');
   };
 
+  // Reset contact source whenever the user navigates away from the contact page
+  useEffect(() => {
+    if (currentView !== 'contact') setContactSource(undefined);
+  }, [currentView]);
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       setAuthUser(u);
