@@ -2814,7 +2814,7 @@ const MetricRow: React.FC<{
           maxLength={NOTE_MAX}
           rows={2}
           placeholder="Notes, context, blockers… (max 200 chars)"
-          className="w-full bg-slate-50 border border-slate-200 px-3 py-2 text-[15px] font-medium text-slate-700 placeholder-slate-400 focus:border-blue-500 outline-none disabled:opacity-60 resize-none"
+          className="w-full bg-slate-50 border border-slate-200 px-3 py-2 text-[11px] font-medium text-slate-700 placeholder-slate-400 focus:border-blue-500 outline-none disabled:opacity-60 resize-none"
         />
         <div className="flex justify-end">
           <span
@@ -3014,7 +3014,7 @@ const CustomMetricRow: React.FC<{
           maxLength={NOTE_MAX}
           rows={2}
           placeholder="Notes, context, blockers… (max 200 chars)"
-          className="w-full bg-slate-50 border border-slate-200 px-3 py-2 text-[15px] font-medium text-slate-700 placeholder-slate-400 focus:border-blue-500 outline-none disabled:opacity-60 resize-none"
+          className="w-full bg-slate-50 border border-slate-200 px-3 py-2 text-[11px] font-medium text-slate-700 placeholder-slate-400 focus:border-blue-500 outline-none disabled:opacity-60 resize-none"
         />
         <div className="flex justify-end">
           <span
@@ -3344,7 +3344,7 @@ const DeliverableChecklist: React.FC<{
               )}
 
               {filteredTemplates.length > 0 && (
-                <p className="text-[15px] font-black uppercase tracking-widest text-slate-400 mt-2">
+                <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mt-2">
                   Reference checklist
                 </p>
               )}
@@ -3391,7 +3391,7 @@ const DeliverableChecklist: React.FC<{
                             <Square size={14} className="flex-shrink-0 mt-0.5 text-slate-400" />
                           )}
                           <span
-                            className={`text-[17px] leading-snug ${
+                            className={`text-[13px] leading-snug ${
                               waived
                                 ? 'text-amber-800 line-through decoration-amber-400/70'
                                 : checked
@@ -3572,7 +3572,7 @@ const DeliverableChecklist: React.FC<{
 
               {filteredCustoms.length > 0 && (
                 <>
-                  <p className="text-[15px] font-black uppercase tracking-widest text-slate-400 mt-3">
+                  <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mt-3">
                     Custom items
                   </p>
                   <ul className="space-y-1">
