@@ -594,3 +594,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Allowlist migration deferred.** Evaluated moving the 10-place hardcoded email allowlist to a Vercel env var (`ALLOWED_EMAILS`) + Firestore `allowedUsers` collection. Decision: defer until 3rd–4th paying user. At current scale (2 beta users), the 10-place edit + code deploy is a 15-min annoyance, not a blocker. Revisit when adding users frequently enough to feel the friction.
 
 - **Deployed to Vercel** via `git push`. ContactForm variant is live in prod.
+
+### 2026-06-02
+- **Deliverable checklist font size tuning (`ProjectDeepDive.tsx`).** Two-pass adjustment:
+  - Pass 1 (reduce by 4px): section headings ("Reference checklist", "Custom items") `15px → 11px`; item labels `17px → 13px`; notes textareas `15px → 11px`.
+  - Pass 2 (user feedback — notes too small): notes textareas bumped back up `11px → 13px`.
+  - Final sizes: section headings = 11px, item labels = 13px, notes textareas = 13px. All changes used `replace_all` to hit both `MetricRow` and `CustomSubItemRow` instances in one pass.
+- **LinkedIn launch infographic (standalone marketing asset — not in repo).** Built a "living" HTML infographic for the BridgeOps Intelligence LinkedIn post. Three iterations:
+  1. SVG-based dark infographic — full narrative arc (old way → Excel → new way).
+  2. HTML version with Tabler icons, humor subtitles ("Smartsheet — Excel with a monthly fee", "nobody knows who built it"), animated data stream SVG, real-time analytics panel (bar chart + donut), pulsing pill dots, gate bar, scan line, circuit corner decorations.
+  3. Final version incorporated the sci-fi dashboard aesthetic from the app screenshots — connected data streams panel, real-time analytics, CDR-highlighted gate bar, "Live" badge. Background lightened from near-black (`#070D1A`) to mid-navy (`#142035`); all fonts bumped 1–2px.
+  - Exported to JPG using Playwright (headless Chromium) at 680×1079px, quality 95. **Do not commit to the repo** — standalone marketing asset, keep outside the project folder.
