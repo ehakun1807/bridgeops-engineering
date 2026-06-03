@@ -144,7 +144,6 @@ const MeetingsTool: React.FC<MeetingsToolProps> = ({ projectId, projectName = ''
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>({ kind: 'list' });
-  const [downloading, setDownloading] = useState(false);
 
   const uid = auth.currentUser?.uid ?? '';
 
@@ -277,36 +276,6 @@ const MeetingsTool: React.FC<MeetingsToolProps> = ({ projectId, projectName = ''
               {loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
               Reload
             </button>
-            {meetings.length > 0 && (
-              <button
-                type="button"
-                disabled={downloading}
-                onClick={async () => {
-                  setDownloading(true);
-                  try {
-                    await downloadMeetingsPdf(
-                      meetings.map(m => ({
-                        id: m.id,
-                        dateMs: m.dateMs,
-                        title: m.title,
-                        attendees: m.attendees,
-                        kind: m.kind,
-                        notes: m.notes,
-                        actionItems: m.actionItems
-                      })),
-                      projectName
-                    );
-                  } finally {
-                    setDownloading(false);
-                  }
-                }}
-                title="Download meeting minutes as PDF"
-                className="text-[10px] font-black uppercase tracking-widest text-white/70 hover:text-white transition-colors flex items-center gap-1 disabled:opacity-50"
-              >
-                {downloading ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
-                PDF
-              </button>
-            )}
             {!readOnly && (
               <button
                 type="button"
@@ -336,6 +305,13 @@ const MeetingsTool: React.FC<MeetingsToolProps> = ({ projectId, projectName = ''
               error={error}
               onOpen={openMeeting}
               onDelete={deleteMeeting}
+              onDownload={async (m) => {
+                await downloadMeetingsPdf([{
+                  id: m.id, dateMs: m.dateMs, title: m.title,
+                  attendees: m.attendees, kind: m.kind,
+                  notes: m.notes, actionItems: m.actionItems
+                }], projectName);
+              }}
               readOnly={readOnly}
             />
           </motion.div>
@@ -352,6 +328,7 @@ const MeetingsTool: React.FC<MeetingsToolProps> = ({ projectId, projectName = ''
               onCancel={cancelEdit}
               onSave={saveMeeting}
               readOnly={readOnly}
+              projectName={projectName}
             />
           </motion.div>
         )}
@@ -372,6 +349,7 @@ interface MeetingListProps {
   error: string | null;
   onOpen: (m: Meeting) => void;
   onDelete: (m: Meeting) => void;
+  onDownload: (m: Meeting) => void;
   readOnly: boolean;
 }
 
@@ -381,6 +359,7 @@ const MeetingList: React.FC<MeetingListProps> = ({
   error,
   onOpen,
   onDelete,
+  onDownload,
   readOnly
 }) => {
   if (loading) {
@@ -452,6 +431,14 @@ const MeetingList: React.FC<MeetingListProps> = ({
                 </p>
               )}
             </button>
+            <button
+              type="button"
+              onClick={() => onDownload(m)}
+              title="Download as PDF"
+              className="text-slate-400 hover:text-slate-700 transition-colors p-1"
+            >
+              <Download size={14} />
+            </button>
             {!readOnly && (
               <button
                 type="button"
@@ -478,12 +465,14 @@ interface MeetingFormProps {
   onCancel: () => void;
   onSave: (m: Meeting) => Promise<void>;
   readOnly: boolean;
+  projectName?: string;
 }
 
-const MeetingForm: React.FC<MeetingFormProps> = ({ initial, onCancel, onSave, readOnly }) => {
+const MeetingForm: React.FC<MeetingFormProps> = ({ initial, onCancel, onSave, readOnly, projectName = '' }) => {
   const [draft, setDraft] = useState<Meeting>(initial);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   const isNew = !initial.id;
 
@@ -648,7 +637,33 @@ const MeetingForm: React.FC<MeetingFormProps> = ({ initial, onCancel, onSave, re
       )}
 
       {/* Footer */}
-      <div className="flex items-center justify-end gap-2 border-t border-slate-200 pt-4">
+      <div className="flex items-center justify-between gap-2 border-t border-slate-200 pt-4">
+        <div>
+          {!isNew && (
+            <button
+              type="button"
+              disabled={downloading}
+              onClick={async () => {
+                setDownloading(true);
+                try {
+                  await downloadMeetingsPdf([{
+                    id: draft.id, dateMs: draft.dateMs, title: draft.title,
+                    attendees: draft.attendees, kind: draft.kind,
+                    notes: draft.notes, actionItems: draft.actionItems
+                  }], projectName);
+                } finally {
+                  setDownloading(false);
+                }
+              }}
+              title="Download this meeting as PDF"
+              className="text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-slate-900 transition-colors flex items-center gap-1 disabled:opacity-50"
+            >
+              {downloading ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+              Download PDF
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={onCancel}
@@ -667,6 +682,7 @@ const MeetingForm: React.FC<MeetingFormProps> = ({ initial, onCancel, onSave, re
             {saving ? 'Saving…' : isNew ? 'Save Meeting' : 'Save Changes'}
           </button>
         )}
+        </div>
       </div>
     </div>
   );
