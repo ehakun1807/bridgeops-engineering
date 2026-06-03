@@ -286,6 +286,17 @@ interface ControlPlanSignal {
   }>;
 }
 
+interface CompanyGuidelineSignal {
+  fileName: string;
+  summary: string;
+  requirements: Array<{
+    id: string;
+    text: string;
+    category: string;
+    severity: 'critical' | 'major' | 'standard';
+  }>;
+}
+
 interface ToolContext {
   takt?: TaktSignal;
   pfmeas?: PFMEASignal[];
@@ -294,6 +305,7 @@ interface ToolContext {
   decisions?: DecisionSignal[];
   lessons?: LessonSignal[];
   controlPlan?: ControlPlanSignal;
+  companyGuidelines?: CompanyGuidelineSignal[];
 }
 
 // Mirrors aiClient.ts ConnectedProjectContext — inlined per Vercel bundler
@@ -435,7 +447,7 @@ function buildPrompt(p: ProjectInput): string {
   // These are first-class inputs, not just score hints.
   // -------------------------------------------------------------------
   const tc = p.toolContext;
-  const hasToolContext = tc && (tc.takt || tc.pfmeas?.length || tc.recentMeetings?.length || tc.latestBom || tc.decisions?.length);
+  const hasToolContext = tc && (tc.takt || tc.pfmeas?.length || tc.recentMeetings?.length || tc.latestBom || tc.decisions?.length || tc.companyGuidelines?.length);
 
   if (hasToolContext) {
     lines.push('');
@@ -606,6 +618,47 @@ function buildPrompt(p: ProjectInput): string {
   }
 
   // -------------------------------------------------------------------
+  // Company Guidelines — org-level SOPs/procedures.
+  // Check the project's current state against these requirements.
+  // Surface any drift as a risk with category "Compliance · SOP drift".
+  // -------------------------------------------------------------------
+  const guidelines = tc?.companyGuidelines;
+  if (guidelines && guidelines.length > 0) {
+    lines.push('');
+    lines.push('## Company Guidelines & SOP Compliance');
+    lines.push(`This organization has uploaded ${guidelines.length} procedure document(s). Check whether the project's current state (RAMP scores, tool signals, decisions, lessons) suggests any of the following requirements may be at risk of non-compliance. Surface violations or gaps as risks with source "Compliance · SOP drift".`);
+    lines.push('');
+    lines.push('Critical requirements (regulatory/safety impact if missed) should ALWAYS appear in the risks list if there is any evidence of a gap. Major requirements should appear in topActions if the project is close to a gate.');
+    lines.push('');
+
+    for (const gl of guidelines) {
+      lines.push(`### Document: "${gl.fileName}"`);
+      lines.push(`Scope: ${gl.summary}`);
+      const critical   = gl.requirements.filter(r => r.severity === 'critical');
+      const major      = gl.requirements.filter(r => r.severity === 'major');
+      const standard   = gl.requirements.filter(r => r.severity === 'standard');
+
+      if (critical.length > 0) {
+        lines.push('**Critical requirements:**');
+        for (const r of critical) {
+          lines.push(`  [${r.category}] ${r.text}`);
+        }
+      }
+      if (major.length > 0) {
+        lines.push('**Major requirements:**');
+        for (const r of major.slice(0, 10)) {
+          lines.push(`  [${r.category}] ${r.text}`);
+        }
+        if (major.length > 10) lines.push(`  … and ${major.length - 10} more major requirements`);
+      }
+      if (standard.length > 0) {
+        lines.push(`**Standard requirements:** ${standard.length} items (check for obvious gaps only)`);
+      }
+      lines.push('');
+    }
+  }
+
+  // -------------------------------------------------------------------
   // Cross-Project Signals — data from connected projects.
   // Enables drift detection, risk propagation, and supplier-chain
   // awareness when this project is explicitly linked to others.
@@ -680,7 +733,7 @@ function buildPrompt(p: ProjectInput): string {
     '2. topActions — exactly 5 moves, ranked by urgency × impact. Draw from BOTH RAMP score gaps AND tool signals (e.g. unresolved PFMEA high-RPN, BOM supplier swaps needing requalification, overdue meeting action items, capacity shortfalls, decision drift). Each: short title, 1–2 sentence rationale citing specific metrics or tool findings by name.'
   );
   lines.push(
-    '3. risks — up to 8 risks, sourced from RAMP scores, notes, tool signals, AND cross-project signals. Prioritize: PFMEA high-RPN items, supplier swaps post-CDR, takt capacity RED/YELLOW, overdue action items, gate-slip risk, decision drift (later evidence contradicts an earlier decision), risk memory (a risk noted in a decision now shows as high-RPN in PFMEA), instability (repeated decision reversals), and cross-project risks (shared suppliers, upstream design churn, dependency slippage). Source attribution for cross-project risks should read e.g. "Cross-project · <ProjectName> · PFMEA".'
+    '3. risks — up to 8 risks, sourced from RAMP scores, notes, tool signals, cross-project signals, AND company guideline compliance gaps. Prioritize: PFMEA high-RPN items, supplier swaps post-CDR, takt capacity RED/YELLOW, overdue action items, gate-slip risk, decision drift (later evidence contradicts an earlier decision), risk memory (a risk noted in a decision now shows as high-RPN in PFMEA), instability (repeated decision reversals), cross-project risks (shared suppliers, upstream design churn, dependency slippage), and SOP compliance drift (project state suggests a critical or major requirement may be unmet). Source attribution: cross-project risks → "Cross-project · <ProjectName> · PFMEA"; SOP gaps → "Compliance · SOP drift · <document name>".'
   );
   if (selectedStandards.length > 0) {
     lines.push('');

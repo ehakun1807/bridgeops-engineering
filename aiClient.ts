@@ -142,6 +142,17 @@ export interface ControlPlanSignal {
   }>;
 }
 
+export interface CompanyGuidelineSignal {
+  fileName: string;
+  summary: string;
+  requirements: Array<{
+    id: string;
+    text: string;
+    category: string;
+    severity: 'critical' | 'major' | 'standard';
+  }>;
+}
+
 export interface ToolContext {
   takt?: TaktSignal;
   pfmeas?: PFMEASignal[];            // up to 3 most-recent
@@ -150,6 +161,7 @@ export interface ToolContext {
   decisions?: DecisionSignal[];      // up to 5 active + any reversed, for drift/risk detection
   lessons?: LessonSignal[];          // up to 5 most-recent open/in-progress lessons
   controlPlan?: ControlPlanSignal;   // most-recent production plan (or pre_launch if none)
+  companyGuidelines?: CompanyGuidelineSignal[]; // org-level SOPs/procedures
 }
 
 /**

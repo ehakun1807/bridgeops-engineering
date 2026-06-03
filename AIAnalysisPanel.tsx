@@ -40,8 +40,10 @@ import {
   DecisionSignal,
   LessonSignal,
   ControlPlanSignal,
-  ConnectedProjectContext
+  ConnectedProjectContext,
+  CompanyGuidelineSignal
 } from './aiClient';
+import { loadOrgGuidelines } from './orgGuidelinesClient.ts';
 import type { ProjectStub } from './projectConnectionsClient.ts';
 
 interface AIAnalysisPanelProps {
@@ -337,6 +339,26 @@ async function fetchToolContext(
     }
   } catch (e) {
     console.warn('[AIAnalysisPanel] controlPlans fetch failed', e);
+  }
+
+  // Company Guidelines — org-level SOPs extracted by CompanyGuidelinesTool.
+  // Loaded once per Analyze click; non-fatal on failure.
+  try {
+    const guidelines = await loadOrgGuidelines(db, userId);
+    if (guidelines.length > 0) {
+      ctx.companyGuidelines = guidelines.map((g): CompanyGuidelineSignal => ({
+        fileName: g.fileName,
+        summary: g.summary,
+        requirements: g.requirements.map(r => ({
+          id: r.id,
+          text: r.text,
+          category: r.category,
+          severity: r.severity
+        }))
+      }));
+    }
+  } catch (e) {
+    console.warn('[AIAnalysisPanel] guidelines fetch failed', e);
   }
 
   // ---------------------------------------------------------------------------
