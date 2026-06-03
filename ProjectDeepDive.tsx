@@ -2111,7 +2111,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
           >
-            <MeetingsTool projectId={project.id} readOnly={readOnly} />
+            <MeetingsTool projectId={project.id} projectName={projectName} readOnly={readOnly} />
           </motion.div>
         ) : activeGroupId === PFMEA_TAB_ID ? (
           <motion.div
@@ -2121,7 +2121,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
           >
-            <PFMEATool projectId={project.id} readOnly={readOnly} />
+            <PFMEATool projectId={project.id} projectName={projectName} readOnly={readOnly} />
           </motion.div>
         ) : activeGroupId === PROCESS_MAP_TAB_ID ? (
           <motion.div

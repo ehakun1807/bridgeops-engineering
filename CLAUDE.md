@@ -595,6 +595,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Deployed to Vercel** via `git push`. ContactForm variant is live in prod.
 
+### 2026-06-03
+- **Download exports for all project tools.** Added one-click export to four tools, triggered via a Download button in each tool's list-view header (only visible when records exist). Button label shows a spinner while generating; all exports use the established helper pattern (pure module, no React, browser-safe download via `<a download>`).
+  - **PFMEA → Excel (`pfmeaXlsx.ts`).** 2-sheet workbook: Summary (aggregate stats, per-FMEA table) + Risks (one row per risk — all 11 fields + revised S/O/D + computed RPN/Tier/AP for both original and revised scores). Added `projectName?: string` prop to `PFMEAToolProps`; passed from `ProjectDeepDive.tsx`. Download icon button added in list-view header.
+  - **Meetings → PDF (`utils/meetingsPdf.ts`).** Cover page (project name, export date, Internal/External/total/with-actions stats box) + one meeting section per record sorted most-recent first. Each section has a header bar (Internal=emerald / External=amber kind chip, title, date), attendees, discussion notes, and action items. Uses pdf-lib (existing dependency). Added `projectName?: string` prop to `MeetingsToolProps`; passed from `ProjectDeepDive.tsx`. Download icon button added in list-view header.
+  - **Control Plan → Excel (`controlPlanXlsx.ts`).** 2-sheet workbook: Summary (per-plan table with type/rev/critical/significant counts) + Control Items (one row per item — all fields including char type, special class, spec/tolerance, measurement technique, sample plan, reaction plan). `projectName` already a prop; wired directly. Download button added alongside the existing New Plan button.
+  - **Lessons & Learned → Excel (`lessonsXlsx.ts`).** 2-sheet workbook: Summary (open/in-progress/closed counts, MUST action stats, per-lesson index table) + Actions (flattened — one row per action item with lesson title/type/category/gate/status/date/root-cause and action text/priority/owner/target-date/done). `projectName` already a prop; wired directly. Fixed: `ActionPriority` is `'must' | 'nice_to_have'` (not `'MUST'`); mapped to display labels `"MUST"` / `"NICE TO HAVE"` in the xlsx output.
+  - **Pattern note.** All four xlsx helpers follow the `taktXlsx.ts` pattern exactly (pure module, `*ToWorkbook` + `download*Xlsx` split, `xlsx` SheetJS via `XLSX.write(..., { bookType: 'xlsx', type: 'array' })`). PDF helper follows the `decisionRegisterPdf.ts` pattern (pdf-lib, `build*Pdf` async + `download*Pdf` browser helper). All files are import-safe under ts-jest (guard `typeof window === 'undefined'`).
+  - **`tsc --noEmit` clean** across all new files and modified tools.
+- **Open follow-ups (after today):**
+  1. **Push to Vercel** (`git push`) so the new export buttons are live in prod.
+  2. **ECO Pulse xlsx diff export** (3-sheet: Summary / Lines / Changes) — carry-over from May 15/16.
+  3. **Control Plan PDF** — AIAG-style formatted register alongside the xlsx. Carry-over from May 28.
+
 ### 2026-06-02
 - **Deliverable checklist font size tuning (`ProjectDeepDive.tsx`).** Two-pass adjustment:
   - Pass 1 (reduce by 4px): section headings ("Reference checklist", "Custom items") `15px → 11px`; item labels `17px → 13px`; notes textareas `15px → 11px`.

@@ -38,8 +38,10 @@ import {
   BarChart3,
   LayoutGrid,
   Copy,
-  Scale
+  Scale,
+  Download
 } from 'lucide-react';
+import { downloadPfmeaXlsx } from './pfmeaXlsx.ts';
 import { db, auth } from './firebase.ts';
 import { logActivity } from './activityLogger.ts';
 import { checkPfmeaVsBom, type CrossCheckResult } from './crossCheckEngine.ts';
@@ -313,16 +315,18 @@ const newPFMEA = (projectId: string, userId: string): PFMEA => ({
 
 interface PFMEAToolProps {
   projectId: string;
+  projectName?: string;
   readOnly?: boolean;
 }
 
 type Mode = { kind: 'list' } | { kind: 'edit'; pfmea: PFMEA };
 
-const PFMEATool: React.FC<PFMEAToolProps> = ({ projectId, readOnly = false }) => {
+const PFMEATool: React.FC<PFMEAToolProps> = ({ projectId, projectName = '', readOnly = false }) => {
   const [items, setItems] = useState<PFMEA[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>({ kind: 'list' });
+  const [downloading, setDownloading] = useState(false);
   // Decision cross-links — loaded once on mount, used in RiskCard badges.
   const [decisions, setDecisions] = useState<DecisionRef[]>([]);
   // Layer-2 cross-check: banner shown after saving with high-RPN risks.
@@ -528,6 +532,50 @@ const PFMEATool: React.FC<PFMEAToolProps> = ({ projectId, readOnly = false }) =>
               {loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
               Reload
             </button>
+            {items.length > 0 && (
+              <button
+                type="button"
+                disabled={downloading}
+                onClick={() => {
+                  setDownloading(true);
+                  try {
+                    downloadPfmeaXlsx(
+                      items.map(p => ({
+                        id: p.id,
+                        title: p.title,
+                        scope: p.scope,
+                        participants: p.participants,
+                        dateMs: p.dateMs
+                      })),
+                      items.map(p => p.risks.map(r => ({
+                        processStep: r.processStep,
+                        failureMode: r.failureMode,
+                        failureEffect: r.failureEffect,
+                        severity: r.severity,
+                        cause: r.cause,
+                        occurrence: r.occurrence,
+                        controls: r.controls,
+                        detection: r.detection,
+                        recommendedAction: r.recommendedAction,
+                        responsible: r.responsible,
+                        actionsTaken: r.actionsTaken,
+                        revisedSeverity: r.revisedSeverity,
+                        revisedOccurrence: r.revisedOccurrence,
+                        revisedDetection: r.revisedDetection
+                      }))),
+                      projectName
+                    );
+                  } finally {
+                    setDownloading(false);
+                  }
+                }}
+                title="Download all FMEAs as Excel"
+                className="text-[10px] font-black uppercase tracking-widest text-white/70 hover:text-white transition-colors flex items-center gap-1 disabled:opacity-50"
+              >
+                {downloading ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                Excel
+              </button>
+            )}
             {!readOnly && (
               <button
                 type="button"

@@ -38,8 +38,10 @@ import {
   X,
   Calendar,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Download
 } from 'lucide-react';
+import { downloadLessonsXlsx } from './lessonsXlsx.ts';
 import { db, auth } from './firebase.ts';
 import { logActivity } from './activityLogger.ts';
 import {
@@ -239,7 +241,7 @@ type Mode = { kind: 'list' } | { kind: 'edit'; lesson: Lesson };
 
 const LessonsLearnedTool: React.FC<LessonsLearnedToolProps> = ({
   projectId,
-  projectName: _projectName = 'Project',
+  projectName = 'Project',
   currentGate,
   readOnly = false
 }) => {
@@ -247,6 +249,7 @@ const LessonsLearnedTool: React.FC<LessonsLearnedToolProps> = ({
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState<string | null>(null);
   const [mode,    setMode]    = useState<Mode>({ kind: 'list' });
+  const [downloading, setDownloading] = useState(false);
 
   const uid = auth.currentUser?.uid ?? '';
 
@@ -404,6 +407,45 @@ const LessonsLearnedTool: React.FC<LessonsLearnedToolProps> = ({
               {loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
               Reload
             </button>
+            {lessons.length > 0 && (
+              <button
+                type="button"
+                disabled={downloading}
+                onClick={() => {
+                  setDownloading(true);
+                  try {
+                    downloadLessonsXlsx(
+                      lessons.map(l => ({
+                        id: l.id,
+                        dateMs: l.dateMs,
+                        title: l.title,
+                        category: l.category,
+                        lessonType: l.lessonType,
+                        gate: l.gate,
+                        description: l.description,
+                        rootCause: l.rootCause,
+                        status: l.status,
+                        actionItems: l.actionItems.map(a => ({
+                          text: a.text,
+                          priority: a.priority,
+                          owner: a.owner,
+                          targetDateMs: a.targetDateMs,
+                          done: a.done
+                        }))
+                      })),
+                      projectName
+                    );
+                  } finally {
+                    setDownloading(false);
+                  }
+                }}
+                title="Download lessons as Excel"
+                className="text-[10px] font-black uppercase tracking-widest text-white/70 hover:text-white transition-colors flex items-center gap-1 disabled:opacity-50"
+              >
+                {downloading ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                Excel
+              </button>
+            )}
             {!readOnly && (
               <button
                 type="button"

@@ -37,8 +37,10 @@ import {
   ShieldAlert,
   Workflow,
   CheckCircle2,
-  Circle
+  Circle,
+  Download
 } from 'lucide-react';
+import { downloadControlPlanXlsx } from './controlPlanXlsx.ts';
 import { db, auth } from './firebase.ts';
 import { logActivity } from './activityLogger.ts';
 import {
@@ -519,6 +521,7 @@ const ControlPlanTool: React.FC<ControlPlanToolProps> = ({
   const [plans, setPlans]             = useState<ControlPlan[]>([]);
   const [loading, setLoading]         = useState(true);
   const [editingPlan, setEditingPlan] = useState<ControlPlan | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   // Cross-link data
   const [steps, setSteps]   = useState<StepRef[]>([]);
@@ -785,14 +788,62 @@ const ControlPlanTool: React.FC<ControlPlanToolProps> = ({
             </div>
           )}
         </div>
-        {!readOnly && view === 'list' && (
-          <button
-            type="button"
-            onClick={openNew}
-            className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow"
-          >
-            <Plus size={12} /> New Plan
-          </button>
+        {view === 'list' && (
+          <div className="flex items-center gap-2">
+            {plans.length > 0 && (
+              <button
+                type="button"
+                disabled={downloading}
+                onClick={() => {
+                  setDownloading(true);
+                  try {
+                    downloadControlPlanXlsx(
+                      plans.map(p => ({
+                        id: p.id,
+                        title: p.title,
+                        planType: p.planType,
+                        partDescription: p.partDescription,
+                        revisionLevel: p.revisionLevel,
+                        dateMs: p.dateMs,
+                        participants: p.participants,
+                        items: p.items.map(it => ({
+                          processStep: it.processStep,
+                          machineFixture: it.machineFixture,
+                          charType: it.charType,
+                          productCharacteristic: it.productCharacteristic,
+                          processCharacteristic: it.processCharacteristic,
+                          specialClass: it.specialClass,
+                          specificationTolerance: it.specificationTolerance,
+                          measurementTechnique: it.measurementTechnique,
+                          sampleSize: it.sampleSize,
+                          sampleFrequency: it.sampleFrequency,
+                          controlMethod: it.controlMethod,
+                          reactionPlan: it.reactionPlan
+                        }))
+                      })),
+                      projectName
+                    );
+                  } finally {
+                    setDownloading(false);
+                  }
+                }}
+                title="Download all control plans as Excel"
+                className="text-[10px] font-black uppercase tracking-widest text-white/70 hover:text-white transition-colors flex items-center gap-1 disabled:opacity-50"
+              >
+                {downloading ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                Excel
+              </button>
+            )}
+            {!readOnly && (
+              <button
+                type="button"
+                onClick={openNew}
+                className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow"
+              >
+                <Plus size={12} /> New Plan
+              </button>
+            )}
+          </div>
         )}
       </div>
 

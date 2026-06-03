@@ -27,8 +27,10 @@ import {
   AlertTriangle,
   Users,
   Building2,
-  ExternalLink as ExternalLinkIcon
+  ExternalLink as ExternalLinkIcon,
+  Download
 } from 'lucide-react';
+import { downloadMeetingsPdf } from './utils/meetingsPdf.ts';
 import { db, auth } from './firebase.ts';
 import { logActivity } from './activityLogger.ts';
 import {
@@ -131,16 +133,18 @@ const newMeeting = (projectId: string, userId: string): Meeting => ({
 
 interface MeetingsToolProps {
   projectId: string;
+  projectName?: string;
   readOnly?: boolean;
 }
 
 type Mode = { kind: 'list' } | { kind: 'edit'; meeting: Meeting };
 
-const MeetingsTool: React.FC<MeetingsToolProps> = ({ projectId, readOnly = false }) => {
+const MeetingsTool: React.FC<MeetingsToolProps> = ({ projectId, projectName = '', readOnly = false }) => {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>({ kind: 'list' });
+  const [downloading, setDownloading] = useState(false);
 
   const uid = auth.currentUser?.uid ?? '';
 
@@ -273,6 +277,36 @@ const MeetingsTool: React.FC<MeetingsToolProps> = ({ projectId, readOnly = false
               {loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
               Reload
             </button>
+            {meetings.length > 0 && (
+              <button
+                type="button"
+                disabled={downloading}
+                onClick={async () => {
+                  setDownloading(true);
+                  try {
+                    await downloadMeetingsPdf(
+                      meetings.map(m => ({
+                        id: m.id,
+                        dateMs: m.dateMs,
+                        title: m.title,
+                        attendees: m.attendees,
+                        kind: m.kind,
+                        notes: m.notes,
+                        actionItems: m.actionItems
+                      })),
+                      projectName
+                    );
+                  } finally {
+                    setDownloading(false);
+                  }
+                }}
+                title="Download meeting minutes as PDF"
+                className="text-[10px] font-black uppercase tracking-widest text-white/70 hover:text-white transition-colors flex items-center gap-1 disabled:opacity-50"
+              >
+                {downloading ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                PDF
+              </button>
+            )}
             {!readOnly && (
               <button
                 type="button"
