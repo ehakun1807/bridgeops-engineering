@@ -189,7 +189,7 @@ const App: React.FC = () => {
                       Not spreadsheets. Not off-the-shelf PM tools. A purpose-built intelligence platform that connects RAMP scoring, risk data, BOM changes, and decisions — live, across your entire project.
                     </p>
                     <div className="flex flex-wrap gap-2">
-                      {['PFMEA', 'ECO Pulse', 'Decision Ledger', 'Takt analysis', 'AI cross-tool scan', 'Process Map', 'Doc Guard'].map((tag) => (
+                      {['PFMEA', 'ECO Pulse', 'Decision Ledger', 'Takt analysis', 'AI cross-tool scan', 'Process Map', 'Doc Guard', 'SOP Radar'].map((tag) => (
                         <span key={tag} className="text-[11px] text-slate-500 border border-slate-800 rounded-full px-3 py-1 bg-white/[0.02] font-medium">
                           {tag}
                         </span>

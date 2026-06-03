@@ -239,7 +239,7 @@ const CompanyGuidelinesTool: React.FC = () => {
       <div className="bg-purple-50 border border-purple-200 rounded p-3 flex items-start gap-2">
         <ShieldCheck size={16} className="text-purple-600 mt-0.5 flex-shrink-0" />
         <p className="text-[12px] text-purple-800 leading-snug">
-          Upload your company SOPs and procedures. Gemini extracts every actionable requirement — these are automatically checked against all projects during AI Analysis to surface compliance drift.
+          Upload your company SOPs and procedures. SOP Radar extracts every actionable requirement and automatically scans all projects during AI Analysis to surface compliance drift.
         </p>
       </div>
 
@@ -314,8 +314,8 @@ const CompanyGuidelinesTool: React.FC = () => {
         ) : guidelines.length === 0 ? (
           <div className="text-center py-6 text-slate-400">
             <ShieldCheck size={28} className="mx-auto mb-2 text-slate-300" />
-            <p className="text-sm">No guidelines uploaded yet.</p>
-            <p className="text-[11px] mt-1">Upload your first SOP to enable compliance drift detection.</p>
+            <p className="text-sm">No SOPs uploaded yet.</p>
+            <p className="text-[11px] mt-1">Upload your first procedure to activate SOP Radar across all projects.</p>
           </div>
         ) : (
           <div className="space-y-2">

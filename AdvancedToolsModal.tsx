@@ -43,7 +43,7 @@ const AdvancedToolsModal: React.FC<AdvancedToolsModalProps> = ({ isOpen, onClose
                     : selectedTool === 'entity-tags'
                       ? 'Entity Tags'
                       : selectedTool === 'company-guidelines'
-                        ? 'Company Guidelines'
+                        ? 'SOP Radar'
                         : 'Tools'}
             </h2>
           </div>
@@ -134,18 +134,18 @@ const AdvancedToolsModal: React.FC<AdvancedToolsModalProps> = ({ isOpen, onClose
               onClick={() => setSelectedTool('company-guidelines')}
               style={{ padding: '24px', border: '2px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', marginBottom: '12px', display: 'flex', gap: '16px', alignItems: 'center', transition: 'all 0.2s', backgroundColor: '#fafafa' }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = '#7c3aed';
-                e.currentTarget.style.backgroundColor = '#faf5ff';
+                e.currentTarget.style.borderColor = '#0f172a';
+                e.currentTarget.style.backgroundColor = '#f0f0f0';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.borderColor = '#e2e8f0';
                 e.currentTarget.style.backgroundColor = '#fafafa';
               }}
             >
-              <ShieldCheck size={48} color="#7c3aed" />
+              <ShieldCheck size={48} color="#64748b" />
               <div>
-                <h3 style={{ fontSize: '14px', fontWeight: 900, textTransform: 'uppercase', margin: 0, marginBottom: '4px', color: '#0f172a' }}>Company Guidelines</h3>
-                <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>Upload SOPs and procedures — AI checks every project for compliance drift automatically</p>
+                <h3 style={{ fontSize: '14px', fontWeight: 900, textTransform: 'uppercase', margin: 0, marginBottom: '4px', color: '#0f172a' }}>SOP Radar</h3>
+                <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>Upload SOPs and procedures — AI scans every project for compliance drift automatically</p>
               </div>
             </div>
           </div>
