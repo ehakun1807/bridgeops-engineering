@@ -501,6 +501,29 @@ service cloud.firestore {
       allow list:   if isAdmin();
     }
 
+    // Project Budget — one doc per project (doc ID = projectId).
+    // Stores the kickoff estimate + all cost lines. Always editable (update
+    // allowed). No composite index needed — read by doc ID directly.
+    function isValidProjectBudget(data) {
+      return data.keys().hasAll(['userId', 'projectId', 'lines', 'updatedAtMs']) &&
+             data.userId == request.auth.uid &&
+             data.projectId is string && data.projectId.size() > 0 &&
+             data.lines is list && data.lines.size() <= 500 &&
+             data.updatedAtMs is number &&
+             (!('kickoffEstimate' in data) || data.kickoffEstimate is number) &&
+             (!('notes' in data)           || (data.notes is string && data.notes.size() <= 500)) &&
+             (!('createdAtMs' in data)     || data.createdAtMs is number);
+    }
+
+    match /projectBudgets/{projectId} {
+      allow get:    if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list:   if isAdmin();
+      allow create: if isAuthenticated() && isValidProjectBudget(request.resource.data);
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid &&
+                       isValidProjectBudget(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
     // Leads / waitlist captures (ramp-score email grabs + Pricing waitlist signups).
     // Public can create, only admin can read — keeps the list private.
     match /leads/{leadId} {

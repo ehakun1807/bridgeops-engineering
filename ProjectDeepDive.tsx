@@ -51,7 +51,8 @@ import {
   ArrowLeftRight,
   Search,
   Unlink,
-  Lightbulb
+  Lightbulb,
+  Wallet
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db, auth } from './firebase.ts';
@@ -80,6 +81,7 @@ import ProductBomTool from './ProductBomTool.tsx';
 import DecisionLedgerTool from './DecisionLedgerTool.tsx';
 import LessonsLearnedTool from './LessonsLearnedTool.tsx';
 import ControlPlanTool from './ControlPlanTool.tsx';
+import ProjectBudgetTool from './ProjectBudgetTool.tsx';
 import ActivityFeedPanel from './ActivityFeedPanel.tsx';
 import ScopeEditor from './ScopeEditor.tsx';
 import CoachPanel from './CoachPanel.tsx';
@@ -318,6 +320,7 @@ const PRODUCT_BOM_TAB_ID    = '__product_bom__';
 const DECISION_LEDGER_TAB_ID = '__decisions__';
 const LESSONS_TAB_ID         = '__lessons__';
 const CONTROL_PLAN_TAB_ID    = '__control_plan__';
+const BUDGET_TAB_ID          = '__budget__';
 
 // ---------------------------------------------------------------------------
 // Project Tools registry — sub-app surfaces that live inside the deep-dive
@@ -412,6 +415,15 @@ const PROJECT_TOOLS: ProjectToolEntry[] = [
     iconActiveClass: 'text-orange-600',
     tileBg: 'bg-orange-50 border-orange-200',
     tileIcon: 'text-orange-700'
+  },
+  {
+    id: BUDGET_TAB_ID,
+    label: 'Budget',
+    description: 'Track kickoff estimate vs. actual — log labor, materials, equipment, capex & overhead in one place',
+    icon: Wallet,
+    iconActiveClass: 'text-green-600',
+    tileBg: 'bg-green-50 border-green-200',
+    tileIcon: 'text-green-700'
   }
 ];
 const HISTORY_TAB_ID = '__history__';
@@ -2194,6 +2206,20 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
               projectId={project.id}
               projectName={projectName}
               currentGate={currentGate}
+              readOnly={readOnly}
+            />
+          </motion.div>
+        ) : activeGroupId === BUDGET_TAB_ID ? (
+          <motion.div
+            key={BUDGET_TAB_ID}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <ProjectBudgetTool
+              projectId={project.id}
+              projectName={projectName}
               readOnly={readOnly}
             />
           </motion.div>

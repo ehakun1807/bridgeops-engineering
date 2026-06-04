@@ -54,6 +54,8 @@ export type ActivityEventType =
   | 'control_plan_created'
   | 'control_plan_updated'
   | 'control_plan_deleted'
+  // Budget
+  | 'budget_updated'
   // AI Analysis
   | 'ai_analysis_run';
 
@@ -67,6 +69,7 @@ export type ActivityTool =
   | 'decisions'
   | 'lessons'
   | 'control_plan'
+  | 'budget'
   | 'doc_guard'
   | 'ai_analysis';
 

@@ -297,6 +297,16 @@ interface CompanyGuidelineSignal {
   }>;
 }
 
+// Mirrors BudgetSignal in aiClient.ts — inlined per Vercel bundler .ts gotcha.
+interface BudgetSignal {
+  kickoffEstimate: number;
+  actualTotal: number;
+  variancePct: number;
+  lineCount: number;
+  byCategory: Array<{ category: string; label: string; actual: number; pctOfTotal: number }>;
+  lastUpdatedMs: number;
+}
+
 interface ToolContext {
   takt?: TaktSignal;
   pfmeas?: PFMEASignal[];
@@ -306,6 +316,7 @@ interface ToolContext {
   lessons?: LessonSignal[];
   controlPlan?: ControlPlanSignal;
   companyGuidelines?: CompanyGuidelineSignal[];
+  budget?: BudgetSignal;
 }
 
 // Mirrors aiClient.ts ConnectedProjectContext — inlined per Vercel bundler
@@ -656,6 +667,38 @@ function buildPrompt(p: ProjectInput): string {
       }
       lines.push('');
     }
+  }
+
+  // -------------------------------------------------------------------
+  // Budget — estimate vs. actual spend, broken down by category.
+  // Flag cost overruns and categories burning faster than expected relative
+  // to the current gate stage. Surface as risks or topActions accordingly.
+  // -------------------------------------------------------------------
+  const bgt = tc?.budget;
+  if (bgt && (bgt.kickoffEstimate > 0 || bgt.actualTotal > 0)) {
+    lines.push('');
+    lines.push('## Project Budget');
+    if (bgt.kickoffEstimate > 0) {
+      lines.push(`Kickoff Estimate: $${bgt.kickoffEstimate.toLocaleString('en-US')}`);
+    }
+    lines.push(`Actual Spent to Date: $${bgt.actualTotal.toLocaleString('en-US')} (${bgt.lineCount} entries)`);
+    if (bgt.kickoffEstimate > 0) {
+      const sign = bgt.variancePct >= 0 ? '+' : '';
+      lines.push(`Variance vs Estimate: ${sign}${bgt.variancePct.toFixed(1)}% (${bgt.variancePct > 0 ? 'OVER budget' : 'under budget'})`);
+    }
+    if (bgt.byCategory.length > 0) {
+      lines.push('Spend by Category:');
+      for (const c of bgt.byCategory) {
+        lines.push(`  ${c.label}: $${c.actual.toLocaleString('en-US')} (${c.pctOfTotal.toFixed(0)}% of total spend)`);
+      }
+    }
+    lines.push('');
+    lines.push('Budget analysis instructions:');
+    lines.push('- If variance > +20%, flag as a HIGH severity risk: the project is materially over estimate.');
+    lines.push('- If variance > +10% near a gate, flag as topAction: review scope and re-baseline estimate.');
+    lines.push('- If Labor or CapEx dominate spend (>50%) relative to project stage, flag potential resource burn rate risk.');
+    lines.push('- If budget exists but no estimate was set (kickoffEstimate = 0), recommend setting one for baseline control.');
+    lines.push('- Do NOT flag as a risk if the project is under budget and variance is within 10%.');
   }
 
   // -------------------------------------------------------------------

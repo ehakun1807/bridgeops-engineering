@@ -153,6 +153,17 @@ export interface CompanyGuidelineSignal {
   }>;
 }
 
+export interface BudgetSignal {
+  kickoffEstimate: number;
+  actualTotal: number;
+  /** (actual - estimate) / estimate * 100 — positive = over budget */
+  variancePct: number;
+  lineCount: number;
+  /** Spend per category (only non-zero categories) */
+  byCategory: Array<{ category: string; label: string; actual: number; pctOfTotal: number }>;
+  lastUpdatedMs: number;
+}
+
 export interface ToolContext {
   takt?: TaktSignal;
   pfmeas?: PFMEASignal[];            // up to 3 most-recent
@@ -162,6 +173,7 @@ export interface ToolContext {
   lessons?: LessonSignal[];          // up to 5 most-recent open/in-progress lessons
   controlPlan?: ControlPlanSignal;   // most-recent production plan (or pre_launch if none)
   companyGuidelines?: CompanyGuidelineSignal[]; // org-level SOPs/procedures
+  budget?: BudgetSignal;             // project budget: estimate vs. actual
 }
 
 /**

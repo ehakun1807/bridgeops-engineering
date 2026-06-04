@@ -26,6 +26,8 @@ import {
   orderBy,
   limit,
   getDocs,
+  getDoc,
+  doc,
   Firestore
 } from 'firebase/firestore';
 import {
@@ -41,7 +43,8 @@ import {
   LessonSignal,
   ControlPlanSignal,
   ConnectedProjectContext,
-  CompanyGuidelineSignal
+  CompanyGuidelineSignal,
+  BudgetSignal
 } from './aiClient';
 import { loadOrgGuidelines } from './orgGuidelinesClient.ts';
 import type { ProjectStub } from './projectConnectionsClient.ts';
@@ -359,6 +362,48 @@ async function fetchToolContext(
     }
   } catch (e) {
     console.warn('[AIAnalysisPanel] guidelines fetch failed', e);
+  }
+
+  // Budget — single doc per project (doc ID = projectId).
+  try {
+    const budgetSnap = await getDoc(doc(db, 'projectBudgets', projectId));
+    if (budgetSnap.exists()) {
+      const data = budgetSnap.data() as any;
+      const lines: any[] = Array.isArray(data.lines) ? data.lines : [];
+      const actualTotal   = lines.reduce((s: number, l: any) => s + (Number(l.amount) || 0), 0);
+      const estimate      = Number(data.kickoffEstimate || 0);
+      const variancePct   = estimate > 0 ? ((actualTotal - estimate) / estimate) * 100 : 0;
+
+      const catLabels: Record<string, string> = {
+        labor: 'Working Hours', material: 'Materials & BOM',
+        test_equipment: 'Test & Equipment', capex: 'CapEx',
+        overhead: 'Overhead', other: 'Other',
+      };
+      const cats = ['labor', 'material', 'test_equipment', 'capex', 'overhead', 'other'];
+      const byCategory = cats
+        .map((cat) => {
+          const catTotal = lines.filter((l: any) => l.category === cat)
+            .reduce((s: number, l: any) => s + (Number(l.amount) || 0), 0);
+          return {
+            category: cat,
+            label: catLabels[cat] ?? cat,
+            actual: catTotal,
+            pctOfTotal: actualTotal > 0 ? (catTotal / actualTotal) * 100 : 0,
+          };
+        })
+        .filter((c) => c.actual > 0);
+
+      ctx.budget = {
+        kickoffEstimate: estimate,
+        actualTotal,
+        variancePct,
+        lineCount: lines.length,
+        byCategory,
+        lastUpdatedMs: Number(data.updatedAtMs || 0),
+      } satisfies BudgetSignal;
+    }
+  } catch (e) {
+    console.warn('[AIAnalysisPanel] budget fetch failed', e);
   }
 
   // ---------------------------------------------------------------------------
