@@ -610,6 +610,7 @@ export default function ProjectBudgetTool({
     const amt = parseFloat(fAmount);
     if (!fAmount || isNaN(amt) || amt < 0) { setFormError('Enter a valid amount ≥ 0.'); return; }
 
+    const ecoRef = fLinkedEcoId.trim();
     const newLine: CostLine = {
       id:          editingLine?.id ?? genId(),
       category:    fCategory,
@@ -617,7 +618,7 @@ export default function ProjectBudgetTool({
       description: fDescription.trim(),
       amount:      amt,
       dateMs:      fDateMs,
-      linkedEcoId: fLinkedEcoId.trim() || undefined,
+      ...(ecoRef ? { linkedEcoId: ecoRef } : {}),  // omit entirely when empty — Firestore rejects `undefined`
     };
 
     const newLines = editingLine
