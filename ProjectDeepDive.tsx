@@ -1637,7 +1637,11 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
         customSubItems,
         aiAnalysis: aiAnalysis || undefined
       };
-      await generateExecutiveSummary(snapshot, aiAnalysis, overall);
+      const groupScoresForExport: Record<string, number> = {};
+      for (const g of RAMP_GROUPS) {
+        groupScoresForExport[g.id] = scoreForGroup(g, metrics, disabledItemIds, deliverableScores);
+      }
+      await generateExecutiveSummary(snapshot, aiAnalysis, overall, groupScoresForExport);
     } catch (err: any) {
       console.error('Executive summary export failed:', err);
       setError(err?.message || 'Could not generate summary.');
@@ -1765,7 +1769,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
             <button
               onClick={handleDownloadSummary}
               disabled={saving || downloadingSummary}
-              title={aiAnalysis ? 'Download editable .pptx executive summary (4 slides)' : 'Download summary — run AI Analysis first for full 4-slide deck'}
+              title={aiAnalysis ? 'Download editable .pptx Project Health Snapshot (5 slides)' : 'Project Health Snapshot — run AI Analysis first for full deck'}
               className="text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-blue-600 transition-colors flex items-center gap-1 disabled:opacity-50"
             >
               {downloadingSummary ? (
@@ -1773,7 +1777,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
               ) : (
                 <Download size={12} />
               )}
-              Download Summary
+              Project Health Snapshot
             </button>
             <button
               onClick={() => setCloseConfirm('cancelled')}

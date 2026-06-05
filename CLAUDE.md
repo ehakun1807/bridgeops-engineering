@@ -651,25 +651,37 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   4. **Currency / multi-currency support.** All amounts are USD today. If teams operate in multiple currencies, add a `currency` field per line + FX conversion for the summary card.
   5. **Carry-over** — SOP Radar Firestore index + rules deploy, ECO Pulse xlsx diff export, Control Plan PDF export, social proof quotes, MedTech language, end-of-beta cleanup.
 
-### 2026-06-05 — Budget Tracker: 4 fixes
+### 2026-06-05 — Budget Tracker: full overhaul
 
-- **Bug fix: Add Entry modal not working.** Root cause: `ProjectBudgetTool` is rendered inside a `motion.div` with `y`-transform in `ProjectDeepDive`. Framer Motion transforms create a new stacking/containing block, which means `position: fixed` descendants are anchored to the transformed ancestor — not the viewport. The modal overlay and form appeared off-screen. Fix: render the modal via `ReactDOM.createPortal(…, document.body)` so it escapes the transform context entirely. Z-indexes bumped to `z-[9998]`/`z-[9999]` to clear all overlays.
+- **Bug fix: Add Entry modal not working (Framer Motion stacking context).** `ProjectBudgetTool` is rendered inside a `motion.div` with `y`-transform in `ProjectDeepDive`. Framer Motion transforms create a new CSS containing block, hijacking `position: fixed` so the modal anchored to the transformed ancestor instead of the viewport and appeared off-screen. Fix: render the modal via `ReactDOM.createPortal(…, document.body)`, escaping the transform context entirely. Z-indexes bumped to `z-[9998]`/`z-[9999]`. Same gotcha documented for any future tool that uses a fixed-position overlay.
+
 - **Budget Plan vs Actuals — two-view layout.** Tool now has two internal tabs in the header:
-  - **Budget Plan** tab: set total kickoff estimate + per-category planned allocation (Working Hours, Materials, Test & Equipment, CapEx, Overhead, Other) + notes. Live allocation progress bars + unallocated/over-total indicator.
-  - **Actuals** tab: cost line log (existing). Add Cost button only visible here.
-  - `categoryPlans: Partial<Record<CostCategory, number>>` added to `ProjectBudget` data model. `firestore.rules` validator updated to accept the new optional `categoryPlans` map field.
-- **Real-time P vs A card.** Always visible at top of both views. Three headline numbers (Planned / Actual / Variance with %). Per-category comparison bars: faint background track = planned, solid fill = actual (rose when over plan). Legend below. Automatically picks up categoryPlans from the Budget Plan and actual spend from Actuals.
+  - **Budget Plan** tab: set total kickoff estimate + per-category planned allocation (Working Hours, Materials, Test & Equipment, CapEx, Overhead, Other) + notes. Live allocation progress bars + unallocated/over-total indicator. Separate from cost logging so planning intent and actuals are never mixed in the same form.
+  - **Actuals** tab: ongoing cost line log. Add Cost button only appears here.
+  - `categoryPlans: Partial<Record<CostCategory, number>>` added to `ProjectBudget` data model. `firestore.rules` validator updated with `(!('categoryPlans' in data) || data.categoryPlans is map)`. `budgetXlsx.ts` Summary sheet updated to include a Plan vs Actual by Category table.
+
+- **Real-time P vs A card.** Always visible at the top of both views — headline numbers never leave sight when switching tabs. Three numbers: Planned / Actual / Variance (absolute + %). Per-category two-track bars below: faint background = planned allocation, solid fill = actual spend, turns rose when over plan. Legend. Populates from `categoryPlans` (Budget Plan) and `lines` (Actuals) independently — works even with partial data on either side.
+
+- **Bug fix: `undefined` field rejected by Firestore.** `setDoc` was throwing "Unsupported field value: undefined" because `linkedEcoId` was being set as `undefined` (not `null`, not omitted) when the ECO Reference input was empty. Fix: spread conditional — `...(ecoRef ? { linkedEcoId: ecoRef } : {})` — so the field is omitted entirely when blank. Firestore's SDK rejects `undefined` values; the field must either be a valid value or not present.
+
+- **Optimistic update + visible error feedback.** Previously `saveBudget` swallowed Firestore errors silently, called `setBudget(payload)` only on success, and `handleSaveForm` always called `closeForm()` regardless — so save failures looked like success (form closed, nothing showed). Fixed three ways:
+  1. **Optimistic update**: `setBudget(payload)` is called immediately before the Firestore write, so the P vs A card and cost line table update instantly.
+  2. **Revert on failure**: if `setDoc` throws, the previous `budget` state is restored.
+  3. **Visible error banner**: a rose banner appears below the P vs A card with the Firestore error message. If the error is a permissions denial, the banner explicitly says "Firestore rules not deployed — paste firestore.rules into Firebase Console and publish." `handleSaveForm` now catches the re-thrown error and keeps the form open (no longer closes on failure).
+
 - **AI Analysis + Org Insights integration verified and enhanced:**
-  - `BudgetSignal` in `aiClient.ts` now includes `planned?: number` per category (populated from `categoryPlans`).
-  - `AIAnalysisPanel.tsx` budget fetch extended to read `data.categoryPlans` and forward per-category planned amounts alongside actuals.
-  - `api/ai-analyze.ts` `BudgetSignal` type updated + prompt section upgraded: now surfaces per-category plan vs actual with explicit variance %, flags any category >30% over plan by name, and distinguishes total-level vs category-level overruns.
-  - Org Insights path confirmed: AI Analysis results (including budget-derived risks) are stored in `projectIntelligence` via `persistAiAnalysis` in `ProjectDeepDive` → `orgInsightsClient` reads these → `/api/org-insights` surfaces cross-project cost patterns.
-- **`tsc --noEmit` clean.**
+  - `BudgetSignal` in `aiClient.ts` extended with `planned?: number` per category.
+  - `AIAnalysisPanel.tsx` budget fetch reads `data.categoryPlans` and forwards per-category planned amounts.
+  - `api/ai-analyze.ts` prompt section upgraded: per-category plan vs actual with explicit variance %, flags any single category >30% over plan by name, distinguishes total-level vs category-level overruns.
+  - Org Insights path confirmed: budget-derived AI risks flow into `projectIntelligence` snapshots → `/api/org-insights` surfaces cross-project cost patterns after several projects accumulate.
+- **`tsc --noEmit` clean** across all changed files.
 
 - **Open follow-ups:**
-  1. **Deploy `firestore.rules`** — paste updated rules into Firebase Console (added `categoryPlans` field to `isValidProjectBudget`). Saves will 403 until deployed.
+  1. **Deploy `firestore.rules`** — paste into Firebase Console (multi-DB deploy lie applies). The `categoryPlans` map field addition + the original `projectBudgets` block must both be live. Until deployed, saves fail with a permissions error (now visible in the rose banner).
   2. **Push to Vercel** (`git push`) so updated `/api/ai-analyze` prompt (per-category budget comparison) is live in prod.
-  3. **`project.budgetSummary` mirror** — write `{ estimate, actual, variancePct, lastUpdatedMs }` to project doc on save → "Budget ●" header pill.
+  3. **`project.budgetSummary` mirror** — write `{ estimate, actual, variancePct, lastUpdatedMs }` to project doc on save → "Budget ●" header pill (green/rose/slate based on variance).
+  4. **RAMP_GROUPS wiring** — wire >+20% budget overrun into a cost-readiness sub-item so it moves the readiness score.
+  5. **Carry-over** — SOP Radar Firestore index, ECO Pulse xlsx diff export, Control Plan PDF export, end-of-beta cleanup.
 
 ### 2026-06-02
 - **Deliverable checklist font size tuning (`ProjectDeepDive.tsx`).** Two-pass adjustment:

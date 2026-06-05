@@ -1,23 +1,32 @@
 // ---------------------------------------------------------------------------
-// pptxGenerator.ts — Executive Summary PPTX export for ProjectDeepDive.
-// Uses pptxgenjs (client-side, browser-compatible) to produce a 2-4 slide
+// pptxGenerator.ts — Project Health Snapshot PPTX export for ProjectDeepDive.
+// Uses pptxgenjs (client-side, browser-compatible) to produce a 2-5 slide
 // editable deck summarising a project's readiness snapshot + latest AI output.
 //
 // Slide layout:
 //   1. Overview       — name, type, readiness %, current gate, status, dates,
 //                       AI narrative (if present)
-//   2. Timelines      — start/end + all stage-gate target dates, current gate
+//   2. Readiness      — 4 RAMP group scores as visual bars + overall score
+//   Scorecard           + AI status snapshot (only if AI analysis exists)
+//   3. Timelines      — start/end + all stage-gate target dates, current gate
 //                       highlighted
-//   3. Latest Deliv.  — top 3 AI actions (title + rationale + impact badge)
+//   4. Top Actions    — top 3 AI actions (title + rationale + impact badge)
 //                       [only if an AI analysis exists]
-//   4. Risks          — flagged risks with severity + source (NO mitigations
-//                       per product decision)
-//                       [only if an AI analysis exists]
+//   5. Risks          — flagged risks with severity + source (top 8, HIGH
+//                       visually accented) [only if an AI analysis exists]
 // ---------------------------------------------------------------------------
 
 import PptxGenJS from 'pptxgenjs';
 import type { AIAnalysis } from './aiClient';
 import type { DeepDiveProject, ProductGate } from './ProjectDeepDive';
+
+// RAMP group display labels + accent colors (mirrors RAMP_GROUPS in rampGroups.ts).
+const RAMP_GROUP_META: Array<{ id: string; label: string; shortLabel: string; barColor: string }> = [
+  { id: 'product_design',      label: 'Product & Design Readiness',    shortLabel: 'Product & Design',    barColor: '2563EB' },
+  { id: 'manufacturing',       label: 'Manufacturing Readiness',        shortLabel: 'Manufacturing',        barColor: '10B981' },
+  { id: 'supply_chain',        label: 'Supply Chain Readiness',         shortLabel: 'Supply Chain',         barColor: 'F59E0B' },
+  { id: 'quality_reliability', label: 'Quality & Reliability Readiness', shortLabel: 'Quality & Reliability', barColor: '8B5CF6' },
+];
 
 // Hardware stage-gate ordering + readable labels.
 const GATE_ORDER: ProductGate[] = ['CR', 'PDR', 'CDR', 'TRR', 'PRR', 'MP'];
@@ -238,6 +247,160 @@ function buildOverviewSlide(
   });
 
   addFooter(slide, project.name, '1 / Overview');
+}
+
+function buildScorecardSlide(
+  pptx: any,
+  project: DeepDiveProject,
+  groupScores: Record<string, number>,
+  overall: number,
+  analysis: AIAnalysis | null,
+  pageLabel: string
+) {
+  const slide = pptx.addSlide();
+  slide.background = { color: COLORS.white };
+
+  addHeaderBar(
+    slide,
+    pptx,
+    clamp(project.name, 60),
+    'PROJECT HEALTH SNAPSHOT — READINESS SCORECARD'
+  );
+
+  // Overall score tile (top-right)
+  const bandColor =
+    overall >= 80 ? COLORS.emerald :
+    overall >= 50 ? COLORS.amber :
+    COLORS.red;
+
+  slide.addShape(pptx.ShapeType.rect, {
+    x: 7.3, y: 1.1, w: 2.3, h: 1.55,
+    fill: { color: COLORS.slate900 },
+    line: { color: COLORS.slate900 }
+  });
+  slide.addText('OVERALL', {
+    x: 7.3, y: 1.15, w: 2.3, h: 0.25,
+    fontFace: 'Arial', fontSize: 8, bold: true, color: COLORS.blue400,
+    align: 'center', charSpacing: 4
+  });
+  slide.addText(`${Math.round(overall)}%`, {
+    x: 7.3, y: 1.35, w: 2.3, h: 0.9,
+    fontFace: 'Arial', fontSize: 52, bold: true, color: bandColor,
+    align: 'center', valign: 'middle'
+  });
+
+  // Status snapshot (if AI ran)
+  const snapshot = analysis?.statusSnapshot;
+  if (snapshot) {
+    slide.addShape(pptx.ShapeType.rect, {
+      x: 0.4, y: 1.1, w: 6.7, h: 0.55,
+      fill: { color: COLORS.slate900 },
+      line: { color: COLORS.slate900 }
+    });
+    slide.addText('AI STATUS SNAPSHOT', {
+      x: 0.55, y: 1.1, w: 2.0, h: 0.55,
+      fontFace: 'Arial', fontSize: 8, bold: true, color: COLORS.blue400,
+      valign: 'middle', charSpacing: 3
+    });
+    slide.addText(clamp(snapshot, 120), {
+      x: 2.6, y: 1.1, w: 4.4, h: 0.55,
+      fontFace: 'Arial', fontSize: 10, color: COLORS.white,
+      valign: 'middle'
+    });
+  }
+
+  // RAMP group score bars
+  const barTop = 1.85;
+  const barRowH = 1.1;
+
+  RAMP_GROUP_META.forEach((meta, idx) => {
+    const score = groupScores[meta.id] ?? 0;
+    const y = barTop + idx * barRowH;
+    const barMaxW = 5.5;
+    const barFillW = Math.max(0, Math.min(1, score / 100)) * barMaxW;
+
+    // Label
+    slide.addText(meta.shortLabel.toUpperCase(), {
+      x: 0.4, y, w: 3.0, h: 0.35,
+      fontFace: 'Arial', fontSize: 9, bold: true, color: COLORS.slate700, valign: 'middle', charSpacing: 2
+    });
+
+    // Score value
+    const scoreColor =
+      score >= 80 ? COLORS.emerald :
+      score >= 50 ? COLORS.amber :
+      COLORS.red;
+    slide.addText(`${Math.round(score)}%`, {
+      x: 3.1, y, w: 0.8, h: 0.35,
+      fontFace: 'Arial', fontSize: 13, bold: true, color: scoreColor, valign: 'middle', align: 'right'
+    });
+
+    // Bar background
+    slide.addShape(pptx.ShapeType.rect, {
+      x: 0.4, y: y + 0.4, w: barMaxW, h: 0.32,
+      fill: { color: COLORS.slate300 },
+      line: { color: COLORS.slate300 }
+    });
+    // Bar fill
+    if (barFillW > 0) {
+      slide.addShape(pptx.ShapeType.rect, {
+        x: 0.4, y: y + 0.4, w: barFillW, h: 0.32,
+        fill: { color: meta.barColor },
+        line: { color: meta.barColor }
+      });
+    }
+
+    // Thin separator
+    if (idx < RAMP_GROUP_META.length - 1) {
+      slide.addShape(pptx.ShapeType.rect, {
+        x: 0.4, y: y + barRowH - 0.05, w: barMaxW, h: 0.02,
+        fill: { color: COLORS.slate300 },
+        line: { color: COLORS.slate300 }
+      });
+    }
+  });
+
+  // Legend: score bands
+  const legendY = barTop + RAMP_GROUP_META.length * barRowH + 0.1;
+  const bands: Array<[string, string]> = [
+    ['≥ 80% On Track', COLORS.emerald],
+    ['50–79% At Risk', COLORS.amber],
+    ['< 50% Critical', COLORS.red],
+  ];
+  let lx = 0.4;
+  for (const [label, color] of bands) {
+    slide.addShape(pptx.ShapeType.rect, {
+      x: lx, y: legendY, w: 0.18, h: 0.18,
+      fill: { color }, line: { color }
+    });
+    slide.addText(label, {
+      x: lx + 0.24, y: legendY, w: 1.6, h: 0.2,
+      fontFace: 'Arial', fontSize: 8, color: COLORS.slate500, valign: 'middle'
+    });
+    lx += 1.9;
+  }
+
+  // Gate + assignees context (right column, below overall tile)
+  const contextY = 2.75;
+  const ctxItems: Array<[string, string]> = [];
+  if (project.currentGate) ctxItems.push(['Current Gate', `${project.currentGate} — ${GATE_LABELS[project.currentGate]}`]);
+  if (project.infoStatus) ctxItems.push(['Status', project.infoStatus]);
+  if ((project as any).assignees) ctxItems.push(['Team', clamp((project as any).assignees, 80)]);
+
+  let cy = contextY;
+  for (const [lbl, val] of ctxItems) {
+    slide.addText(lbl.toUpperCase(), {
+      x: 6.2, y: cy, w: 1.5, h: 0.28,
+      fontFace: 'Arial', fontSize: 8, bold: true, color: COLORS.slate500, charSpacing: 2
+    });
+    slide.addText(val, {
+      x: 7.75, y: cy, w: 1.85, h: 0.28,
+      fontFace: 'Arial', fontSize: 10, color: COLORS.slate900, valign: 'middle'
+    });
+    cy += 0.38;
+  }
+
+  addFooter(slide, project.name, pageLabel);
 }
 
 function buildTimelineSlide(
@@ -489,53 +652,66 @@ function buildRisksSlide(
     fontFace: 'Arial', fontSize: 9, bold: true, color: COLORS.white, valign: 'middle', charSpacing: 3
   });
 
-  // Risk rows — cap at 5 so they fit nicely
-  const shown = risks.slice(0, 5);
+  // Risk rows — cap at 8 (sorted HIGH first). HIGH rows get a rose left-accent bar.
+  const sorted = [...risks].sort((a, b) => {
+    const ord: Record<string, number> = { high: 0, medium: 1, low: 2 };
+    return (ord[a.severity || 'medium'] ?? 1) - (ord[b.severity || 'medium'] ?? 1);
+  });
+  const shown = sorted.slice(0, 8);
   let rowY = 2.05;
-  const rowH = 0.85;
+  const rowH = 0.66;
 
   shown.forEach((risk, idx) => {
-    const bg = idx % 2 === 0 ? COLORS.slate100 : COLORS.white;
+    const sev = risk.severity || 'medium';
+    const isHigh = sev === 'high';
+    const bg = isHigh ? 'FFF1F2' : (idx % 2 === 0 ? COLORS.slate100 : COLORS.white);
     slide.addShape(pptx.ShapeType.rect, {
       x: 0.4, y: rowY, w: 9.2, h: rowH,
       fill: { color: bg },
       line: { color: COLORS.slate300 }
     });
+    // Rose left-accent bar for HIGH risks
+    if (isHigh) {
+      slide.addShape(pptx.ShapeType.rect, {
+        x: 0.4, y: rowY, w: 0.09, h: rowH,
+        fill: { color: COLORS.red },
+        line: { color: COLORS.red }
+      });
+    }
 
     // Severity pill
-    const sev = risk.severity || 'medium';
     const pillColor = SEVERITY_COLOR[sev];
     slide.addShape(pptx.ShapeType.rect, {
-      x: 0.55, y: rowY + 0.22, w: 1.1, h: 0.35,
+      x: 0.6, y: rowY + 0.16, w: 1.0, h: 0.3,
       fill: { color: pillColor },
       line: { color: pillColor }
     });
     slide.addText(sev.toUpperCase(), {
-      x: 0.55, y: rowY + 0.22, w: 1.1, h: 0.35,
-      fontFace: 'Arial', fontSize: 9, bold: true, color: COLORS.white,
+      x: 0.6, y: rowY + 0.16, w: 1.0, h: 0.3,
+      fontFace: 'Arial', fontSize: 8, bold: true, color: COLORS.white,
       align: 'center', valign: 'middle', charSpacing: 2
     });
 
     // Flag text
-    slide.addText(clamp(risk.flag || '', 220), {
-      x: 1.9, y: rowY + 0.1, w: 5.3, h: rowH - 0.2,
-      fontFace: 'Arial', fontSize: 11, color: COLORS.slate900, valign: 'middle'
+    slide.addText(clamp(risk.flag || '', 200), {
+      x: 1.75, y: rowY + 0.08, w: 5.45, h: rowH - 0.16,
+      fontFace: 'Arial', fontSize: 10, color: COLORS.slate900, valign: 'middle'
     });
 
     // Source text
     slide.addText(clamp(risk.source || '', 80), {
-      x: 7.2, y: rowY + 0.1, w: 2.3, h: rowH - 0.2,
-      fontFace: 'Arial', fontSize: 10, color: COLORS.slate700, valign: 'middle'
+      x: 7.25, y: rowY + 0.08, w: 2.25, h: rowH - 0.16,
+      fontFace: 'Arial', fontSize: 9, color: COLORS.slate700, valign: 'middle'
     });
 
-    rowY += rowH + 0.05;
+    rowY += rowH + 0.04;
   });
 
   if (risks.length > shown.length) {
     slide.addText(
       `+ ${risks.length - shown.length} additional risk${risks.length - shown.length === 1 ? '' : 's'} not shown — see AI Analysis tab for full list.`,
       {
-        x: 0.4, y: rowY + 0.1, w: 9.2, h: 0.3,
+        x: 0.4, y: rowY + 0.08, w: 9.2, h: 0.28,
         fontFace: 'Arial', fontSize: 9, italic: true, color: COLORS.slate500
       }
     );
@@ -549,16 +725,17 @@ function buildRisksSlide(
 // ---------------------------------------------------------------------------
 
 /**
- * Build an Executive Summary deck for a project and trigger a browser
+ * Build a Project Health Snapshot deck for a project and trigger a browser
  * download. Returns the filename that was downloaded.
  *
- * Produces 4 slides when an AI analysis is present, 2 slides otherwise
- * (Overview + Timeline). Output is fully editable PowerPoint.
+ * Produces 5 slides when an AI analysis is present, 3 slides otherwise
+ * (Overview + Scorecard + Timeline). Output is fully editable PowerPoint.
  */
 export async function generateExecutiveSummary(
   project: DeepDiveProject,
   analysis: AIAnalysis | null,
-  overallPercent: number
+  overallPercent: number,
+  groupScores: Record<string, number> = {}
 ): Promise<string> {
   const pptx = new PptxGenJS();
 
@@ -566,21 +743,23 @@ export async function generateExecutiveSummary(
   pptx.defineLayout({ name: 'BRIDGEOPS_WIDE', width: 10, height: 7.5 });
   pptx.layout = 'BRIDGEOPS_WIDE';
 
-  pptx.title = `${project.name} — Executive Summary`;
+  pptx.title = `${project.name} — Project Health Snapshot`;
   pptx.author = 'BridgeOps Engineering';
   pptx.company = 'BridgeOps Engineering';
-  pptx.subject = 'Ramp Readiness Executive Summary';
+  pptx.subject = 'Ramp Readiness — Project Health Snapshot';
 
   const score = overallScore(project, overallPercent);
 
   if (analysis) {
     buildOverviewSlide(pptx, project, analysis, score);
-    buildTimelineSlide(pptx, project, '2 / Timeline');
-    buildDeliverablesSlide(pptx, project, analysis, '3 / Deliverables');
-    buildRisksSlide(pptx, project, analysis, '4 / Risks');
+    buildScorecardSlide(pptx, project, groupScores, score, analysis, '2 / Scorecard');
+    buildTimelineSlide(pptx, project, '3 / Timeline');
+    buildDeliverablesSlide(pptx, project, analysis, '4 / Top Actions');
+    buildRisksSlide(pptx, project, analysis, '5 / Risks');
   } else {
     buildOverviewSlide(pptx, project, null, score);
-    buildTimelineSlide(pptx, project, '2 / Timeline');
+    buildScorecardSlide(pptx, project, groupScores, score, null, '2 / Scorecard');
+    buildTimelineSlide(pptx, project, '3 / Timeline');
   }
 
   // Safe filename: strip path-hostile chars
@@ -590,7 +769,7 @@ export async function generateExecutiveSummary(
     .replace(/\s+/g, '_')
     .slice(0, 60) || 'Project';
   const datePart = new Date().toISOString().slice(0, 10);
-  const fileName = `${safeName}_Executive_Summary_${datePart}.pptx`;
+  const fileName = `${safeName}_Health_Snapshot_${datePart}.pptx`;
 
   await pptx.writeFile({ fileName });
   return fileName;
