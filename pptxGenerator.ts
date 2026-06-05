@@ -182,15 +182,26 @@ function buildOverviewSlide(
   });
 
   // Left-column facts
+  const gatesEnabled = (project.templateId ?? 'full_ramp') === 'full_ramp';
   const facts: Array<[string, string]> = [];
   facts.push(['Product Type', project.productType || '—']);
   facts.push(['Status', project.infoStatus || 'TBD']);
-  facts.push([
-    'Current Stage Gate',
-    project.currentGate
-      ? `${project.currentGate} — ${GATE_LABELS[project.currentGate]}`
-      : 'Not set'
-  ]);
+  if (gatesEnabled) {
+    facts.push([
+      'Current Stage Gate',
+      project.currentGate
+        ? `${project.currentGate} — ${GATE_LABELS[project.currentGate]}`
+        : 'Not set'
+    ]);
+  } else {
+    const scopeLabels: Record<string, string> = {
+      pcba: 'PCBA / Sub-Assembly',
+      mechanical: 'Mechanical Module',
+      pilot: 'Pilot / Prototype',
+      custom: 'Custom'
+    };
+    facts.push(['Scope', scopeLabels[project.templateId || ''] || 'Custom']);
+  }
   facts.push(['Start Date', formatDate(project.startDate)]);
   facts.push(['End Date', formatDate(project.endDate)]);
 
@@ -381,9 +392,10 @@ function buildScorecardSlide(
   }
 
   // Gate + assignees context (right column, below overall tile)
+  const gatesEnabledSC = (project.templateId ?? 'full_ramp') === 'full_ramp';
   const contextY = 2.75;
   const ctxItems: Array<[string, string]> = [];
-  if (project.currentGate) ctxItems.push(['Current Gate', `${project.currentGate} — ${GATE_LABELS[project.currentGate]}`]);
+  if (gatesEnabledSC && project.currentGate) ctxItems.push(['Current Gate', `${project.currentGate} — ${GATE_LABELS[project.currentGate]}`]);
   if (project.infoStatus) ctxItems.push(['Status', project.infoStatus]);
   if ((project as any).assignees) ctxItems.push(['Team', clamp((project as any).assignees, 80)]);
 
@@ -411,21 +423,21 @@ function buildTimelineSlide(
   const slide = pptx.addSlide();
   slide.background = { color: COLORS.white };
 
+  const gatesEnabled = (project.templateId ?? 'full_ramp') === 'full_ramp';
+
   addHeaderBar(
     slide,
     pptx,
     clamp(project.name, 60),
-    'EXECUTIVE SUMMARY — TIMELINE & STAGE GATES'
+    gatesEnabled
+      ? 'PROJECT HEALTH SNAPSHOT — TIMELINE & STAGE GATES'
+      : 'PROJECT HEALTH SNAPSHOT — TIMELINE'
   );
 
-  // Project window block
+  // Project window — always shown
   slide.addText('PROJECT WINDOW', {
     x: 0.4, y: 1.2, w: 9.2, h: 0.3,
-    fontFace: 'Arial',
-    fontSize: 9,
-    bold: true,
-    color: COLORS.blue600,
-    charSpacing: 3
+    fontFace: 'Arial', fontSize: 9, bold: true, color: COLORS.blue600, charSpacing: 3
   });
 
   slide.addText(
@@ -435,66 +447,66 @@ function buildTimelineSlide(
       { text: '     End: ', options: { fontSize: 11, color: COLORS.slate500, bold: true } },
       { text: formatDate(project.endDate),   options: { fontSize: 12, color: COLORS.slate900 } }
     ],
-    {
-      x: 0.4, y: 1.5, w: 9.2, h: 0.35,
-      fontFace: 'Arial'
-    }
+    { x: 0.4, y: 1.5, w: 9.2, h: 0.35, fontFace: 'Arial' }
   );
 
-  // Gate header
-  slide.addShape(pptx.ShapeType.rect, {
-    x: 0.4, y: 2.1, w: 9.2, h: 0.45,
-    fill: { color: COLORS.slate900 },
-    line: { color: COLORS.slate900 }
-  });
-  slide.addText('STAGE GATE', {
-    x: 0.6, y: 2.1, w: 2.4, h: 0.45,
-    fontFace: 'Arial', fontSize: 9, bold: true, color: COLORS.white, valign: 'middle', charSpacing: 3
-  });
-  slide.addText('DESCRIPTION', {
-    x: 3.0, y: 2.1, w: 4.2, h: 0.45,
-    fontFace: 'Arial', fontSize: 9, bold: true, color: COLORS.white, valign: 'middle', charSpacing: 3
-  });
-  slide.addText('TARGET DATE', {
-    x: 7.2, y: 2.1, w: 2.2, h: 0.45,
-    fontFace: 'Arial', fontSize: 9, bold: true, color: COLORS.white, valign: 'middle', charSpacing: 3
-  });
-
-  // Gate rows
-  const targets = project.gateTargets || {};
-  let rowY = 2.6;
-  const rowH = 0.55;
-  GATE_ORDER.forEach((gate, idx) => {
-    const isCurrent = project.currentGate === gate;
-    const rowBg = isCurrent
-      ? COLORS.blue600
-      : (idx % 2 === 0 ? COLORS.slate100 : COLORS.white);
-    const txtColor = isCurrent ? COLORS.white : COLORS.slate900;
-    const subColor = isCurrent ? COLORS.white : COLORS.slate500;
-
+  if (gatesEnabled) {
+    // Full gate table — Full Ramp only
     slide.addShape(pptx.ShapeType.rect, {
-      x: 0.4, y: rowY, w: 9.2, h: rowH,
-      fill: { color: rowBg },
-      line: { color: rowBg }
+      x: 0.4, y: 2.1, w: 9.2, h: 0.45,
+      fill: { color: COLORS.slate900 }, line: { color: COLORS.slate900 }
+    });
+    slide.addText('STAGE GATE', {
+      x: 0.6, y: 2.1, w: 2.4, h: 0.45,
+      fontFace: 'Arial', fontSize: 9, bold: true, color: COLORS.white, valign: 'middle', charSpacing: 3
+    });
+    slide.addText('DESCRIPTION', {
+      x: 3.0, y: 2.1, w: 4.2, h: 0.45,
+      fontFace: 'Arial', fontSize: 9, bold: true, color: COLORS.white, valign: 'middle', charSpacing: 3
+    });
+    slide.addText('TARGET DATE', {
+      x: 7.2, y: 2.1, w: 2.2, h: 0.45,
+      fontFace: 'Arial', fontSize: 9, bold: true, color: COLORS.white, valign: 'middle', charSpacing: 3
     });
 
-    slide.addText(
-      isCurrent ? `${gate}  ◀ CURRENT` : gate,
-      {
+    const targets = project.gateTargets || {};
+    let rowY = 2.6;
+    const rowH = 0.55;
+    GATE_ORDER.forEach((gate, idx) => {
+      const isCurrent = project.currentGate === gate;
+      const rowBg = isCurrent ? COLORS.blue600 : (idx % 2 === 0 ? COLORS.slate100 : COLORS.white);
+      const txtColor = isCurrent ? COLORS.white : COLORS.slate900;
+      const subColor = isCurrent ? COLORS.white : COLORS.slate500;
+
+      slide.addShape(pptx.ShapeType.rect, {
+        x: 0.4, y: rowY, w: 9.2, h: rowH,
+        fill: { color: rowBg }, line: { color: rowBg }
+      });
+      slide.addText(isCurrent ? `${gate}  ◀ CURRENT` : gate, {
         x: 0.6, y: rowY, w: 2.4, h: rowH,
         fontFace: 'Arial', fontSize: 12, bold: true, color: txtColor, valign: 'middle'
-      }
-    );
-    slide.addText(GATE_LABELS[gate], {
-      x: 3.0, y: rowY, w: 4.2, h: rowH,
-      fontFace: 'Arial', fontSize: 11, color: subColor, valign: 'middle'
+      });
+      slide.addText(GATE_LABELS[gate], {
+        x: 3.0, y: rowY, w: 4.2, h: rowH,
+        fontFace: 'Arial', fontSize: 11, color: subColor, valign: 'middle'
+      });
+      slide.addText(formatDate(targets[gate]), {
+        x: 7.2, y: rowY, w: 2.2, h: rowH,
+        fontFace: 'Arial', fontSize: 11, bold: true, color: txtColor, valign: 'middle'
+      });
+      rowY += rowH + 0.05;
     });
-    slide.addText(formatDate(targets[gate]), {
-      x: 7.2, y: rowY, w: 2.2, h: rowH,
-      fontFace: 'Arial', fontSize: 11, bold: true, color: txtColor, valign: 'middle'
+  } else {
+    // Non-Full-Ramp: note that stage gates are not applicable
+    slide.addShape(pptx.ShapeType.rect, {
+      x: 0.4, y: 2.1, w: 9.2, h: 0.55,
+      fill: { color: COLORS.slate100 }, line: { color: COLORS.slate300 }
     });
-    rowY += rowH + 0.05;
-  });
+    slide.addText('Stage gate tracking is not applicable for this project scope.', {
+      x: 0.6, y: 2.1, w: 8.8, h: 0.55,
+      fontFace: 'Arial', fontSize: 11, italic: true, color: COLORS.slate500, valign: 'middle'
+    });
+  }
 
   addFooter(slide, project.name, pageLabel);
 }
@@ -502,7 +514,7 @@ function buildTimelineSlide(
 function buildDeliverablesSlide(
   pptx: any,
   project: DeepDiveProject,
-  analysis: AIAnalysis,
+  analysis: AIAnalysis | null,
   pageLabel: string
 ) {
   const slide = pptx.addSlide();
@@ -523,6 +535,20 @@ function buildDeliverablesSlide(
     color: COLORS.blue600,
     charSpacing: 3
   });
+
+  if (!analysis) {
+    slide.addShape(pptx.ShapeType.rect, {
+      x: 0.4, y: 2.5, w: 9.2, h: 1.2,
+      fill: { color: COLORS.slate100 }, line: { color: COLORS.slate300 }
+    });
+    slide.addText('Run AI Analysis from the project workspace to populate this slide.', {
+      x: 0.6, y: 2.5, w: 8.8, h: 1.2,
+      fontFace: 'Arial', fontSize: 13, italic: true, color: COLORS.slate500,
+      align: 'center', valign: 'middle'
+    });
+    addFooter(slide, project.name, pageLabel);
+    return;
+  }
 
   const actions = (analysis.topActions || []).slice(0, 3);
 
@@ -597,7 +623,7 @@ function buildDeliverablesSlide(
 function buildRisksSlide(
   pptx: any,
   project: DeepDiveProject,
-  analysis: AIAnalysis,
+  analysis: AIAnalysis | null,
   pageLabel: string
 ) {
   const slide = pptx.addSlide();
@@ -618,6 +644,20 @@ function buildRisksSlide(
     color: COLORS.blue600,
     charSpacing: 3
   });
+
+  if (!analysis) {
+    slide.addShape(pptx.ShapeType.rect, {
+      x: 0.4, y: 2.5, w: 9.2, h: 1.2,
+      fill: { color: COLORS.slate100 }, line: { color: COLORS.slate300 }
+    });
+    slide.addText('Run AI Analysis from the project workspace to populate this slide.', {
+      x: 0.6, y: 2.5, w: 8.8, h: 1.2,
+      fontFace: 'Arial', fontSize: 13, italic: true, color: COLORS.slate500,
+      align: 'center', valign: 'middle'
+    });
+    addFooter(slide, project.name, pageLabel);
+    return;
+  }
 
   const risks = analysis.risks || [];
 
@@ -659,7 +699,7 @@ function buildRisksSlide(
   });
   const shown = sorted.slice(0, 8);
   let rowY = 2.05;
-  const rowH = 0.66;
+  const rowH = 0.57; // 8 rows × (0.57 + 0.04) = 4.88 — fits within 7.15 footer
 
   shown.forEach((risk, idx) => {
     const sev = risk.severity || 'medium';
@@ -750,17 +790,12 @@ export async function generateExecutiveSummary(
 
   const score = overallScore(project, overallPercent);
 
-  if (analysis) {
-    buildOverviewSlide(pptx, project, analysis, score);
-    buildScorecardSlide(pptx, project, groupScores, score, analysis, '2 / Scorecard');
-    buildTimelineSlide(pptx, project, '3 / Timeline');
-    buildDeliverablesSlide(pptx, project, analysis, '4 / Top Actions');
-    buildRisksSlide(pptx, project, analysis, '5 / Risks');
-  } else {
-    buildOverviewSlide(pptx, project, null, score);
-    buildScorecardSlide(pptx, project, groupScores, score, null, '2 / Scorecard');
-    buildTimelineSlide(pptx, project, '3 / Timeline');
-  }
+  // Always emit all 5 slides. Slides 4 & 5 show a placeholder when AI hasn't run.
+  buildOverviewSlide(pptx, project, analysis, score);
+  buildScorecardSlide(pptx, project, groupScores, score, analysis, '2 / Scorecard');
+  buildTimelineSlide(pptx, project, '3 / Timeline');
+  buildDeliverablesSlide(pptx, project, analysis, '4 / Top Actions');
+  buildRisksSlide(pptx, project, analysis, '5 / Risks');
 
   // Safe filename: strip path-hostile chars
   const safeName = (project.name || 'Project')
