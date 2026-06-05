@@ -475,6 +475,7 @@ export default function ProjectBudgetTool({
   const [budget, setBudget]         = useState<ProjectBudget | null>(null);
   const [loading, setLoading]       = useState(true);
   const [saving, setSaving]         = useState(false);
+  const [saveError, setSaveError]   = useState('');   // persistent banner for failed writes
   const [exporting, setExporting]   = useState(false);
   const [activeView, setActiveView] = useState<'plan' | 'actuals'>('actuals');
 
@@ -506,27 +507,33 @@ export default function ProjectBudgetTool({
   }, [projectId, user]);
 
   // ---------------------------------------------------------------------------
-  // Core save — merges a partial patch into the existing doc.
+  // Core save — optimistic update first, then Firestore write.
+  // Throws on failure so callers (form handlers) can surface the error.
   // ---------------------------------------------------------------------------
   const saveBudget = useCallback(
     async (patch: Partial<Pick<ProjectBudget, 'lines' | 'kickoffEstimate' | 'categoryPlans' | 'notes'>>) => {
-      if (!user) return;
+      if (!user) throw new Error('Not authenticated');
       setSaving(true);
+      setSaveError('');
+
+      const now      = Date.now();
+      const existing = budget;
+      const payload: ProjectBudget = {
+        userId:          user.uid,
+        projectId,
+        kickoffEstimate: patch.kickoffEstimate  ?? existing?.kickoffEstimate  ?? 0,
+        categoryPlans:   patch.categoryPlans    ?? existing?.categoryPlans    ?? {},
+        notes:           patch.notes            ?? existing?.notes            ?? '',
+        lines:           patch.lines            ?? existing?.lines            ?? [],
+        updatedAtMs:     now,
+        createdAtMs:     existing?.createdAtMs  ?? now,
+      };
+
+      // Optimistic update — UI reflects the change immediately.
+      setBudget(payload);
+
       try {
-        const now      = Date.now();
-        const existing = budget;
-        const payload: ProjectBudget = {
-          userId:          user.uid,
-          projectId,
-          kickoffEstimate: patch.kickoffEstimate  ?? existing?.kickoffEstimate  ?? 0,
-          categoryPlans:   patch.categoryPlans    ?? existing?.categoryPlans    ?? {},
-          notes:           patch.notes            ?? existing?.notes            ?? '',
-          lines:           patch.lines            ?? existing?.lines            ?? [],
-          updatedAtMs:     now,
-          createdAtMs:     existing?.createdAtMs  ?? now,
-        };
         await setDoc(doc(db, 'projectBudgets', projectId), payload);
-        setBudget(payload);
 
         const actualTotal = payload.lines.reduce((s, l) => s + l.amount, 0);
         logActivity({
@@ -540,7 +547,15 @@ export default function ProjectBudgetTool({
           metadata:    { lineCount: payload.lines.length, estimate: payload.kickoffEstimate, actual: actualTotal },
         });
       } catch (e) {
+        // Revert optimistic update on failure
+        setBudget(existing);
+        const msg = (e as Error)?.message ?? String(e);
+        const hint = msg.includes('permission') || msg.includes('PERMISSION_DENIED')
+          ? 'Firestore rules not deployed — paste firestore.rules into Firebase Console and publish.'
+          : msg;
+        setSaveError(`Save failed: ${hint}`);
         console.error('[ProjectBudgetTool] save error', e);
+        throw e;
       } finally {
         setSaving(false);
       }
@@ -609,8 +624,13 @@ export default function ProjectBudgetTool({
       ? lines.map((l) => (l.id === editingLine.id ? newLine : l))
       : [...lines, newLine];
 
-    await saveBudget({ lines: newLines });
-    closeForm();
+    try {
+      await saveBudget({ lines: newLines });
+      closeForm();   // only close on success
+    } catch {
+      // saveBudget already set saveError banner; show inline too
+      setFormError('Save failed — check the banner above for details.');
+    }
   };
 
   const handleDeleteLine = async (id: string) => {
@@ -702,6 +722,17 @@ export default function ProjectBudgetTool({
         categoryPlans={categoryPlans}
         lines={lines}
       />
+
+      {/* ── Save error banner — shown when Firestore write fails ── */}
+      {saveError && (
+        <div className="flex items-start gap-2 px-4 py-2.5 bg-rose-50 border-b border-rose-100">
+          <span className="text-rose-500 text-sm mt-0.5 shrink-0">⚠</span>
+          <p className="text-[11px] text-rose-700 leading-snug flex-1">{saveError}</p>
+          <button onClick={() => setSaveError('')} className="text-rose-400 hover:text-rose-600 shrink-0">
+            <X size={13} />
+          </button>
+        </div>
+      )}
 
       {/* ── Plan / Actuals views ── */}
       <AnimatePresence mode="wait">
