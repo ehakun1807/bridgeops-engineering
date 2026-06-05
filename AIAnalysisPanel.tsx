@@ -380,18 +380,23 @@ async function fetchToolContext(
         overhead: 'Overhead', other: 'Other',
       };
       const cats = ['labor', 'material', 'test_equipment', 'capex', 'overhead', 'other'];
+      const catPlans: Record<string, number> = typeof data.categoryPlans === 'object' && data.categoryPlans
+        ? data.categoryPlans as Record<string, number>
+        : {};
       const byCategory = cats
         .map((cat) => {
-          const catTotal = lines.filter((l: any) => l.category === cat)
+          const catTotal  = lines.filter((l: any) => l.category === cat)
             .reduce((s: number, l: any) => s + (Number(l.amount) || 0), 0);
+          const planned   = Number(catPlans[cat] || 0);
           return {
-            category: cat,
-            label: catLabels[cat] ?? cat,
-            actual: catTotal,
+            category:   cat,
+            label:      catLabels[cat] ?? cat,
+            actual:     catTotal,
+            planned:    planned > 0 ? planned : undefined,
             pctOfTotal: actualTotal > 0 ? (catTotal / actualTotal) * 100 : 0,
           };
         })
-        .filter((c) => c.actual > 0);
+        .filter((c) => c.actual > 0 || (c.planned ?? 0) > 0);
 
       ctx.budget = {
         kickoffEstimate: estimate,

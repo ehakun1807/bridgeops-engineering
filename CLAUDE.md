@@ -651,6 +651,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   4. **Currency / multi-currency support.** All amounts are USD today. If teams operate in multiple currencies, add a `currency` field per line + FX conversion for the summary card.
   5. **Carry-over** — SOP Radar Firestore index + rules deploy, ECO Pulse xlsx diff export, Control Plan PDF export, social proof quotes, MedTech language, end-of-beta cleanup.
 
+### 2026-06-05 — Budget Tracker: 4 fixes
+
+- **Bug fix: Add Entry modal not working.** Root cause: `ProjectBudgetTool` is rendered inside a `motion.div` with `y`-transform in `ProjectDeepDive`. Framer Motion transforms create a new stacking/containing block, which means `position: fixed` descendants are anchored to the transformed ancestor — not the viewport. The modal overlay and form appeared off-screen. Fix: render the modal via `ReactDOM.createPortal(…, document.body)` so it escapes the transform context entirely. Z-indexes bumped to `z-[9998]`/`z-[9999]` to clear all overlays.
+- **Budget Plan vs Actuals — two-view layout.** Tool now has two internal tabs in the header:
+  - **Budget Plan** tab: set total kickoff estimate + per-category planned allocation (Working Hours, Materials, Test & Equipment, CapEx, Overhead, Other) + notes. Live allocation progress bars + unallocated/over-total indicator.
+  - **Actuals** tab: cost line log (existing). Add Cost button only visible here.
+  - `categoryPlans: Partial<Record<CostCategory, number>>` added to `ProjectBudget` data model. `firestore.rules` validator updated to accept the new optional `categoryPlans` map field.
+- **Real-time P vs A card.** Always visible at top of both views. Three headline numbers (Planned / Actual / Variance with %). Per-category comparison bars: faint background track = planned, solid fill = actual (rose when over plan). Legend below. Automatically picks up categoryPlans from the Budget Plan and actual spend from Actuals.
+- **AI Analysis + Org Insights integration verified and enhanced:**
+  - `BudgetSignal` in `aiClient.ts` now includes `planned?: number` per category (populated from `categoryPlans`).
+  - `AIAnalysisPanel.tsx` budget fetch extended to read `data.categoryPlans` and forward per-category planned amounts alongside actuals.
+  - `api/ai-analyze.ts` `BudgetSignal` type updated + prompt section upgraded: now surfaces per-category plan vs actual with explicit variance %, flags any category >30% over plan by name, and distinguishes total-level vs category-level overruns.
+  - Org Insights path confirmed: AI Analysis results (including budget-derived risks) are stored in `projectIntelligence` via `persistAiAnalysis` in `ProjectDeepDive` → `orgInsightsClient` reads these → `/api/org-insights` surfaces cross-project cost patterns.
+- **`tsc --noEmit` clean.**
+
+- **Open follow-ups:**
+  1. **Deploy `firestore.rules`** — paste updated rules into Firebase Console (added `categoryPlans` field to `isValidProjectBudget`). Saves will 403 until deployed.
+  2. **Push to Vercel** (`git push`) so updated `/api/ai-analyze` prompt (per-category budget comparison) is live in prod.
+  3. **`project.budgetSummary` mirror** — write `{ estimate, actual, variancePct, lastUpdatedMs }` to project doc on save → "Budget ●" header pill.
+
 ### 2026-06-02
 - **Deliverable checklist font size tuning (`ProjectDeepDive.tsx`).** Two-pass adjustment:
   - Pass 1 (reduce by 4px): section headings ("Reference checklist", "Custom items") `15px → 11px`; item labels `17px → 13px`; notes textareas `15px → 11px`.

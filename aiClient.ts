@@ -159,8 +159,14 @@ export interface BudgetSignal {
   /** (actual - estimate) / estimate * 100 — positive = over budget */
   variancePct: number;
   lineCount: number;
-  /** Spend per category (only non-zero categories) */
-  byCategory: Array<{ category: string; label: string; actual: number; pctOfTotal: number }>;
+  /** Per-category breakdown — includes planned amount when a Budget Plan was set */
+  byCategory: Array<{
+    category: string;
+    label: string;
+    actual: number;
+    planned?: number;  // from categoryPlans — present when budget plan was set
+    pctOfTotal: number;
+  }>;
   lastUpdatedMs: number;
 }
 

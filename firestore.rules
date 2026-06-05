@@ -502,8 +502,8 @@ service cloud.firestore {
     }
 
     // Project Budget — one doc per project (doc ID = projectId).
-    // Stores the kickoff estimate + all cost lines. Always editable (update
-    // allowed). No composite index needed — read by doc ID directly.
+    // Stores the kickoff estimate + per-category plans + all cost lines.
+    // Always editable (update allowed). No composite index needed — read by doc ID.
     function isValidProjectBudget(data) {
       return data.keys().hasAll(['userId', 'projectId', 'lines', 'updatedAtMs']) &&
              data.userId == request.auth.uid &&
@@ -511,6 +511,7 @@ service cloud.firestore {
              data.lines is list && data.lines.size() <= 500 &&
              data.updatedAtMs is number &&
              (!('kickoffEstimate' in data) || data.kickoffEstimate is number) &&
+             (!('categoryPlans' in data)   || data.categoryPlans is map) &&
              (!('notes' in data)           || (data.notes is string && data.notes.size() <= 500)) &&
              (!('createdAtMs' in data)     || data.createdAtMs is number);
     }

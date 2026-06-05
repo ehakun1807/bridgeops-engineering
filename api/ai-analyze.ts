@@ -303,7 +303,13 @@ interface BudgetSignal {
   actualTotal: number;
   variancePct: number;
   lineCount: number;
-  byCategory: Array<{ category: string; label: string; actual: number; pctOfTotal: number }>;
+  byCategory: Array<{
+    category: string;
+    label: string;
+    actual: number;
+    planned?: number;  // set when a per-category Budget Plan exists
+    pctOfTotal: number;
+  }>;
   lastUpdatedMs: number;
 }
 
@@ -670,35 +676,43 @@ function buildPrompt(p: ProjectInput): string {
   }
 
   // -------------------------------------------------------------------
-  // Budget — estimate vs. actual spend, broken down by category.
-  // Flag cost overruns and categories burning faster than expected relative
-  // to the current gate stage. Surface as risks or topActions accordingly.
+  // Budget — planned vs. actual spend with per-category breakdown.
+  // Uses categoryPlans (if set) for granular plan vs actual comparison.
   // -------------------------------------------------------------------
   const bgt = tc?.budget;
   if (bgt && (bgt.kickoffEstimate > 0 || bgt.actualTotal > 0)) {
     lines.push('');
     lines.push('## Project Budget');
     if (bgt.kickoffEstimate > 0) {
-      lines.push(`Kickoff Estimate: $${bgt.kickoffEstimate.toLocaleString('en-US')}`);
+      lines.push(`Total Plan (Kickoff Estimate): $${bgt.kickoffEstimate.toLocaleString('en-US')}`);
     }
     lines.push(`Actual Spent to Date: $${bgt.actualTotal.toLocaleString('en-US')} (${bgt.lineCount} entries)`);
     if (bgt.kickoffEstimate > 0) {
       const sign = bgt.variancePct >= 0 ? '+' : '';
-      lines.push(`Variance vs Estimate: ${sign}${bgt.variancePct.toFixed(1)}% (${bgt.variancePct > 0 ? 'OVER budget' : 'under budget'})`);
+      lines.push(`Total Variance: ${sign}${bgt.variancePct.toFixed(1)}% (${bgt.variancePct > 0 ? 'OVER plan' : 'under plan'})`);
     }
     if (bgt.byCategory.length > 0) {
-      lines.push('Spend by Category:');
+      const hasCatPlans = bgt.byCategory.some((c) => (c.planned ?? 0) > 0);
+      lines.push(hasCatPlans ? 'Category Plan vs Actual:' : 'Actual Spend by Category:');
       for (const c of bgt.byCategory) {
-        lines.push(`  ${c.label}: $${c.actual.toLocaleString('en-US')} (${c.pctOfTotal.toFixed(0)}% of total spend)`);
+        if (hasCatPlans && (c.planned ?? 0) > 0) {
+          const catVar   = c.actual - (c.planned ?? 0);
+          const catVarPct = ((catVar / (c.planned ?? 1)) * 100).toFixed(0);
+          const over     = catVar > 0;
+          lines.push(`  ${c.label}: planned $${(c.planned ?? 0).toLocaleString('en-US')}, actual $${c.actual.toLocaleString('en-US')} (${over ? '+' : ''}${catVarPct}% ${over ? 'OVER' : 'under'})`);
+        } else {
+          lines.push(`  ${c.label}: $${c.actual.toLocaleString('en-US')} (${c.pctOfTotal.toFixed(0)}% of total spend)`);
+        }
       }
     }
     lines.push('');
     lines.push('Budget analysis instructions:');
-    lines.push('- If variance > +20%, flag as a HIGH severity risk: the project is materially over estimate.');
-    lines.push('- If variance > +10% near a gate, flag as topAction: review scope and re-baseline estimate.');
-    lines.push('- If Labor or CapEx dominate spend (>50%) relative to project stage, flag potential resource burn rate risk.');
-    lines.push('- If budget exists but no estimate was set (kickoffEstimate = 0), recommend setting one for baseline control.');
-    lines.push('- Do NOT flag as a risk if the project is under budget and variance is within 10%.');
+    lines.push('- If total variance > +20%, flag as a HIGH severity risk: the project is materially over plan.');
+    lines.push('- If total variance > +10% near a gate, flag as topAction: review scope and re-baseline estimate.');
+    lines.push('- If any individual category is >30% over its plan, flag that category specifically (e.g. "CapEx running 40% over — review tooling scope").');
+    lines.push('- If Labor or CapEx dominate actual spend (>50% of total) relative to project stage, flag potential resource burn rate risk.');
+    lines.push('- If budget exists but no estimate was set (kickoffEstimate = 0), recommend setting one in the Budget Plan tab.');
+    lines.push('- Do NOT flag as a risk if the project is under budget and all categories are within 10% of plan.');
   }
 
   // -------------------------------------------------------------------

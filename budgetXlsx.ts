@@ -27,12 +27,14 @@ export function budgetToWorkbook(budget: ProjectBudget, projectName: string): XL
   const variancePct = estimate > 0 ? (variance / estimate) * 100 : 0;
 
   const categories: CostCategory[] = ['labor', 'material', 'test_equipment', 'capex', 'overhead', 'other'];
+  const catPlans = budget.categoryPlans ?? {};
   const byCategory = categories
     .map((cat) => {
-      const total = lines.filter((l) => l.category === cat).reduce((s, l) => s + l.amount, 0);
-      return { label: COST_CATEGORY_LABELS[cat], total };
+      const planned = catPlans[cat] ?? 0;
+      const actual  = lines.filter((l) => l.category === cat).reduce((s, l) => s + l.amount, 0);
+      return { label: COST_CATEGORY_LABELS[cat], planned, actual };
     })
-    .filter((c) => c.total > 0);
+    .filter((c) => c.planned > 0 || c.actual > 0);
 
   // ── Summary sheet ──────────────────────────────────────────────────────────
   const summaryRows: (string | number)[][] = [
@@ -45,8 +47,9 @@ export function budgetToWorkbook(budget: ProjectBudget, projectName: string): XL
     ['Variance ($)',         variance],
     ['Variance (%)',         Number(variancePct.toFixed(1))],
     [],
-    ['Spend by Category', ''],
-    ...byCategory.map((c) => [c.label, c.total]),
+    ['Plan vs Actual by Category', '', ''],
+    ['Category', 'Planned ($)', 'Actual ($)', 'Variance ($)'],
+    ...byCategory.map((c) => [c.label, c.planned, c.actual, c.actual - c.planned]),
     [],
     ['Notes', budget.notes ?? ''],
   ];
