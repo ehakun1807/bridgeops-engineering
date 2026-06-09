@@ -43,14 +43,78 @@ export async function parseBomsFromXlsx(file: File): Promise<BomRow[]> {
     }
 
     // Check column count (should be exactly 2)
-    const headerRow = data[0];
-    if (!headerRow || headerRow.length !== 2) {
+    const firstRow = data[0];
+    if (!firstRow || firstRow.length < 2) {
       throw new Error('File must contain exactly 2 columns: Manufacturer and Part Number');
     }
 
-    // Process data rows (skip header)
+    // -----------------------------------------------------------------------
+    // Header detection.
+    //
+    // The original parser unconditionally skipped row 0 as a header. That
+    // silently dropped the first data row when users upload headerless files
+    // (just two columns of PN + manufacturer data, no label row).
+    //
+    // Now we check whether row 0 looks like a real header row:
+    //   - A header row contains recognisable label keywords in at least one
+    //     cell (e.g. "manufacturer", "part number", "mpn", "vendor").
+    //   - A data row does NOT contain those keywords.
+    // If row 0 is not a header we start processing from row 0 instead of 1.
+    // -----------------------------------------------------------------------
+    const HEADER_KEYWORDS = /manufacturer|part.?number|part.?no|mpn|vendor|mfr|mfg|supplier/i;
+    const row0Cells = firstRow.map(c => String(c ?? '').trim());
+    const hasHeaderRow = row0Cells.some(c => HEADER_KEYWORDS.test(c));
+    const dataStartIndex = hasHeaderRow ? 1 : 0;
+
+    // -----------------------------------------------------------------------
+    // Column mapping.
+    //
+    // The parser previously assumed col-0 = manufacturer, col-1 = part
+    // number. Users sometimes provide the file in the opposite order
+    // (part number first, manufacturer second). We detect the intended
+    // mapping by inspecting the header labels when present, or by heuristic
+    // when there is no header.
+    //
+    // Heuristic for headerless files: manufacturer names are typically
+    // alphabetic words (letters and spaces), while part numbers usually
+    // contain digits or hyphens. We check both columns on the first data row
+    // and swap if col-0 looks more like a part number than a manufacturer.
+    // -----------------------------------------------------------------------
+    let mfrCol = 0;
+    let pnCol  = 1;
+
+    if (hasHeaderRow) {
+      // Use header labels to determine column order.
+      const MFR_LABEL  = /manufacturer|mfr|mfg|vendor|supplier/i;
+      const PN_LABEL   = /part.?number|part.?no|mpn/i;
+      const col0Label  = row0Cells[0];
+      const col1Label  = row0Cells[1];
+      if (PN_LABEL.test(col0Label) && MFR_LABEL.test(col1Label)) {
+        // e.g. "Part Number" | "Manufacturer" — swap
+        mfrCol = 1;
+        pnCol  = 0;
+      }
+      // In all other cases keep col-0 = mfr, col-1 = pn (the original
+      // assumption). This covers: mfr|pn (correct), ambiguous labels,
+      // and single-label rows.
+    } else {
+      // Headerless: inspect the first data row for clues.
+      // A value that is purely alphabetic with spaces is more likely a
+      // manufacturer name. A value with embedded digits / hyphens is more
+      // likely a part number.
+      const LOOKS_LIKE_PN = /\d|[-\/_.]/;
+      const col0Val = String(data[dataStartIndex]?.[0] ?? '');
+      const col1Val = String(data[dataStartIndex]?.[1] ?? '');
+      if (LOOKS_LIKE_PN.test(col0Val) && !LOOKS_LIKE_PN.test(col1Val)) {
+        // col-0 looks like a PN, col-1 looks like a manufacturer name
+        mfrCol = 1;
+        pnCol  = 0;
+      }
+    }
+
+    // Process data rows
     const bomRows: BomRow[] = [];
-    for (let i = 1; i < data.length; i++) {
+    for (let i = dataStartIndex; i < data.length; i++) {
       const row = data[i];
 
       // Skip empty rows
@@ -58,8 +122,8 @@ export async function parseBomsFromXlsx(file: File): Promise<BomRow[]> {
         continue;
       }
 
-      const manufacturer = String(row[0] || '').trim().toLowerCase();
-      const partNumber = String(row[1] || '').trim().toLowerCase();
+      const manufacturer = String(row[mfrCol] || '').trim().toLowerCase();
+      const partNumber   = String(row[pnCol]  || '').trim().toLowerCase();
 
       // Skip rows where either field is empty after trimming
       if (!manufacturer || !partNumber) {
@@ -69,7 +133,7 @@ export async function parseBomsFromXlsx(file: File): Promise<BomRow[]> {
       bomRows.push({
         manufacturer,
         partNumber,
-        rowIndex: i + 1 // Convert to 1-indexed (row 1 is header, so first data row is 2)
+        rowIndex: i + 1 // 1-indexed for display
       });
     }
 

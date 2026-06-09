@@ -693,3 +693,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   2. HTML version with Tabler icons, humor subtitles ("Smartsheet — Excel with a monthly fee", "nobody knows who built it"), animated data stream SVG, real-time analytics panel (bar chart + donut), pulsing pill dots, gate bar, scan line, circuit corner decorations.
   3. Final version incorporated the sci-fi dashboard aesthetic from the app screenshots — connected data streams panel, real-time analytics, CDR-highlighted gate bar, "Live" badge. Background lightened from near-black (`#070D1A`) to mid-navy (`#142035`); all fonts bumped 1–2px.
   - Exported to JPG using Playwright (headless Chromium) at 680×1079px, quality 95. **Do not commit to the repo** — standalone marketing asset, keep outside the project folder.
+
+### 2026-06-09
+- **LinkedIn post: "Two Schools of Hardware Program Intelligence."** Drafted and refined a LinkedIn post contrasting the integration-first vs. human-first + AI approaches to hardware program tooling. Key framing: PM is the only person who holds the full cross-discipline view — no system pulls that picture together, a person builds it. Final grammar fix: Oxford comma before "and manufacturing." Post saved outside the repo.
+- **LinkedIn infographic: Two Schools visual (`two-schools-clean.png`).** Iterated on an SVG visualization (V1–V4) for the LinkedIn post, then switched to working with an AI-generated image the user produced externally. Four SVG iterations:
+  - V1: Dark background (#0f172a), formal layout, red dashed lines left / blue arrows right.
+  - V2: White cards, pill-shaped tags, soft red/blue palette, less structured.
+  - V3: Added illustrated school buildings to both panels.
+  - V4: Replaced abstract blocks with drawn icons — server stack (ERP), gear (PLM), kanban board (Jira), envelope with unread badge (Email) on the left; shield (PFMEA), layered sheets (BOM), balance scale (Decisions), lightbulb (Lessons) on the right.
+- **Image editing: Gemini logo removal (`two-schools-clean.png`).** User provided an AI-generated PNG (1207×864px). Removed three Gemini-branded elements using Python + Pillow:
+  1. **Large brain icon** (center-top of right panel, ~x=800–1020, y=315–525): reconstructed background via per-column bilinear gradient interpolation from rows above/below + horizontal edge sampling, then 3-pass Gaussian blur (radius 3).
+  2. **Small brain badge** (dark bar, ~x=663–784, y=690–776): filled with bar background color sampled from the right of the badge + noise + blur.
+  3. **Gemini sparkle logo** (bottom-right corner, purple circle ~x=1098–1207, y=758–862): filled with per-row background color sampled from the left edge + noise + 4-pass Gaussian blur.
+  - **Gotcha:** `result.save()` to the mounted folder path requires the VM path (`/sessions/.../mnt/bridgeops-engineering-main/`) not a host path — earlier saves landed in `/mnt/outputs/` instead. Verified by checking `ls` before presenting the file.
+  - Final file saved as `two-schools-clean.png` in the project root (not committed — marketing asset).
