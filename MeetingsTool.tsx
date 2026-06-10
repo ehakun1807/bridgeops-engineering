@@ -28,7 +28,11 @@ import {
   Users,
   Building2,
   ExternalLink as ExternalLinkIcon,
-  Download
+  Download,
+  Mail,
+  ChevronDown,
+  ChevronUp,
+  Wand2
 } from 'lucide-react';
 import { downloadMeetingsPdf } from './utils/meetingsPdf.ts';
 import { db, auth } from './firebase.ts';
@@ -457,6 +461,148 @@ const MeetingList: React.FC<MeetingListProps> = ({
 };
 
 // ---------------------------------------------------------------------------
+// Email parser — client-side heuristic extraction from pasted email text.
+// No API call needed; works on raw copy-paste from any email client.
+// ---------------------------------------------------------------------------
+
+interface ParsedEmail {
+  date?: string;       // yyyy-mm-dd if found
+  title?: string;      // Subject line
+  attendees?: string;  // From/To/CC lines joined
+  notes?: string;      // Body (minus action-item lines)
+  actionItems?: string;// Lines that look like action items
+}
+
+function parseEmailText(raw: string): ParsedEmail {
+  const lines = raw.split('\n').map((l) => l.trimEnd());
+  const result: ParsedEmail = {};
+
+  // ---- Header extraction (From / To / CC / Subject / Date) ----------------
+  const headerLines: string[] = [];
+  const bodyLines: string[] = [];
+  let pastHeader = false;
+  let inForwardedHeader = false;
+
+  for (const line of lines) {
+    // Forwarded / reply header block markers
+    if (/^-{3,}.*forwarded|^-{3,}.*original message|^>{1,2}\s*from:/i.test(line)) {
+      inForwardedHeader = true;
+    }
+    // Blank line after headers = body starts
+    if (!pastHeader && line.trim() === '') {
+      pastHeader = true;
+      continue;
+    }
+    if (!pastHeader || inForwardedHeader) {
+      headerLines.push(line);
+      if (inForwardedHeader && line.trim() === '') inForwardedHeader = false;
+    } else {
+      bodyLines.push(line);
+    }
+  }
+
+  // Parse header fields
+  const allHeaderText = headerLines.join('\n');
+
+  // Subject → title
+  const subjectMatch = allHeaderText.match(/^Subject:\s*(.+)/mi);
+  if (subjectMatch) {
+    // Strip Re: / Fwd: prefixes
+    result.title = subjectMatch[1].replace(/^(Re|Fwd|Fw|RE|FW|FWD):\s*/gi, '').trim();
+  }
+
+  // Date
+  const dateMatch = allHeaderText.match(/^Date:\s*(.+)/mi);
+  if (dateMatch) {
+    const parsed = new Date(dateMatch[1].trim());
+    if (!isNaN(parsed.getTime())) {
+      const yyyy = parsed.getFullYear();
+      const mm = String(parsed.getMonth() + 1).padStart(2, '0');
+      const dd = String(parsed.getDate()).padStart(2, '0');
+      result.date = `${yyyy}-${mm}-${dd}`;
+    }
+  }
+
+  // If no Date header, scan for date-like strings in the first 5 body lines
+  if (!result.date) {
+    const datePatterns = [
+      /\b(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\b/,
+      /\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},?\s+\d{4}\b/i,
+    ];
+    const searchLines = bodyLines.slice(0, 5).join(' ');
+    for (const pat of datePatterns) {
+      const m = searchLines.match(pat);
+      if (m) {
+        const parsed = new Date(m[0]);
+        if (!isNaN(parsed.getTime())) {
+          result.date = `${parsed.getFullYear()}-${String(parsed.getMonth()+1).padStart(2,'0')}-${String(parsed.getDate()).padStart(2,'0')}`;
+          break;
+        }
+      }
+    }
+  }
+
+  // Attendees — From + To + CC
+  const attendeeParts: string[] = [];
+  const nameFromField = (field: string): string => {
+    // Extract "Display Name" from "Display Name <email>" or just "email@…"
+    const entries = field.split(/[,;]/).map((e) => e.trim());
+    return entries.map((e) => {
+      const m = e.match(/^["']?([^"'<@]+?)["']?\s*</);
+      if (m) return m[1].trim();
+      const atM = e.match(/^([^@\s]+)@/);
+      return atM ? atM[1] : e.replace(/<[^>]+>/g, '').trim();
+    }).filter(Boolean).join(', ');
+  };
+
+  ['From', 'To', 'CC', 'Cc'].forEach((field) => {
+    const m = allHeaderText.match(new RegExp(`^${field}:\\s*(.+)`, 'mi'));
+    if (m) {
+      const names = nameFromField(m[1]);
+      if (names) attendeeParts.push(names);
+    }
+  });
+  if (attendeeParts.length) result.attendees = attendeeParts.join(', ');
+
+  // ---- Body: split into notes vs action items --------------------------
+  // Action-item lines: start with action:, todo:, - [ ], checkbox symbols,
+  // "owner —", or numbered "N." followed by a capital
+  const actionItemRegex =
+    /^(?:[-*•]\s*\[[ x]\]|action\s*item[s]?:?|todo:?|task:?|ai:?|\d+\.\s+(?=[A-Z]))/i;
+  const actionItemLineRegex =
+    /^\s*(?:[-•*]\s*\[[ x]\]|action\s*:?|todo\s*:?|@\w+\s*[-—]|[A-Z][a-z]+\s+[-—])/;
+
+  const noteLines: string[] = [];
+  const actionLines: string[] = [];
+  let inActionBlock = false;
+
+  for (const line of bodyLines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      if (!inActionBlock) noteLines.push('');
+      continue;
+    }
+    if (actionItemRegex.test(trimmed) || inActionBlock && /^\s{2,}/.test(line)) {
+      inActionBlock = true;
+      actionLines.push(trimmed.replace(/^action\s*item[s]?:?\s*/i, '').replace(/^todo:\s*/i, ''));
+    } else if (actionItemLineRegex.test(trimmed)) {
+      actionLines.push(trimmed);
+    } else {
+      inActionBlock = false;
+      noteLines.push(line);
+    }
+  }
+
+  const notesText = noteLines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  const actionsText = actionLines.join('\n').trim();
+
+  if (notesText) result.notes = notesText.slice(0, 1000);
+  if (actionsText) result.actionItems = actionsText.slice(0, 1000);
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // Form view
 // ---------------------------------------------------------------------------
 
@@ -473,6 +619,42 @@ const MeetingForm: React.FC<MeetingFormProps> = ({ initial, onCancel, onSave, re
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+
+  // Email import state
+  const [importOpen, setImportOpen] = useState(false);
+  const [emailPaste, setEmailPaste] = useState('');
+  const [importApplied, setImportApplied] = useState(false);
+
+  const handleImportEmail = () => {
+    if (!emailPaste.trim()) return;
+    const parsed = parseEmailText(emailPaste);
+    setDraft((prev) => ({
+      ...prev,
+      ...(parsed.date ? { dateMs: msFromDateInputValue(parsed.date) } : {}),
+      ...(parsed.title && !prev.title ? { title: parsed.title.slice(0, TITLE_MAX) } : {}),
+      ...(parsed.attendees ? {
+        attendees: (prev.attendees
+          ? `${prev.attendees}, ${parsed.attendees}`
+          : parsed.attendees
+        ).slice(0, ATTENDEES_MAX)
+      } : {}),
+      ...(parsed.notes ? {
+        notes: (prev.notes
+          ? `${prev.notes}\n\n${parsed.notes}`
+          : parsed.notes
+        ).slice(0, NOTES_MAX)
+      } : {}),
+      ...(parsed.actionItems ? {
+        actionItems: (prev.actionItems
+          ? `${prev.actionItems}\n${parsed.actionItems}`
+          : parsed.actionItems
+        ).slice(0, ACTIONS_MAX)
+      } : {}),
+    }));
+    setImportApplied(true);
+    setEmailPaste('');
+    setTimeout(() => setImportOpen(false), 400);
+  };
 
   const isNew = !initial.id;
 
@@ -507,6 +689,65 @@ const MeetingForm: React.FC<MeetingFormProps> = ({ initial, onCancel, onSave, re
           {isNew ? 'New meeting' : 'Edit meeting'}
         </span>
       </div>
+
+      {/* Import from Email */}
+      {!readOnly && (
+        <div className="border border-slate-200 rounded-sm">
+          <button
+            type="button"
+            onClick={() => { setImportOpen(!importOpen); setImportApplied(false); }}
+            className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-slate-50 transition-colors"
+          >
+            <span className="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-slate-500">
+              <Mail size={13} className="text-slate-400" />
+              Import from Email
+              {importApplied && (
+                <span className="text-[9px] bg-emerald-100 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 font-black uppercase tracking-widest">
+                  Applied ✓
+                </span>
+              )}
+            </span>
+            {importOpen ? <ChevronUp size={13} className="text-slate-400" /> : <ChevronDown size={13} className="text-slate-400" />}
+          </button>
+          <AnimatePresence>
+            {importOpen && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.18 }}
+                className="overflow-hidden"
+              >
+                <div className="px-4 pb-4 pt-1 space-y-3 border-t border-slate-100">
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Paste a meeting invite, email thread, or calendar summary. Fields will be extracted automatically — you can edit anything after.
+                  </p>
+                  <textarea
+                    value={emailPaste}
+                    onChange={(e) => setEmailPaste(e.target.value)}
+                    rows={8}
+                    placeholder={`Paste email here. Examples of what gets extracted:\n\nSubject: PDR Review with Mechanical Team\nDate: Mon, 9 Jun 2026 14:00\nFrom: A. Singh <asingh@…>\nTo: J. Park <jpark@…>, E. Hakun <eran@…>\n\nMeeting notes:\n- Reviewed gating criteria for CDR…\n\nAction items:\n- A. Singh — send updated drawings by Friday\n- J. Park — confirm supplier lead times`}
+                    className="w-full border border-slate-200 bg-slate-50 px-3 py-2.5 text-[12px] font-mono text-slate-700 focus:border-slate-400 focus:outline-none resize-y leading-relaxed"
+                  />
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-[10px] text-slate-400 italic">
+                      Extracts: date, subject → title, From/To/CC → attendees, body → notes, action-item lines → action items
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleImportEmail}
+                      disabled={!emailPaste.trim()}
+                      className="flex items-center gap-1.5 px-4 py-2 text-[10px] font-black uppercase tracking-widest bg-slate-900 text-white hover:bg-slate-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <Wand2 size={12} /> Extract & Fill
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
 
       {/* Date + Type */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

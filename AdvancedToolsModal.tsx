@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { X, Cpu, ArrowLeft, Receipt, FileSearch, Tag, ShieldCheck, Truck } from 'lucide-react';
+import { X, Cpu, ArrowLeft, Receipt, FileSearch, ShieldCheck, Truck } from 'lucide-react';
 import BOMAnalyzerTool from './BOMAnalyzerTool.tsx';
 import QuoteCompareTool from './QuoteCompareTool.tsx';
 import DocGuardTool from './DocGuardTool.tsx';
-import EntityTagsTool from './EntityTagsTool.tsx';
 import CompanyGuidelinesTool from './CompanyGuidelinesTool.tsx';
 import SupplierTrackerPage from './SupplierTrackerPage.tsx';
 
@@ -41,9 +40,7 @@ const AdvancedToolsModal: React.FC<AdvancedToolsModalProps> = ({ isOpen, onClose
                   ? 'Quote Compare'
                   : selectedTool === 'doc-guard'
                     ? 'Doc Guard'
-                    : selectedTool === 'entity-tags'
-                      ? 'Entity Tags'
-                      : selectedTool === 'company-guidelines'
+                    : selectedTool === 'company-guidelines'
                         ? 'SOP Radar'
                         : selectedTool === 'supplier-tracker'
                           ? 'Supplier Tracker'
@@ -115,25 +112,6 @@ const AdvancedToolsModal: React.FC<AdvancedToolsModalProps> = ({ isOpen, onClose
             </div>
 
             <div
-              onClick={() => setSelectedTool('entity-tags')}
-              style={{ padding: '24px', border: '2px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', marginBottom: '12px', display: 'flex', gap: '16px', alignItems: 'center', transition: 'all 0.2s', backgroundColor: '#fafafa' }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = '#0f172a';
-                e.currentTarget.style.backgroundColor = '#f0f0f0';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = '#e2e8f0';
-                e.currentTarget.style.backgroundColor = '#fafafa';
-              }}
-            >
-              <Tag size={48} color="#64748b" />
-              <div>
-                <h3 style={{ fontSize: '14px', fontWeight: 900, textTransform: 'uppercase', margin: 0, marginBottom: '4px', color: '#0f172a' }}>Entity Tags</h3>
-                <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>Normalize supplier and component names across projects for smarter Org Insights</p>
-              </div>
-            </div>
-
-            <div
               onClick={() => setSelectedTool('company-guidelines')}
               style={{ padding: '24px', border: '2px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', marginBottom: '12px', display: 'flex', gap: '16px', alignItems: 'center', transition: 'all 0.2s', backgroundColor: '#fafafa' }}
               onMouseEnter={(e) => {
@@ -177,8 +155,6 @@ const AdvancedToolsModal: React.FC<AdvancedToolsModalProps> = ({ isOpen, onClose
           <QuoteCompareTool />
         ) : selectedTool === 'doc-guard' ? (
           <DocGuardTool />
-        ) : selectedTool === 'entity-tags' ? (
-          <EntityTagsTool />
         ) : selectedTool === 'company-guidelines' ? (
           <CompanyGuidelinesTool />
         ) : selectedTool === 'supplier-tracker' ? (
