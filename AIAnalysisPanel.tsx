@@ -28,6 +28,7 @@ import {
   getDocs,
   getDoc,
   doc,
+  documentId,
   Firestore
 } from 'firebase/firestore';
 import {
@@ -44,7 +45,8 @@ import {
   ControlPlanSignal,
   ConnectedProjectContext,
   CompanyGuidelineSignal,
-  BudgetSignal
+  BudgetSignal,
+  SupplierSignal
 } from './aiClient';
 import { loadOrgGuidelines } from './orgGuidelinesClient.ts';
 import type { ProjectStub } from './projectConnectionsClient.ts';
@@ -64,6 +66,8 @@ interface AIAnalysisPanelProps {
   connectedProjectIds?: string[];
   /** All user projects (for name lookup on connected projects). */
   allUserProjects?: ProjectStub[];
+  /** Supplier IDs linked to this project via the General Info picker. */
+  linkedSupplierIds?: string[];
 }
 
 const IMPACT_STYLES: Record<'high' | 'medium' | 'low', string> = {
@@ -94,7 +98,8 @@ async function fetchToolContext(
   projectId: string,
   taktSummary?: TaktSignal,
   connectedProjectIds?: string[],
-  projectNameMap?: Map<string, string>
+  projectNameMap?: Map<string, string>,
+  linkedSupplierIds?: string[]
 ): Promise<{ toolContext: ToolContext; connectedProjectsContext?: ConnectedProjectContext[] }> {
   const ctx: ToolContext = {};
 
@@ -411,6 +416,51 @@ async function fetchToolContext(
     console.warn('[AIAnalysisPanel] budget fetch failed', e);
   }
 
+  // Linked suppliers — fetch from org-level Suppliers collection using the
+  // project's linkedSupplierIds array. IN query on documentId requires no
+  // composite index (single-field index on __name__ auto-created by Firestore).
+  if (linkedSupplierIds && linkedSupplierIds.length > 0) {
+    try {
+      const chunks: string[][] = [];
+      for (let i = 0; i < linkedSupplierIds.length; i += 10) {
+        chunks.push(linkedSupplierIds.slice(i, i + 10));
+      }
+      const allDocs: any[] = [];
+      for (const chunk of chunks) {
+        const snap = await getDocs(
+          query(collection(db, 'suppliers'), where(documentId(), 'in', chunk))
+        );
+        snap.docs.forEach((d) => allDocs.push(d.data()));
+      }
+      if (allDocs.length > 0) {
+        const SCORECARD_LABELS: Record<string, string> = {
+          qms: 'QMS', technical: 'Technical', financial: 'Financial',
+          delivery: 'Delivery', pricing: 'Pricing', responsiveness: 'Responsiveness',
+          compliance: 'Compliance', capacity: 'Capacity', innovation: 'Innovation',
+          geographic: 'Geographic Risk'
+        };
+        ctx.suppliers = allDocs.map((s: any): SupplierSignal => {
+          const scorecard: Record<string, number> = s.scorecard ?? {};
+          const lowScoreParams = Object.entries(scorecard)
+            .filter(([, v]) => (v as number) > 0 && (v as number) < 6)
+            .map(([k, v]) => ({ label: SCORECARD_LABELS[k] ?? k, score: v as number }))
+            .sort((a, b) => a.score - b.score)
+            .slice(0, 3);
+          return {
+            name:           String(s.name || 'Unknown'),
+            category:       String(s.category || 'other'),
+            status:         String(s.status || 'candidate'),
+            overallScore:   Number(s.overallScore || 0),
+            location:       s.location ? String(s.location).slice(0, 80) : undefined,
+            lowScoreParams: lowScoreParams.length > 0 ? lowScoreParams : undefined,
+          };
+        });
+      }
+    } catch (e) {
+      console.warn('[AIAnalysisPanel] suppliers fetch failed', e);
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Cross-project signals — fetch key tool data for each connected project.
   // Kept lightweight: up to 2 PFMEAs + 1 latest BOM + up to 5 active decisions
@@ -574,7 +624,8 @@ const AIAnalysisPanel: React.FC<AIAnalysisPanelProps> = ({
   db,
   taktSummary,
   connectedProjectIds,
-  allUserProjects
+  allUserProjects,
+  linkedSupplierIds
 }) => {
   const [analysis, setAnalysis] = useState<AIAnalysis | null>(cached ?? null);
   const [loading, setLoading] = useState(false);
@@ -595,7 +646,8 @@ const AIAnalysisPanel: React.FC<AIAnalysisPanelProps> = ({
         projectId,
         taktSummary,
         connectedProjectIds,
-        projectNameMap
+        projectNameMap,
+        linkedSupplierIds
       );
       const result = await analyzeProject({ ...projectInput, toolContext, connectedProjectsContext });
       setAnalysis(result);

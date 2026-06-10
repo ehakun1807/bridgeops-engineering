@@ -313,6 +313,17 @@ interface BudgetSignal {
   lastUpdatedMs: number;
 }
 
+// Mirrors aiClient.ts SupplierSignal — inlined per Vercel bundler .ts gotcha.
+interface SupplierSignal {
+  name: string;
+  category: string;
+  status: string;
+  overallScore: number;
+  location?: string;
+  lowScoreParams?: Array<{ label: string; score: number }>;
+  lastEventSummary?: string;
+}
+
 interface ToolContext {
   takt?: TaktSignal;
   pfmeas?: PFMEASignal[];
@@ -323,6 +334,7 @@ interface ToolContext {
   controlPlan?: ControlPlanSignal;
   companyGuidelines?: CompanyGuidelineSignal[];
   budget?: BudgetSignal;
+  suppliers?: SupplierSignal[];
 }
 
 // Mirrors aiClient.ts ConnectedProjectContext — inlined per Vercel bundler
@@ -464,7 +476,7 @@ function buildPrompt(p: ProjectInput): string {
   // These are first-class inputs, not just score hints.
   // -------------------------------------------------------------------
   const tc = p.toolContext;
-  const hasToolContext = tc && (tc.takt || tc.pfmeas?.length || tc.recentMeetings?.length || tc.latestBom || tc.decisions?.length || tc.companyGuidelines?.length);
+  const hasToolContext = tc && (tc.takt || tc.pfmeas?.length || tc.recentMeetings?.length || tc.latestBom || tc.decisions?.length || tc.companyGuidelines?.length || tc.suppliers?.length);
 
   if (hasToolContext) {
     lines.push('');
@@ -713,6 +725,46 @@ function buildPrompt(p: ProjectInput): string {
     lines.push('- If Labor or CapEx dominate actual spend (>50% of total) relative to project stage, flag potential resource burn rate risk.');
     lines.push('- If budget exists but no estimate was set (kickoffEstimate = 0), recommend setting one in the Budget Plan tab.');
     lines.push('- Do NOT flag as a risk if the project is under budget and all categories are within 10% of plan.');
+  }
+
+  // -------------------------------------------------------------------
+  // Linked Suppliers — suppliers explicitly linked to this project.
+  // Sourced from the Supplier Tracker org-level tool and linked via
+  // the project's General Info tab. Surface supplier-readiness risks.
+  // -------------------------------------------------------------------
+  const suppliers = tc?.suppliers;
+  if (suppliers && suppliers.length > 0) {
+    lines.push('');
+    lines.push('## Linked Suppliers');
+    const catLabels: Record<string, string> = {
+      ems: 'EMS / CM', component: 'Component', material: 'Raw Material',
+      tooling: 'Tooling', testing_lab: 'Testing Lab', logistics: 'Logistics', other: 'Other'
+    };
+    const statusLabels: Record<string, string> = {
+      candidate: 'Candidate', under_evaluation: 'Under Evaluation',
+      qualified: 'Qualified', disqualified: 'Disqualified', on_hold: 'On Hold'
+    };
+    for (const s of suppliers) {
+      const cat    = catLabels[s.category] ?? s.category;
+      const status = statusLabels[s.status] ?? s.status;
+      const score  = s.overallScore > 0 ? ` | Score: ${s.overallScore.toFixed(1)}/10` : '';
+      const loc    = s.location ? ` | Location: ${s.location}` : '';
+      lines.push(`- ${s.name} [${cat}] Status: ${status}${score}${loc}`);
+      if (s.lowScoreParams && s.lowScoreParams.length > 0) {
+        const low = s.lowScoreParams.map((p) => `${p.label}: ${p.score}/10`).join(', ');
+        lines.push(`  Weak scorecard areas: ${low}`);
+      }
+      if (s.lastEventSummary) {
+        lines.push(`  Last activity: ${s.lastEventSummary}`);
+      }
+    }
+    lines.push('');
+    lines.push('Supplier analysis instructions:');
+    lines.push('- Suppliers with status "Candidate" or "Under Evaluation" approaching a gate (CDR, PRR, MP) = HIGH risk if not yet qualified.');
+    lines.push('- Suppliers with overall score < 6 or any critical scorecard param (QMS, Compliance, Financial) < 5 = supplier-readiness risk.');
+    lines.push('- "Disqualified" or "On Hold" suppliers = investigate if there is an approved alternate or gap in the supply chain.');
+    lines.push('- If no qualified EMS/CM is linked but the project is past PDR, flag as a topAction.');
+    lines.push('- Do NOT flag qualified suppliers with score ≥ 7 and no weak areas as risks.');
   }
 
   // -------------------------------------------------------------------

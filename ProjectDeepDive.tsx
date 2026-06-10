@@ -52,11 +52,12 @@ import {
   Search,
   Unlink,
   Lightbulb,
-  Wallet
+  Wallet,
+  Truck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db, auth } from './firebase.ts';
-import { doc, updateDoc, setDoc, getDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { doc, updateDoc, setDoc, getDoc, serverTimestamp, Timestamp, collection, getDocs, query as fsQuery, where } from 'firebase/firestore';
 import {
   RAMP_GROUPS,
   RampSubItem,
@@ -103,6 +104,7 @@ import {
   removeConnection,
   removeBidirectionalConnection
 } from './projectConnectionsClient.ts';
+import type { Supplier as OrgSupplier } from './SupplierTrackerPage.tsx';
 
 export type InfoStatus = 'TBD' | 'In Process' | 'Completed' | 'Cancelled';
 
@@ -287,6 +289,9 @@ export interface DeepDiveProject {
   // collection on every save/delete so Dashboard + header can show a chip
   // without an extra query. Updated on every mutation in DecisionLedgerTool.
   decisionSummary?: ProjectDecisionSummary;
+  // IDs of org-level suppliers linked to this project (via General Info picker).
+  // Stored as a flat array on the project doc — suitable for single-user scale.
+  linkedSupplierIds?: string[];
 }
 
 export interface ProjectTaktSummary {
@@ -721,6 +726,8 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
   const [infoStatus, setInfoStatus] = useState<InfoStatus>(project.infoStatus || 'TBD');
   const [generalInfo, setGeneralInfo] = useState<string>(project.generalInfo || '');
   const [assignees, setAssignees] = useState<string>(project.assignees || '');
+  const [linkedSupplierIds, setLinkedSupplierIds] = useState<string[]>(project.linkedSupplierIds || []);
+  const [allOrgSuppliers, setAllOrgSuppliers] = useState<OrgSupplier[]>([]);
   const [currentGate, setCurrentGate] = useState<ProductGate | ''>(
     migratedProject.currentGate || ''
   );
@@ -803,6 +810,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
     setInfoStatus(project.infoStatus || 'TBD');
     setGeneralInfo(project.generalInfo || '');
     setAssignees(project.assignees || '');
+    setLinkedSupplierIds(project.linkedSupplierIds || []);
     setCurrentGate(mp.currentGate || '');
     setGateTargets(mp.gateTargets || {});
     setAttachments(project.attachments || []);
@@ -828,6 +836,21 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
     }).catch(() => { if (!cancelled) setConnectionsLoading(false); });
     return () => { cancelled = true; };
   }, [project.id]);
+
+  // Load org-level suppliers once (on mount / user change) for the General Info picker.
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    let cancelled = false;
+    getDocs(fsQuery(collection(db, 'suppliers'), where('userId', '==', uid))).then((snap) => {
+      if (cancelled) return;
+      const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() } as OrgSupplier));
+      rows.sort((a, b) => a.name.localeCompare(b.name));
+      setAllOrgSuppliers(rows);
+    }).catch(() => { /* non-fatal */ });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Load last-analyzed timestamp from projectIntelligence on project change.
   useEffect(() => {
@@ -1476,6 +1499,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
         infoStatus,
         generalInfo,
         assignees,
+        linkedSupplierIds,
         currentGate: currentGate || null,
         gateTargets,
         attachments,
@@ -1527,6 +1551,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
         infoStatus,
         generalInfo,
         assignees,
+        linkedSupplierIds,
         currentGate: currentGate || null,
         gateTargets,
         attachments,
@@ -1629,6 +1654,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
         infoStatus,
         generalInfo,
         assignees,
+        linkedSupplierIds,
         currentGate: currentGate || undefined,
         gateTargets,
         attachments,
@@ -2103,6 +2129,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
               taktSummary={project.taktSummary}
               connectedProjectIds={connectedProjectIds}
               allUserProjects={allUserProjects}
+              linkedSupplierIds={linkedSupplierIds}
             />
           </motion.div>
         ) : activeGroupId === STUDIES_TAB_ID ? (
@@ -2309,6 +2336,9 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
               onAddConnection={handleAddConnection}
               onRemoveConnection={handleRemoveConnection}
               currentProjectId={project.id}
+              allOrgSuppliers={allOrgSuppliers}
+              linkedSupplierIds={linkedSupplierIds}
+              onChangeLinkedSuppliers={setLinkedSupplierIds}
             />
           </motion.div>
         ) : (
@@ -3925,6 +3955,10 @@ const GeneralInfoPanel: React.FC<{
   onPickerDirection: (d: 'one-way' | 'both-ways') => void;
   onAddConnection: () => void;
   onRemoveConnection: (conn: ProjectConnection) => void;
+  // Supplier picker
+  allOrgSuppliers: OrgSupplier[];
+  linkedSupplierIds: string[];
+  onChangeLinkedSuppliers: (ids: string[]) => void;
 }> = ({
   projectName,
   productType,
@@ -3970,7 +4004,10 @@ const GeneralInfoPanel: React.FC<{
   onPickerSelect,
   onPickerDirection,
   onAddConnection,
-  onRemoveConnection
+  onRemoveConnection,
+  allOrgSuppliers,
+  linkedSupplierIds,
+  onChangeLinkedSuppliers
 }) => {
   const template = getTemplate(templateId);
   const scopeIsFull = enabledCount === totalCount;
@@ -4287,6 +4324,73 @@ const GeneralInfoPanel: React.FC<{
               {assignees.length}/{ASSIGNEES_MAX}
             </span>
           </div>
+        </div>
+
+        {/* Linked Suppliers */}
+        <div className="border-t border-slate-100 pt-6">
+          <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-2 flex items-center gap-2">
+            <Truck size={12} />
+            Linked Suppliers
+            {linkedSupplierIds.length > 0 && (
+              <span className="text-slate-400">· {linkedSupplierIds.length} selected</span>
+            )}
+          </label>
+          {allOrgSuppliers.length === 0 ? (
+            <p className="text-[11px] text-slate-400 italic">
+              No suppliers in Supplier Tracker yet. Add them via Tools → Supplier Tracker.
+            </p>
+          ) : (
+            <div className="bg-slate-50 border border-slate-200 rounded-sm p-3 space-y-1.5 max-h-48 overflow-y-auto">
+              {allOrgSuppliers.map((s) => {
+                const checked = linkedSupplierIds.includes(s.id);
+                const STATUS_COLOR: Record<string, string> = {
+                  qualified: 'text-green-700 bg-green-50 border-green-200',
+                  under_evaluation: 'text-amber-700 bg-amber-50 border-amber-200',
+                  candidate: 'text-slate-600 bg-slate-100 border-slate-200',
+                  disqualified: 'text-red-600 bg-red-50 border-red-200',
+                  on_hold: 'text-orange-600 bg-orange-50 border-orange-200'
+                };
+                const statusLabel: Record<string, string> = {
+                  qualified: 'Qualified', under_evaluation: 'Evaluating',
+                  candidate: 'Candidate', disqualified: 'Disqualified', on_hold: 'On Hold'
+                };
+                return (
+                  <label
+                    key={s.id}
+                    className={`flex items-center gap-3 px-2 py-1.5 rounded-sm cursor-pointer transition-colors ${
+                      readOnly ? 'cursor-default' : 'hover:bg-slate-100'
+                    } ${checked ? 'bg-blue-50' : ''}`}
+                  >
+                    <input
+                      type="checkbox"
+                      disabled={readOnly}
+                      checked={checked}
+                      onChange={() => {
+                        if (readOnly) return;
+                        onChangeLinkedSuppliers(
+                          checked
+                            ? linkedSupplierIds.filter((id) => id !== s.id)
+                            : [...linkedSupplierIds, s.id]
+                        );
+                      }}
+                      className="accent-blue-600 w-3.5 h-3.5 flex-shrink-0"
+                    />
+                    <span className="flex-1 text-[12px] font-medium text-slate-800 truncate">
+                      {s.name}
+                    </span>
+                    <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 border rounded-sm flex-shrink-0 ${STATUS_COLOR[s.status] ?? 'text-slate-600 bg-slate-100 border-slate-200'}`}>
+                      {statusLabel[s.status] ?? s.status}
+                    </span>
+                    {s.overallScore > 0 && (
+                      <span className="text-[9px] font-black text-slate-400 flex-shrink-0">
+                        {s.overallScore.toFixed(1)}
+                      </span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Attachments — link-based, no file hosting */}

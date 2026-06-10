@@ -170,6 +170,19 @@ export interface BudgetSignal {
   lastUpdatedMs: number;
 }
 
+/** Per-supplier summary for AI Analysis — derived from the Supplier Tracker. */
+export interface SupplierSignal {
+  name: string;
+  category: string;    // e.g. 'ems', 'component', 'material', 'tooling', etc.
+  status: string;      // 'candidate' | 'under_evaluation' | 'qualified' | 'disqualified' | 'on_hold'
+  overallScore: number; // 1–10 weighted average of APQP scorecard
+  location?: string;
+  /** Scorecard params scoring below 6 — potential risk areas for the AI to flag. */
+  lowScoreParams?: Array<{ label: string; score: number }>;
+  /** Summary of the most recent supplier event, if any. */
+  lastEventSummary?: string;
+}
+
 export interface ToolContext {
   takt?: TaktSignal;
   pfmeas?: PFMEASignal[];            // up to 3 most-recent
@@ -180,6 +193,7 @@ export interface ToolContext {
   controlPlan?: ControlPlanSignal;   // most-recent production plan (or pre_launch if none)
   companyGuidelines?: CompanyGuidelineSignal[]; // org-level SOPs/procedures
   budget?: BudgetSignal;             // project budget: estimate vs. actual
+  suppliers?: SupplierSignal[];      // suppliers linked to this project via General Info picker
 }
 
 /**
