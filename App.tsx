@@ -19,6 +19,7 @@ import { isAdminUser } from './config.ts';
 const RampScoreTool = lazy(() => import('./RampScoreTool.tsx'));
 const Dashboard = lazy(() => import('./Dashboard.tsx'));
 const IntelligencePage = lazy(() => import('./IntelligencePage.tsx'));
+const SupplierTrackerPage = lazy(() => import('./SupplierTrackerPage.tsx'));
 
 // URL <-> view mapping. Hash routing keeps things simple and works on any static host.
 const VIEW_TO_PATH: Record<View, string> = {
@@ -31,6 +32,7 @@ const VIEW_TO_PATH: Record<View, string> = {
   pricing: '/pricing',
   dashboard: '/dashboard',
   intelligence: '/intelligence',
+  suppliers: '/suppliers',
 };
 
 const PATH_TO_VIEW: Record<string, View> = Object.fromEntries(
@@ -47,6 +49,7 @@ const VIEW_TITLES: Record<View, string> = {
   pricing: 'Engagements | BridgeOps.ENGINEERING',
   dashboard: 'Dashboard | BridgeOps.ENGINEERING',
   intelligence: 'BridgeOps Intelligence | Operational AI Platform',
+  suppliers: 'Supplier Tracker | BridgeOps Intelligence',
 };
 
 function getViewFromHash(): View {
@@ -375,6 +378,33 @@ const App: React.FC = () => {
             </Suspense>
           </div>
         );
+
+      case 'suppliers': {
+        if (!authReady) {
+          return (
+            <div className="pt-24 min-h-screen bg-slate-50">
+              <ViewLoader />
+            </div>
+          );
+        }
+        if (!isAdminUser(authUser?.email)) {
+          return (
+            <div className="pt-24 min-h-screen bg-slate-50 flex items-center justify-center">
+              <div className="text-center">
+                <Lock size={32} className="mx-auto text-slate-300 mb-3" />
+                <p className="text-slate-600 font-semibold">Sign in to access Supplier Tracker</p>
+              </div>
+            </div>
+          );
+        }
+        return (
+          <div className="pt-[64px] min-h-screen">
+            <Suspense fallback={<ViewLoader />}>
+              <SupplierTrackerPage />
+            </Suspense>
+          </div>
+        );
+      }
 
       case 'dashboard': {
         // While we're still resolving auth state, show the loader so the

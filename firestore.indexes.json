@@ -96,6 +96,22 @@
         { "fieldPath": "sourceProjectId", "order": "ASCENDING" },
         { "fieldPath": "targetProjectId", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "suppliers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "createdAtMs", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "supplierEvents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "dateMs", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

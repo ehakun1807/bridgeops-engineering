@@ -56,6 +56,12 @@ export type ActivityEventType =
   | 'control_plan_deleted'
   // Budget
   | 'budget_updated'
+  // Supplier Tracker
+  | 'supplier_added'
+  | 'supplier_updated'
+  | 'supplier_qualified'
+  | 'supplier_disqualified'
+  | 'supplier_event_logged'
   // AI Analysis
   | 'ai_analysis_run';
 
@@ -71,6 +77,7 @@ export type ActivityTool =
   | 'control_plan'
   | 'budget'
   | 'doc_guard'
+  | 'suppliers'
   | 'ai_analysis';
 
 // ---------------------------------------------------------------------------

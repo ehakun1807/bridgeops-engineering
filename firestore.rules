@@ -525,6 +525,63 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
+    // Suppliers — org-level supplier registry (userId-scoped, not project-embedded).
+    // One doc per supplier. Always editable (update allowed).
+    function isValidSupplier(data) {
+      return data.keys().hasAll(['userId', 'name', 'category', 'status', 'scorecard', 'overallScore', 'createdAtMs', 'updatedAtMs']) &&
+             data.userId == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 150 &&
+             data.category is string &&
+             data.category in ['ems', 'component', 'material', 'tooling', 'testing_lab', 'logistics', 'other'] &&
+             data.status is string &&
+             data.status in ['candidate', 'under_evaluation', 'qualified', 'disqualified', 'on_hold'] &&
+             data.scorecard is map &&
+             data.overallScore is number &&
+             data.createdAtMs is number &&
+             data.updatedAtMs is number &&
+             (!('notes' in data)        || (data.notes is string && data.notes.size() <= 600)) &&
+             (!('tags' in data)         || (data.tags is string && data.tags.size() <= 300)) &&
+             (!('location' in data)     || (data.location is string && data.location.size() <= 100)) &&
+             (!('website' in data)      || (data.website is string && data.website.size() <= 200)) &&
+             (!('contactName' in data)  || (data.contactName is string && data.contactName.size() <= 100)) &&
+             (!('contactEmail' in data) || (data.contactEmail is string && data.contactEmail.size() <= 150));
+    }
+
+    match /suppliers/{supplierId} {
+      allow get:    if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list:   if isAuthenticated() && (request.query.filters[0].value == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidSupplier(request.resource.data);
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid &&
+                       isValidSupplier(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // Supplier Events — one doc per interaction/event with a supplier.
+    // userId + supplierId scoped. Always editable (update allowed).
+    function isValidSupplierEvent(data) {
+      return data.keys().hasAll(['userId', 'supplierId', 'eventType', 'title', 'motivation', 'status', 'dateMs', 'createdAtMs', 'updatedAtMs']) &&
+             data.userId == request.auth.uid &&
+             data.supplierId is string && data.supplierId.size() > 0 &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 150 &&
+             data.motivation is string && data.motivation.size() <= 500 &&
+             data.status in ['planned', 'completed', 'cancelled'] &&
+             data.dateMs is number &&
+             data.createdAtMs is number &&
+             data.updatedAtMs is number &&
+             (!('participants' in data) || (data.participants is string && data.participants.size() <= 500)) &&
+             (!('outcome' in data)      || (data.outcome is string && data.outcome.size() <= 600)) &&
+             (!('nextSteps' in data)    || (data.nextSteps is string && data.nextSteps.size() <= 400));
+    }
+
+    match /supplierEvents/{eventId} {
+      allow get:    if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list:   if isAuthenticated() && (request.query.filters[0].value == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidSupplierEvent(request.resource.data);
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid &&
+                       isValidSupplierEvent(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
     // Leads / waitlist captures (ramp-score email grabs + Pricing waitlist signups).
     // Public can create, only admin can read — keeps the list private.
     match /leads/{leadId} {

@@ -123,6 +123,18 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate }) => {
                 isAdminUser(user.email) ? (
                   <div className="flex items-center space-x-4">
                     <button
+                      onClick={() => handleLinkClick('suppliers')}
+                      aria-label="Supplier Tracker"
+                      className={`text-[11px] font-black uppercase tracking-[0.2em] transition-all relative py-1 ${
+                        currentView === 'suppliers' ? 'text-purple-400' : 'text-slate-300 hover:text-purple-300'
+                      }`}
+                    >
+                      Suppliers
+                      {currentView === 'suppliers' && (
+                        <span className="absolute -bottom-1 left-0 w-full h-[2px] bg-purple-500"></span>
+                      )}
+                    </button>
+                    <button
                       onClick={() => handleLinkClick('dashboard')}
                       aria-label="Open BridgeOps Intelligence platform"
                       className="bg-blue-600 text-white px-6 py-3 border border-blue-400/30 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-blue-500 transition-all shadow-xl shadow-blue-500/20 flex items-center space-x-2"

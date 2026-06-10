@@ -36,7 +36,8 @@ import {
   Link2,
   Lightbulb,
   ClipboardList,
-  Wallet
+  Wallet,
+  Truck
 } from 'lucide-react';
 import { db, auth } from './firebase.ts';
 import {
@@ -77,6 +78,7 @@ const TOOL_META: Record<ActivityTool, {
   control_plan: { label: 'Control Plan',      icon: ClipboardList, dotClass: 'bg-orange-400',  textClass: 'text-orange-700',  bgClass: 'bg-orange-50',   borderClass: 'border-orange-200'  },
   budget:       { label: 'Budget',            icon: Wallet,        dotClass: 'bg-green-500',   textClass: 'text-green-700',   bgClass: 'bg-green-50',    borderClass: 'border-green-200'   },
   doc_guard:    { label: 'Doc Guard',         icon: FileText,      dotClass: 'bg-slate-400',   textClass: 'text-slate-700',   bgClass: 'bg-slate-50',    borderClass: 'border-slate-200'   },
+  suppliers:    { label: 'Suppliers',          icon: Truck,         dotClass: 'bg-purple-400',  textClass: 'text-purple-700',  bgClass: 'bg-purple-50',   borderClass: 'border-purple-200'  },
   ai_analysis:  { label: 'AI Analysis', icon: Sparkles,     dotClass: 'bg-blue-500',    textClass: 'text-blue-700',    bgClass: 'bg-blue-50',     borderClass: 'border-blue-200'    },
 };
 
