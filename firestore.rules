@@ -534,7 +534,7 @@ service cloud.firestore {
              data.category is string &&
              data.category in ['ems', 'component', 'material', 'tooling', 'testing_lab', 'logistics', 'other'] &&
              data.status is string &&
-             data.status in ['candidate', 'under_evaluation', 'qualified', 'disqualified', 'on_hold'] &&
+             data.status in ['candidate', 'under_evaluation', 'qualified', 'disqualified', 'on_hold', 'rnd_supplier'] &&
              data.scorecard is map &&
              data.overallScore is number &&
              data.createdAtMs is number &&
