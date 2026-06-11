@@ -70,7 +70,8 @@ export type SupplierStatus =
   | 'under_evaluation'
   | 'qualified'
   | 'disqualified'
-  | 'on_hold';
+  | 'on_hold'
+  | 'rnd_supplier';
 
 export type SupplierEventType =
   | 'initial_contact'
@@ -151,6 +152,7 @@ const STATUS_LABELS: Record<SupplierStatus, string> = {
   qualified: 'Qualified',
   disqualified: 'Disqualified',
   on_hold: 'On Hold',
+  rnd_supplier: 'R&D Supplier',
 };
 
 const STATUS_COLORS: Record<SupplierStatus, string> = {
@@ -159,6 +161,7 @@ const STATUS_COLORS: Record<SupplierStatus, string> = {
   qualified: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   disqualified: 'bg-rose-50 text-rose-700 border-rose-200',
   on_hold: 'bg-orange-50 text-orange-700 border-orange-200',
+  rnd_supplier: 'bg-violet-50 text-violet-700 border-violet-200',
 };
 
 const EVENT_TYPE_LABELS: Record<SupplierEventType, string> = {
@@ -374,19 +377,26 @@ const SupplierForm: React.FC<SupplierFormProps> = ({ initial, onSave, onClose })
 
         {/* Tabs */}
         <div className="flex gap-0 border-b border-slate-100 px-5">
-          {(['details', 'scorecard'] as const).map(t => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`py-2.5 px-4 text-xs font-semibold uppercase tracking-wide border-b-2 transition-colors ${
-                tab === t
-                  ? 'border-purple-600 text-purple-700'
-                  : 'border-transparent text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              {t === 'details' ? 'Details' : `Scorecard · ${overall}/10`}
-            </button>
-          ))}
+          {(['details', 'scorecard'] as const).map(t => {
+            const isRnd = form.status === 'rnd_supplier';
+            const scorecardDisabled = t === 'scorecard' && isRnd;
+            return (
+              <button
+                key={t}
+                onClick={() => !scorecardDisabled && setTab(t)}
+                title={scorecardDisabled ? 'No qualification process for R&D Suppliers' : undefined}
+                className={`py-2.5 px-4 text-xs font-semibold uppercase tracking-wide border-b-2 transition-colors ${
+                  scorecardDisabled
+                    ? 'border-transparent text-slate-300 cursor-not-allowed'
+                    : tab === t
+                      ? 'border-purple-600 text-purple-700'
+                      : 'border-transparent text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {t === 'details' ? 'Details' : isRnd ? 'Scorecard · N/A' : `Scorecard · ${overall}/10`}
+              </button>
+            );
+          })}
         </div>
 
         {/* Body */}
@@ -502,6 +512,17 @@ const SupplierForm: React.FC<SupplierFormProps> = ({ initial, onSave, onClose })
                 <p className="text-right text-[10px] text-slate-400 mt-0.5">{(form.notes ?? '').length}/600</p>
               </div>
             </>
+          ) : form.status === 'rnd_supplier' ? (
+            <div className="flex flex-col items-center justify-center py-10 text-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-violet-50 border border-violet-200 flex items-center justify-center">
+                <BarChart3 size={22} className="text-violet-400" />
+              </div>
+              <p className="text-sm font-bold text-slate-600">Scorecard not applicable</p>
+              <p className="text-[12px] text-slate-400 max-w-xs leading-relaxed">
+                R&D Suppliers are not subject to the standard qualification process. No scorecard is required.
+                Change the status to begin formal evaluation.
+              </p>
+            </div>
           ) : (
             <>
               <div className="flex items-start gap-6">
@@ -828,10 +849,17 @@ const SupplierDetail: React.FC<SupplierDetailProps> = ({
                 </div>
               </div>
             </div>
-            <div className={`text-center px-4 py-2 rounded border ${scoreBg(overall)}`}>
-              <p className={`text-3xl font-black tabular-nums ${scoreColor(overall)}`}>{overall}</p>
-              <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide mt-0.5">Overall</p>
-            </div>
+            {supplier.status === 'rnd_supplier' ? (
+              <div className="text-center px-4 py-2 rounded border border-violet-200 bg-violet-50">
+                <p className="text-sm font-black text-violet-500 uppercase tracking-wide">R&D</p>
+                <p className="text-[10px] text-violet-400 font-semibold uppercase tracking-wide mt-0.5">No Score</p>
+              </div>
+            ) : (
+              <div className={`text-center px-4 py-2 rounded border ${scoreBg(overall)}`}>
+                <p className={`text-3xl font-black tabular-nums ${scoreColor(overall)}`}>{overall}</p>
+                <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide mt-0.5">Overall</p>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-slate-100">
@@ -902,35 +930,48 @@ const SupplierDetail: React.FC<SupplierDetailProps> = ({
             <AnimatePresence mode="wait">
               {tab === 'scorecard' && (
                 <motion.div key="scorecard" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                  <div className="flex flex-col md:flex-row gap-8 items-start">
-                    <div className="flex-shrink-0">
-                      <RadarChart scorecard={supplier.scorecard} size={220} />
+                  {supplier.status === 'rnd_supplier' ? (
+                    <div className="flex flex-col items-center justify-center py-10 text-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-violet-50 border border-violet-200 flex items-center justify-center">
+                        <BarChart3 size={22} className="text-violet-400" />
+                      </div>
+                      <p className="text-sm font-bold text-slate-600">Scorecard not applicable</p>
+                      <p className="text-[12px] text-slate-400 max-w-xs leading-relaxed">
+                        R&D Suppliers are not subject to the standard qualification process.
+                        No scorecard is required.
+                      </p>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-bold text-slate-800 mb-3">Parameter Breakdown</h3>
-                      <div className="space-y-0">
-                        {SCORECARD_PARAMS.map(param => {
-                          const v = supplier.scorecard[param.key];
-                          const pct = (v / 10) * 100;
-                          return (
-                            <div key={param.key} className="flex items-center gap-3 py-1.5 border-b border-slate-50">
-                              <span className="w-40 text-xs font-medium text-slate-700 truncate">{param.label}</span>
-                              <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full rounded-full transition-all"
-                                  style={{
-                                    width: `${pct}%`,
-                                    backgroundColor: v >= 7.5 ? '#10b981' : v >= 5 ? '#f59e0b' : '#ef4444',
-                                  }}
-                                />
+                  ) : (
+                    <div className="flex flex-col md:flex-row gap-8 items-start">
+                      <div className="flex-shrink-0">
+                        <RadarChart scorecard={supplier.scorecard} size={220} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-sm font-bold text-slate-800 mb-3">Parameter Breakdown</h3>
+                        <div className="space-y-0">
+                          {SCORECARD_PARAMS.map(param => {
+                            const v = supplier.scorecard[param.key];
+                            const pct = (v / 10) * 100;
+                            return (
+                              <div key={param.key} className="flex items-center gap-3 py-1.5 border-b border-slate-50">
+                                <span className="w-40 text-xs font-medium text-slate-700 truncate">{param.label}</span>
+                                <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full transition-all"
+                                    style={{
+                                      width: `${pct}%`,
+                                      backgroundColor: v >= 7.5 ? '#10b981' : v >= 5 ? '#f59e0b' : '#ef4444',
+                                    }}
+                                  />
+                                </div>
+                                <span className={`w-6 text-right text-xs font-bold tabular-nums ${scoreColor(v)}`}>{v}</span>
                               </div>
-                              <span className={`w-6 text-right text-xs font-bold tabular-nums ${scoreColor(v)}`}>{v}</span>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </motion.div>
               )}
 
@@ -1035,7 +1076,13 @@ const SupplierDetail: React.FC<SupplierDetailProps> = ({
                     </button>
                   </div>
 
-                  {/* Status track */}
+                  {/* Status track — hidden for R&D suppliers */}
+                  {supplier.status === 'rnd_supplier' ? (
+                    <div className="flex items-center gap-2 mb-6 px-3 py-2 bg-violet-50 border border-violet-200 rounded text-xs text-violet-700 font-semibold">
+                      <span className={`border rounded px-2 py-0.5 ${STATUS_COLORS['rnd_supplier']}`}>{STATUS_LABELS['rnd_supplier']}</span>
+                      <span className="text-violet-500">· No qualification pathway required</span>
+                    </div>
+                  ) : (
                   <div className="flex items-center gap-0 mb-6 overflow-x-auto pb-1">
                     {(['candidate', 'under_evaluation', 'qualified'] as SupplierStatus[]).map((s, idx, arr) => (
                       <React.Fragment key={s}>
@@ -1050,6 +1097,7 @@ const SupplierDetail: React.FC<SupplierDetailProps> = ({
                       </React.Fragment>
                     ))}
                   </div>
+                  )}
 
                   {/* Qualification events */}
                   {qualEvents.length === 0 ? (
@@ -1242,9 +1290,12 @@ const SupplierTrackerPage: React.FC = () => {
     total:      suppliers.length,
     qualified:  suppliers.filter(s => s.status === 'qualified').length,
     evaluating: suppliers.filter(s => s.status === 'under_evaluation').length,
-    avgScore:   suppliers.length
-      ? Math.round(suppliers.reduce((acc, s) => acc + s.overallScore, 0) / suppliers.length * 10) / 10
-      : 0,
+    avgScore: (() => {
+      const scoreable = suppliers.filter(s => s.status !== 'rnd_supplier');
+      return scoreable.length
+        ? Math.round(scoreable.reduce((acc, s) => acc + s.overallScore, 0) / scoreable.length * 10) / 10
+        : 0;
+    })(),
   }), [suppliers]);
 
   // ---- Render detail ----
