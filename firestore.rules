@@ -187,7 +187,7 @@ service cloud.firestore {
       return data.keys().hasAll(['userId', 'projectId', 'fileName', 'uploadedAtMs', 'lines', 'totalLines', 'columnMap', 'source']) &&
              data.userId == request.auth.uid &&
              data.projectId is string && data.projectId.size() > 0 &&
-             data.fileName is string && data.fileName.size() > 0 && data.fileName.size() <= 300 &&
+             data.fileName is string && data.fileName.size() <= 300 &&
              data.uploadedAtMs is number &&
              data.totalLines is number &&
              data.lines is list && data.lines.size() <= 5000 &&

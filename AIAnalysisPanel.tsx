@@ -167,7 +167,7 @@ async function fetchToolContext(
         return {
           dateMs: Number(data.dateMs || 0),
           title: String(data.title || 'Untitled').slice(0, 100),
-          type: data.meetingType === 'External' ? 'External' : 'Internal',
+          type: data.kind === 'external' ? 'External' : 'Internal',
           hasActionItems: ai.length > 0,
           actionItemsPreview: ai.length > 0 ? ai.slice(0, 300) : undefined
         } satisfies MeetingSignal;
@@ -252,7 +252,7 @@ async function fetchToolContext(
         rationale:     String(d.rationale     || '').slice(0, 200),
         relatedRisks:  d.relatedRisks ? String(d.relatedRisks).slice(0, 200) : undefined,
         impact:        d.impact       ? String(d.impact).slice(0, 200)       : undefined,
-        status:        d.status in ['active', 'superseded', 'reversed'] ? d.status : 'active',
+        status:        (['active', 'superseded', 'reversed'] as string[]).includes(d.status) ? d.status : 'active',
         category:      String(d.category || 'other'),
         gate:          d.gate ? String(d.gate) : undefined
       }));
@@ -286,9 +286,9 @@ async function fetchToolContext(
           title:       String(l.title       || '').slice(0, 150),
           dateMs:      Number(l.dateMs      || 0),
           category:    String(l.category    || 'other'),
-          lessonType:  l.lessonType in ['problem', 'improvement', 'best_practice']
+          lessonType:  (['problem', 'improvement', 'best_practice'] as string[]).includes(l.lessonType)
                          ? l.lessonType : 'problem',
-          status:      l.status in ['open', 'in_progress', 'closed'] ? l.status : 'open',
+          status:      (['open', 'in_progress', 'closed'] as string[]).includes(l.status) ? l.status : 'open',
           gate:        l.gate ? String(l.gate) : undefined,
           description: String(l.description || '').slice(0, 300),
           rootCause:   l.rootCause ? String(l.rootCause).slice(0, 200) : undefined,
@@ -328,7 +328,7 @@ async function fetchToolContext(
       const topRaw = [...critical, ...significant].slice(0, 5);
       ctx.controlPlan = {
         title:            String(cp.title || 'Untitled'),
-        planType:         cp.planType in ['prototype', 'pre_launch', 'production'] ? cp.planType : 'prototype',
+        planType:         (['prototype', 'pre_launch', 'production'] as string[]).includes(cp.planType) ? cp.planType : 'prototype',
         dateMs:           Number(cp.dateMs || 0),
         totalItems:       items.length,
         criticalCount:    critical.length,
@@ -622,7 +622,7 @@ async function fetchToolContext(
               rationale:     String(d.rationale     || '').slice(0, 200),
               relatedRisks:  d.relatedRisks ? String(d.relatedRisks).slice(0, 150) : undefined,
               impact:        d.impact       ? String(d.impact).slice(0, 150)       : undefined,
-              status:        d.status in ['active', 'superseded', 'reversed'] ? d.status : 'active',
+              status:        (['active', 'superseded', 'reversed'] as string[]).includes(d.status) ? d.status : 'active',
               category:      String(d.category || 'other'),
               gate:          d.gate ? String(d.gate) : undefined
             }));

@@ -479,7 +479,7 @@ const Dashboard: React.FC = () => {
               <span className="text-[10px] font-black uppercase tracking-widest">Tools</span>
             </button>
             <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-slate-900 text-white text-[10px] leading-relaxed rounded px-2.5 py-1.5 opacity-0 group-hover/tools:opacity-100 transition-opacity duration-150 text-center z-50">
-              Alt BOM · Quote Compare · Doc Guard · Entity Tags
+              Alt BOM · Quote Compare · Doc Guard · SOP Radar · Suppliers
             </div>
           </div>
 
