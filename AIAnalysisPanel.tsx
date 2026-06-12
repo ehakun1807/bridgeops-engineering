@@ -466,7 +466,7 @@ async function fetchToolContext(
         const snap = await getDocs(
           query(collection(db, 'suppliers'), where(documentId(), 'in', chunk))
         );
-        snap.docs.forEach((d) => allDocs.push(d.data()));
+        snap.docs.forEach((d) => allDocs.push({ ...d.data(), _docId: d.id }));
       }
       if (allDocs.length > 0) {
         const SCORECARD_LABELS: Record<string, string> = {
@@ -475,6 +475,29 @@ async function fetchToolContext(
           compliance: 'Compliance', capacity: 'Capacity', innovation: 'Innovation',
           geographic: 'Geographic Risk'
         };
+        // Fetch most-recent event per supplier (one query per chunk — supplierEvents are userId-scoped).
+        const lastEventMap = new Map<string, string>();
+        try {
+          for (const chunk of chunks) {
+            const evSnap = await getDocs(
+              query(
+                collection(db, 'supplierEvents'),
+                where('userId', '==', userId),
+                where('supplierId', 'in', chunk),
+                orderBy('dateMs', 'desc'),
+                limit(chunk.length * 2) // up to 2 events per supplier, pick first per id
+              )
+            );
+            evSnap.docs.forEach((d) => {
+              const ev = d.data() as any;
+              if (ev.supplierId && !lastEventMap.has(ev.supplierId)) {
+                const summary = [ev.title, ev.outcome ?? ev.nextSteps ?? ''].filter(Boolean).join(' — ').slice(0, 150);
+                if (summary) lastEventMap.set(ev.supplierId, summary);
+              }
+            });
+          }
+        } catch (e) { /* non-fatal — best-effort */ }
+
         ctx.suppliers = allDocs.map((s: any): SupplierSignal => {
           const scorecard: Record<string, number> = s.scorecard ?? {};
           const lowScoreParams = Object.entries(scorecard)
@@ -482,13 +505,15 @@ async function fetchToolContext(
             .map(([k, v]) => ({ label: SCORECARD_LABELS[k] ?? k, score: v as number }))
             .sort((a, b) => a.score - b.score)
             .slice(0, 3);
+          const supplierId = s._docId ?? '';
           return {
-            name:           String(s.name || 'Unknown'),
-            category:       String(s.category || 'other'),
-            status:         String(s.status || 'candidate'),
-            overallScore:   Number(s.overallScore || 0),
-            location:       s.location ? String(s.location).slice(0, 80) : undefined,
-            lowScoreParams: lowScoreParams.length > 0 ? lowScoreParams : undefined,
+            name:              String(s.name || 'Unknown'),
+            category:          String(s.category || 'other'),
+            status:            String(s.status || 'candidate'),
+            overallScore:      Number(s.overallScore || 0),
+            location:          s.location ? String(s.location).slice(0, 80) : undefined,
+            lowScoreParams:    lowScoreParams.length > 0 ? lowScoreParams : undefined,
+            lastEventSummary:  lastEventMap.get(supplierId),
           };
         });
       }

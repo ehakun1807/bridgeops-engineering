@@ -509,7 +509,11 @@ function buildPrompt(p: ProjectInput): string {
   // These are first-class inputs, not just score hints.
   // -------------------------------------------------------------------
   const tc = p.toolContext;
-  const hasToolContext = tc && (tc.takt || tc.pfmeas?.length || tc.recentMeetings?.length || tc.latestBom || tc.decisions?.length || tc.companyGuidelines?.length || tc.suppliers?.length);
+  const hasToolContext = tc && (
+    tc.takt || tc.pfmeas?.length || tc.recentMeetings?.length || tc.latestBom ||
+    tc.decisions?.length || tc.companyGuidelines?.length || tc.suppliers?.length ||
+    tc.lessons?.length || tc.controlPlan || tc.processMap
+  );
 
   if (hasToolContext) {
     lines.push('');

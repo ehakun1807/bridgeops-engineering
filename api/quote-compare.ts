@@ -643,7 +643,7 @@ export default async function handler(req: ReqLike, res: ResLike) {
   // ------------------------------------------------------------------------
   const PRIMARY_MODEL = 'gemini-2.5-flash';
   const FALLBACK_MODEL = 'gemini-2.5-flash-lite';
-  const RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
+  const RETRY_STATUSES = new Set([429, 500, 502, 503]); // 504 excluded: retrying a timeout burns remaining budget
 
   type CallResult =
     | { kind: 'ok'; res: Response; model: string }
