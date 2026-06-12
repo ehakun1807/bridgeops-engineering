@@ -812,15 +812,6 @@ const OpenItemsPanel: React.FC<OpenItemsPanelProps> = ({
 
                   {/* Right meta */}
                   <div className="flex-shrink-0 flex items-center gap-1.5 pt-0.5">
-                    {/* Priority dot */}
-                    {!item.closed && (
-                      <button type="button" onClick={() => handleTogglePriority(item)} disabled={readOnly}
-                        title={`Priority: ${pmeta.label} — click to change`}
-                        className="w-3 h-3 rounded-full transition-transform hover:scale-125 disabled:cursor-default flex-shrink-0">
-                        <span className={`block w-3 h-3 rounded-full ${pmeta.dotClass}`} />
-                      </button>
-                    )}
-
                     {/* Due date — editable for custom items */}
                     {!item.closed && item.source !== 'deliverable' && (
                       readOnly ? (
@@ -849,6 +840,15 @@ const OpenItemsPanel: React.FC<OpenItemsPanelProps> = ({
                           />
                         </div>
                       )
+                    )}
+
+                    {/* Priority dot */}
+                    {!item.closed && (
+                      <button type="button" onClick={() => handleTogglePriority(item)} disabled={readOnly}
+                        title={`Priority: ${pmeta.label} — click to change`}
+                        className="w-3 h-3 rounded-full transition-transform hover:scale-125 disabled:cursor-default flex-shrink-0">
+                        <span className={`block w-3 h-3 rounded-full ${pmeta.dotClass}`} />
+                      </button>
                     )}
 
                     {/* Source chip */}
