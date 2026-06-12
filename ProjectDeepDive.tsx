@@ -295,6 +295,12 @@ export interface DeepDiveProject {
   // collection on every save/delete so Dashboard + header can show a chip
   // without an extra query. Updated on every mutation in DecisionLedgerTool.
   decisionSummary?: ProjectDecisionSummary;
+  // Snapshot of the PFMEA risk summary — mirrored from the pfmeas collection
+  // on every save so the header can show a risk pill without an extra query.
+  pfmeaSummary?: ProjectPFMEASummary;
+  // Snapshot of the Control Plan maturity — mirrored from the controlPlans
+  // collection on every save so the header can show a plan pill.
+  controlPlanSummary?: ProjectControlPlanSummary;
   // IDs of org-level suppliers linked to this project (via General Info picker).
   // Stored as a flat array on the project doc — suitable for single-user scale.
   linkedSupplierIds?: string[];
@@ -315,6 +321,22 @@ export interface ProjectDecisionSummary {
   reversedCount: number;
   totalCount: number;
   lastDecisionMs: number;
+}
+
+export interface ProjectPFMEASummary {
+  maxRpn: number;
+  highCount: number;
+  mediumCount: number;
+  totalRisks: number;
+  lastUpdatedMs: number;
+}
+
+export interface ProjectControlPlanSummary {
+  planType: 'prototype' | 'pre_launch' | 'production';
+  totalItems: number;
+  criticalCount: number;
+  significantCount: number;
+  lastUpdatedMs: number;
 }
 
 const NOTE_MAX = 200;
@@ -1858,6 +1880,28 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
                   title={`Last takt study: ${project.taktSummary.studyName} · takt ${project.taktSummary.taktSec.toFixed(1)}s · bottleneck ${project.taktSummary.bottleneckSec.toFixed(1)}s`}
                 >
                   Capacity {project.taktSummary.capacity.toUpperCase()}
+                </span>
+              )}
+              {/* PFMEA risk summary — mirrored by PFMEATool on save. */}
+              {project.pfmeaSummary && project.pfmeaSummary.totalRisks > 0 && (
+                <span
+                  className={`px-3 py-1 text-white ${
+                    project.pfmeaSummary.highCount > 0 ? 'bg-red-600' : project.pfmeaSummary.mediumCount > 0 ? 'bg-amber-500' : 'bg-slate-600'
+                  }`}
+                  title={`PFMEA: ${project.pfmeaSummary.totalRisks} risks · max RPN ${project.pfmeaSummary.maxRpn} · ${project.pfmeaSummary.highCount} High / ${project.pfmeaSummary.mediumCount} Medium`}
+                >
+                  Risk {project.pfmeaSummary.highCount > 0 ? 'HIGH' : project.pfmeaSummary.mediumCount > 0 ? 'MEDIUM' : 'LOW'}
+                </span>
+              )}
+              {/* Control Plan summary — mirrored by ControlPlanTool on save. */}
+              {project.controlPlanSummary && (
+                <span
+                  className={`px-3 py-1 text-white ${
+                    project.controlPlanSummary.planType === 'production' ? 'bg-emerald-600' : 'bg-slate-600'
+                  }`}
+                  title={`Control Plan: ${project.controlPlanSummary.planType.replace('_', ' ')} · ${project.controlPlanSummary.totalItems} items · ${project.controlPlanSummary.criticalCount} CC / ${project.controlPlanSummary.significantCount} SC`}
+                >
+                  {project.controlPlanSummary.planType === 'production' ? 'Ctrl Plan ✓' : `Ctrl Plan (${project.controlPlanSummary.planType === 'pre_launch' ? 'Pre-Launch' : 'Proto'})`}
                 </span>
               )}
               {lastAnalyzedMs && (() => {

@@ -15,7 +15,7 @@ import {
   CheckCircle2, Circle, Plus, Loader2, AlertTriangle,
   ClipboardCheck, SlidersHorizontal,
   ChevronDown, X, EyeOff, RefreshCw, User, Send,
-  ShieldAlert, ArrowUpRight, Check,
+  ShieldAlert, ArrowUpRight, Check, Calendar,
 } from 'lucide-react';
 import {
   Firestore, collection, query, where, getDocs,
@@ -49,6 +49,7 @@ export interface OpenItemDoc {
   title: string;
   description?: string;
   assignee?: string;
+  dueDateMs?: number;
   priority: OpenItemPriority;
   status: 'open' | 'closed';
   sourceRef?: { tool: OpenItemSource; docId: string; originalTitle?: string };
@@ -250,7 +251,7 @@ interface OpenItemsPanelProps {
 }
 
 const blankCustom = () => ({
-  title: '', description: '', assignee: '', priority: 'medium' as OpenItemPriority,
+  title: '', description: '', assignee: '', dueDate: '', priority: 'medium' as OpenItemPriority,
 });
 
 // ---------------------------------------------------------------------------
@@ -548,11 +549,15 @@ const OpenItemsPanel: React.FC<OpenItemsPanelProps> = ({
     if (!customDraft.title.trim()) return;
     setSavingCustom(true);
     try {
+      const dueDateMs = customDraft.dueDate
+        ? new Date(customDraft.dueDate + 'T00:00:00Z').getTime()
+        : undefined;
       const payload: OpenItemDoc = {
         userId, projectId,
         title: customDraft.title.trim(),
         ...(customDraft.description.trim() ? { description: customDraft.description.trim() } : {}),
         ...(customDraft.assignee.trim()    ? { assignee:    customDraft.assignee.trim()    } : {}),
+        ...(dueDateMs                      ? { dueDateMs }                                   : {}),
         priority: customDraft.priority, status: 'open',
         createdAtMs: Date.now(), updatedAtMs: Date.now(),
       };
@@ -639,10 +644,13 @@ const OpenItemsPanel: React.FC<OpenItemsPanelProps> = ({
             <input type="text" placeholder="What needs to be done? *" value={customDraft.title} maxLength={150}
               onChange={(e) => setCustomDraft((d) => ({ ...d, title: e.target.value }))}
               className="w-full bg-white border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-400 outline-none" />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <input type="text" placeholder="Owner" value={customDraft.assignee} maxLength={40}
                 onChange={(e) => setCustomDraft((d) => ({ ...d, assignee: e.target.value }))}
                 className="bg-white border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-blue-400 outline-none" />
+              <input type="date" value={customDraft.dueDate}
+                onChange={(e) => setCustomDraft((d) => ({ ...d, dueDate: e.target.value }))}
+                className="bg-white border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:border-blue-400 outline-none" />
               <select value={customDraft.priority} onChange={(e) => setCustomDraft((d) => ({ ...d, priority: e.target.value as OpenItemPriority }))}
                 className="bg-white border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:border-blue-400 outline-none appearance-none cursor-pointer">
                 <option value="high">High priority</option>
@@ -755,20 +763,34 @@ const OpenItemsPanel: React.FC<OpenItemsPanelProps> = ({
                     )}
                   </div>
 
-                  {/* Title + owner (stacked) */}
+                  {/* Title + owner + due date (stacked) */}
                   <div className="flex-1 min-w-0">
                     <p className={`text-[12px] font-medium leading-snug truncate ${item.closed ? 'line-through text-slate-400' : 'text-slate-800'}`}>
                       {item.title}
                     </p>
                     {!item.closed && (
-                      <div className="flex items-center gap-1 mt-0.5">
-                        <User size={9} className="text-slate-300 flex-shrink-0" />
-                        {readOnly
-                          ? ownerValue ? <span className="text-[10px] text-slate-500">{ownerValue}</span> : null
-                          : <input type="text" value={ownerValue} onChange={(e) => handleOwnerChange(item.uid, e.target.value)}
-                              placeholder="owner" maxLength={40}
-                              className="w-28 text-[10px] text-slate-600 placeholder-slate-300 bg-transparent border-b border-transparent hover:border-slate-200 focus:border-blue-300 outline-none transition-colors" />
-                        }
+                      <div className="flex items-center gap-3 mt-0.5">
+                        <div className="flex items-center gap-1">
+                          <User size={9} className="text-slate-300 flex-shrink-0" />
+                          {readOnly
+                            ? ownerValue ? <span className="text-[10px] text-slate-500">{ownerValue}</span> : null
+                            : <input type="text" value={ownerValue} onChange={(e) => handleOwnerChange(item.uid, e.target.value)}
+                                placeholder="owner" maxLength={40}
+                                className="w-28 text-[10px] text-slate-600 placeholder-slate-300 bg-transparent border-b border-transparent hover:border-slate-200 focus:border-blue-300 outline-none transition-colors" />
+                          }
+                        </div>
+                        {(() => {
+                          const doc = openDocs.find((d) => d.id === item.sourceDocId);
+                          if (!doc?.dueDateMs) return null;
+                          const isOverdue = doc.dueDateMs < Date.now();
+                          const label = new Date(doc.dueDateMs).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+                          return (
+                            <span className={`flex items-center gap-1 text-[10px] font-bold ${isOverdue ? 'text-rose-600' : 'text-slate-400'}`}>
+                              <Calendar size={9} />
+                              {isOverdue ? `Overdue · ${label}` : label}
+                            </span>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>

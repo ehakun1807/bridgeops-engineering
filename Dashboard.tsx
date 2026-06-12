@@ -118,6 +118,16 @@ interface ProjectRecord {
   templateId?: string;
   disabledItemIds?: string[];
   customSubItems?: CustomSubItem[];
+  assignees?: string;
+  gateStatuses?: Partial<Record<ProductGate, string>>;
+  // Mirrored summaries from per-project tools — written back on each save
+  // so the deep-dive header can show status pills without extra queries.
+  taktSummary?: Record<string, unknown>;
+  decisionSummary?: Record<string, unknown>;
+  pfmeaSummary?: Record<string, unknown>;
+  controlPlanSummary?: Record<string, unknown>;
+  linkedSupplierIds?: string[];
+  bomColumnMap?: Record<string, unknown>;
 }
 
 type TabKey = 'active' | 'archive' | 'academy';
@@ -413,7 +423,12 @@ const Dashboard: React.FC = () => {
       userId: selectedProject.userId,
       createdAt: selectedProject.createdAt,
       closedAt: selectedProject.closedAt,
-      closeReason: selectedProject.closeReason
+      closeReason: selectedProject.closeReason,
+      taktSummary: selectedProject.taktSummary,
+      decisionSummary: selectedProject.decisionSummary,
+      pfmeaSummary: selectedProject.pfmeaSummary,
+      controlPlanSummary: selectedProject.controlPlanSummary,
+      linkedSupplierIds: selectedProject.linkedSupplierIds,
     };
     return (
       <ProjectDeepDive
@@ -1195,6 +1210,12 @@ const ProjectCard: React.FC<{
             <Calendar size={11} />
             {archiveMode && closed ? `Closed ${closed}` : `Created ${created}`}
           </span>
+          {/* Gate chip */}
+          {project.currentGate && (
+            <span className="flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 text-slate-600 border border-slate-200 rounded-sm">
+              {project.currentGate}
+            </span>
+          )}
           {/* Decision chip — shows reversed count (rose) or total (indigo) */}
           {project.decisionSummary && project.decisionSummary.totalCount > 0 && (
             project.decisionSummary.reversedCount > 0 ? (

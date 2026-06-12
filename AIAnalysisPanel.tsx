@@ -46,7 +46,8 @@ import {
   ConnectedProjectContext,
   CompanyGuidelineSignal,
   BudgetSignal,
-  SupplierSignal
+  SupplierSignal,
+  ProcessMapSignal
 } from './aiClient';
 import { loadOrgGuidelines } from './orgGuidelinesClient.ts';
 import type { ProjectStub } from './projectConnectionsClient.ts';
@@ -347,6 +348,41 @@ async function fetchToolContext(
     }
   } catch (e) {
     console.warn('[AIAnalysisPanel] controlPlans fetch failed', e);
+  }
+
+  // Process Map — most-recent process map for the project.
+  try {
+    const pmSnap = await getDocs(
+      query(
+        collection(db, 'processMaps'),
+        where('userId', '==', userId),
+        where('projectId', '==', projectId),
+        orderBy('updatedAtMs', 'desc'),
+        limit(1)
+      )
+    );
+    if (!pmSnap.empty) {
+      const data = pmSnap.docs[0].data() as any;
+      const steps: any[] = Array.isArray(data.steps) ? data.steps : [];
+      const actionSteps   = steps.filter((s: any) => s.kind === 'action');
+      const decisionSteps = steps.filter((s: any) => s.kind === 'decision');
+      ctx.processMap = {
+        title:        String(data.title || 'Untitled').slice(0, 100),
+        stepCount:    steps.length,
+        actionCount:  actionSteps.length,
+        decisionCount: decisionSteps.length,
+        stepSummaries: [...actionSteps, ...decisionSteps]
+          .slice(0, 10)
+          .map((s: any) => ({
+            kind:        String(s.kind),
+            description: String(s.description || '').slice(0, 80),
+            docRef:      s.docRef ? String(s.docRef).slice(0, 30) : undefined,
+          })),
+        updatedAtMs: Number(data.updatedAtMs || 0),
+      } satisfies ProcessMapSignal;
+    }
+  } catch (e) {
+    console.warn('[AIAnalysisPanel] processMaps fetch failed', e);
   }
 
   // Company Guidelines — org-level SOPs extracted by CompanyGuidelinesTool.

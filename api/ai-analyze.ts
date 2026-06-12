@@ -324,6 +324,16 @@ interface SupplierSignal {
   lastEventSummary?: string;
 }
 
+// Mirrors aiClient.ts ProcessMapSignal — inlined per Vercel bundler .ts gotcha.
+interface ProcessMapSignal {
+  title: string;
+  stepCount: number;
+  actionCount: number;
+  decisionCount: number;
+  stepSummaries: Array<{ kind: string; description: string; docRef?: string }>;
+  updatedAtMs: number;
+}
+
 interface ToolContext {
   takt?: TaktSignal;
   pfmeas?: PFMEASignal[];
@@ -332,6 +342,7 @@ interface ToolContext {
   decisions?: DecisionSignal[];
   lessons?: LessonSignal[];
   controlPlan?: ControlPlanSignal;
+  processMap?: ProcessMapSignal;
   companyGuidelines?: CompanyGuidelineSignal[];
   budget?: BudgetSignal;
   suppliers?: SupplierSignal[];
@@ -664,6 +675,29 @@ function buildPrompt(p: ProjectInput): string {
       }
       if (cp.planType !== 'production') {
         lines.push(`⚠ Current plan type is ${planTypeLabel} — a Production Control Plan is typically required before MP gate.`);
+      }
+    }
+
+    // Process Map
+    const pm = tc.processMap;
+    if (pm) {
+      const pmDate = new Date(pm.updatedAtMs).toISOString().slice(0, 10);
+      lines.push('');
+      lines.push(`### Process Map ("${pm.title.slice(0, 60)}", updated ${pmDate}: ${pm.stepCount} steps, ${pm.actionCount} action, ${pm.decisionCount} decision)`);
+      lines.push('(Use for: process definition maturity — is the manufacturing flow documented? doc-ref coverage — do action steps reference work instructions/SOPs? decision density — too many decisions may indicate an unstable or underspecified process; missing end step = incomplete flow.)');
+      if (pm.decisionCount > pm.actionCount * 0.4) {
+        lines.push(`⚠ High decision density (${pm.decisionCount} decisions vs ${pm.actionCount} actions) — may indicate an underspecified process or significant rework loops.`);
+      }
+      if (pm.stepSummaries.length > 0) {
+        const missingDocRef = pm.stepSummaries.filter((s) => s.kind === 'action' && !s.docRef);
+        if (missingDocRef.length > 0) {
+          lines.push(`⚠ ${missingDocRef.length} action step${missingDocRef.length !== 1 ? 's' : ''} missing a work instruction / doc reference — process may be undocumented.`);
+        }
+        lines.push('Key process steps:');
+        for (const s of pm.stepSummaries.slice(0, 8)) {
+          const docLabel = s.docRef ? ` [${s.docRef}]` : '';
+          lines.push(`  - [${s.kind.toUpperCase()}] ${s.description.slice(0, 80)}${docLabel}`);
+        }
       }
     }
   }

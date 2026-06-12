@@ -485,6 +485,26 @@ const PFMEATool: React.FC<PFMEAToolProps> = ({ projectId, projectName = '', read
       }).catch(() => { /* non-fatal */ });
     }
 
+    // Mirror a summary snapshot to the project doc so the header pill + Gate
+    // Review PDF can read risk state without querying the pfmeas collection.
+    try {
+      const rpn = (r: RiskLine) => r.severity * r.occurrence * r.detection;
+      const highCount   = cleanRisks.filter((r) => rpn(r) > 100).length;
+      const mediumCount = cleanRisks.filter((r) => rpn(r) >= 40 && rpn(r) <= 100).length;
+      const maxRpn      = cleanRisks.length > 0 ? Math.max(...cleanRisks.map(rpn)) : 0;
+      await updateDoc(doc(db, 'projects', projectId), {
+        pfmeaSummary: {
+          maxRpn,
+          highCount,
+          mediumCount,
+          totalRisks: cleanRisks.length,
+          lastUpdatedMs: Date.now(),
+        }
+      });
+    } catch (e) {
+      console.warn('[PFMEATool] pfmeaSummary writeback failed', e);
+    }
+
     await load();
     setMode({ kind: 'list' });
   };

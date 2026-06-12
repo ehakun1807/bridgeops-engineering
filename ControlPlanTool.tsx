@@ -709,6 +709,25 @@ const ControlPlanTool: React.FC<ControlPlanToolProps> = ({
         timestampMs: Date.now(),
       });
 
+      // Mirror a summary snapshot to the project doc so the header pill can
+      // surface control plan maturity without querying the controlPlans collection.
+      try {
+        const savedItems = payload.items;
+        const criticalItems  = savedItems.filter((it) => it.specialClass === 'critical').length;
+        const significantItems = savedItems.filter((it) => it.specialClass === 'significant').length;
+        await updateDoc(doc(db, 'projects', projectId), {
+          controlPlanSummary: {
+            planType,
+            totalItems: savedItems.length,
+            criticalCount: criticalItems,
+            significantCount: significantItems,
+            lastUpdatedMs: Date.now(),
+          }
+        });
+      } catch (e) {
+        console.warn('[ControlPlanTool] controlPlanSummary writeback failed', e);
+      }
+
       await loadPlans();
       setView('list');
     } catch (e: any) {

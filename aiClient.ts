@@ -183,6 +183,16 @@ export interface SupplierSignal {
   lastEventSummary?: string;
 }
 
+export interface ProcessMapSignal {
+  title: string;
+  stepCount: number;
+  actionCount: number;
+  decisionCount: number;
+  /** Up to 10 action/decision step summaries for process-awareness in AI prompt */
+  stepSummaries: Array<{ kind: string; description: string; docRef?: string }>;
+  updatedAtMs: number;
+}
+
 export interface ToolContext {
   takt?: TaktSignal;
   pfmeas?: PFMEASignal[];            // up to 3 most-recent
@@ -191,6 +201,7 @@ export interface ToolContext {
   decisions?: DecisionSignal[];      // up to 5 active + any reversed, for drift/risk detection
   lessons?: LessonSignal[];          // up to 5 most-recent open/in-progress lessons
   controlPlan?: ControlPlanSignal;   // most-recent production plan (or pre_launch if none)
+  processMap?: ProcessMapSignal;     // most-recent process map
   companyGuidelines?: CompanyGuidelineSignal[]; // org-level SOPs/procedures
   budget?: BudgetSignal;             // project budget: estimate vs. actual
   suppliers?: SupplierSignal[];      // suppliers linked to this project via General Info picker
