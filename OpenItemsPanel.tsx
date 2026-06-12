@@ -522,6 +522,33 @@ const OpenItemsPanel: React.FC<OpenItemsPanelProps> = ({
     return ownerOverrides[item.uid] || '';
   };
 
+  // Due date — only editable for openItems docs (not deliverables).
+  const getDueDateValue = (item: UnifiedOpenItem): string => {
+    const oDoc = openDocs.find((d) => `custom-${d.id}` === item.uid);
+    if (!oDoc?.dueDateMs) return '';
+    return new Date(oDoc.dueDateMs).toISOString().slice(0, 10);
+  };
+
+  const handleDueDateChange = async (item: UnifiedOpenItem, dateStr: string) => {
+    const oDoc = openDocs.find((d) => `custom-${d.id}` === item.uid);
+    if (!oDoc) return;
+    const dueDateMs = dateStr ? new Date(dateStr + 'T00:00:00Z').getTime() : undefined;
+    try {
+      if (dueDateMs) {
+        await updateDoc(doc(db, 'openItems', oDoc.id), { dueDateMs, updatedAtMs: Date.now() });
+        setOpenDocs((prev) => prev.map((d) => d.id === oDoc.id ? { ...d, dueDateMs } : d));
+      } else {
+        await updateDoc(doc(db, 'openItems', oDoc.id), { dueDateMs: null, updatedAtMs: Date.now() });
+        setOpenDocs((prev) => prev.map((d) => { const n = { ...d }; if (d.id === oDoc.id) delete n.dueDateMs; return n; }));
+      }
+      setPersistError(null);
+    } catch (e) {
+      console.warn('[OpenItemsPanel] due date update error', e);
+      const msg = (e as any)?.message ?? 'Unknown error';
+      setPersistError(msg.includes('insufficient permissions') ? 'Changes not saved: Firestore rules not deployed.' : `Save failed: ${msg}`);
+    }
+  };
+
   const handleClose = async (item: UnifiedOpenItem, resolveText?: string) => {
     if (!item.closeable || item.closed || readOnly) return;
     setClosingUid(item.uid);
@@ -779,18 +806,32 @@ const OpenItemsPanel: React.FC<OpenItemsPanelProps> = ({
                                 className="w-28 text-[10px] text-slate-600 placeholder-slate-300 bg-transparent border-b border-transparent hover:border-slate-200 focus:border-blue-300 outline-none transition-colors" />
                           }
                         </div>
-                        {(() => {
-                          const doc = openDocs.find((d) => d.id === item.sourceDocId);
-                          if (!doc?.dueDateMs) return null;
-                          const isOverdue = doc.dueDateMs < Date.now();
-                          const label = new Date(doc.dueDateMs).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
-                          return (
-                            <span className={`flex items-center gap-1 text-[10px] font-bold ${isOverdue ? 'text-rose-600' : 'text-slate-400'}`}>
-                              <Calendar size={9} />
-                              {isOverdue ? `Overdue · ${label}` : label}
-                            </span>
-                          );
-                        })()}
+                        {/* Due date — editable for custom items, read-only for deliverables */}
+                        {item.source !== 'deliverable' && (
+                          <div className="flex items-center gap-1">
+                            <Calendar size={9} className="text-slate-300 flex-shrink-0" />
+                            {readOnly ? (
+                              getDueDateValue(item) ? (
+                                <span className={`text-[10px] font-bold ${
+                                  new Date(getDueDateValue(item) + 'T00:00:00Z').getTime() < Date.now()
+                                    ? 'text-rose-600' : 'text-slate-400'
+                                }`}>
+                                  {new Date(getDueDateValue(item) + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                </span>
+                              ) : null
+                            ) : (
+                              <input
+                                type="date"
+                                value={getDueDateValue(item)}
+                                onChange={(e) => handleDueDateChange(item, e.target.value)}
+                                className={`text-[10px] bg-transparent border-b border-transparent hover:border-slate-200 focus:border-blue-300 outline-none transition-colors cursor-pointer ${
+                                  getDueDateValue(item) && new Date(getDueDateValue(item) + 'T00:00:00Z').getTime() < Date.now()
+                                    ? 'text-rose-600 font-bold' : 'text-slate-400'
+                                }`}
+                              />
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
