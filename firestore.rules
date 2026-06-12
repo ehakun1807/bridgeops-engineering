@@ -525,6 +525,48 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
+    // Open Items — unified open-items list (userId + projectId scoped).
+    // Stores user-created custom items; auto-aggregated items from other tools
+    // are computed client-side at read time (meetings, lessons, PFMEA, decisions).
+    function isValidOpenItem(data) {
+      return data.keys().hasAll(['userId', 'projectId', 'title', 'priority', 'status', 'createdAtMs', 'updatedAtMs']) &&
+             data.userId == request.auth.uid &&
+             data.projectId is string && data.projectId.size() > 0 &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 150 &&
+             data.priority in ['high', 'medium', 'low'] &&
+             data.status in ['open', 'closed'] &&
+             data.createdAtMs is number &&
+             data.updatedAtMs is number &&
+             (!('description' in data) || (data.description is string && data.description.size() <= 200)) &&
+             (!('assignee' in data)    || (data.assignee is string    && data.assignee.size()    <= 80)) &&
+             (!('closedAtMs' in data)  || data.closedAtMs is number);
+    }
+
+    match /openItems/{itemId} {
+      allow get:    if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list:   if isAuthenticated() && request.auth.uid != null;
+      allow create: if isAuthenticated() && isValidOpenItem(request.resource.data);
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid &&
+                       isValidOpenItem(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // openItemsDismissed — per-user per-project dismissed UIDs list.
+    // Doc ID: {userId}_{projectId}. Read by doc ID only — no composite index needed.
+    function isValidOpenItemsDismissed(data) {
+      return data.keys().hasAll(['userId', 'projectId', 'dismissedUids']) &&
+             data.userId == request.auth.uid &&
+             data.projectId is string && data.projectId.size() > 0 &&
+             data.dismissedUids is list;
+    }
+    match /openItemsDismissed/{dismissDocId} {
+      allow get:    if isAuthenticated();
+      allow create: if isAuthenticated() && isValidOpenItemsDismissed(request.resource.data);
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid &&
+                       isValidOpenItemsDismissed(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
     // Suppliers — org-level supplier registry (userId-scoped, not project-embedded).
     // One doc per supplier. Always editable (update allowed).
     function isValidSupplier(data) {

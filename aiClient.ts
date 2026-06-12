@@ -219,6 +219,7 @@ export interface AnalyzeProjectInput {
   generalInfo?: string;
   currentGate?: ProductGate;
   gateTargets?: Partial<Record<ProductGate, string>>;
+  gateStatuses?: Partial<Record<string, string>>;
   // Sub-item IDs explicitly marked out-of-scope. These are excluded from the
   // payload entirely so the AI doesn't flag missing evidence on N/A metrics.
   disabledItemIds?: string[];
@@ -296,6 +297,7 @@ function buildSnapshot(input: AnalyzeProjectInput) {
     generalInfo: input.generalInfo,
     currentGate: input.currentGate,
     gateTargets: input.gateTargets,
+    gateStatuses: input.gateStatuses,
     templateName: input.templateName,
     standards: Array.isArray(input.standards) ? input.standards : undefined,
     groups,

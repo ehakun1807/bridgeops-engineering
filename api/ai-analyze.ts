@@ -358,6 +358,7 @@ interface ProjectInput {
   templateName?: string;
   currentGate?: ProductGate;
   gateTargets?: Partial<Record<ProductGate, string>>;
+  gateStatuses?: Partial<Record<string, string>>;
   // Applicable standards/regulations picked by the user (e.g. ISO 13485,
   // IEC 62304). Used to compliance-weight risk findings and top actions —
   // gaps touching user-declared standards should rank higher.
@@ -432,6 +433,27 @@ function buildPrompt(p: ProjectInput): string {
         lines.push(
           `Next upcoming gate: ${nextGate} on ${p.gateTargets[nextGate]}.`
         );
+      }
+    }
+    // Gate schedule status (user-set: on_track / at_risk / slipped)
+    if (p.gateStatuses && Object.keys(p.gateStatuses).length > 0) {
+      const statusLines: string[] = [];
+      for (const [key, status] of Object.entries(p.gateStatuses)) {
+        if (status) {
+          const label = key === 'project_start' ? 'Start' : key === 'project_end' ? 'End' : key;
+          statusLines.push(`  ${label}: ${String(status).replace('_', ' ')}`);
+        }
+      }
+      if (statusLines.length > 0) {
+        lines.push('Schedule Status (user-assessed):');
+        lines.push(...statusLines);
+        const hasSlipped = Object.values(p.gateStatuses).some((s) => s === 'slipped');
+        const hasAtRisk = Object.values(p.gateStatuses).some((s) => s === 'at_risk');
+        if (hasSlipped) {
+          lines.push('NOTE: One or more gates are SLIPPED — treat schedule risk as HIGH priority in risks and topActions.');
+        } else if (hasAtRisk) {
+          lines.push('NOTE: One or more gates are AT RISK — flag schedule pressure in risks and topActions.');
+        }
       }
     }
   }

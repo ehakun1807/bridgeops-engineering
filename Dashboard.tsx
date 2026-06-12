@@ -403,6 +403,7 @@ const Dashboard: React.FC = () => {
       assignees: selectedProject.assignees,
       currentGate: selectedProject.currentGate,
       gateTargets: selectedProject.gateTargets,
+      gateStatuses: selectedProject.gateStatuses,
       attachments: selectedProject.attachments,
       scoreHistory: selectedProject.scoreHistory,
       deliverables: selectedProject.deliverables,

@@ -707,3 +707,32 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   3. **Gemini sparkle logo** (bottom-right corner, purple circle ~x=1098–1207, y=758–862): filled with per-row background color sampled from the left edge + noise + 4-pass Gaussian blur.
   - **Gotcha:** `result.save()` to the mounted folder path requires the VM path (`/sessions/.../mnt/bridgeops-engineering-main/`) not a host path — earlier saves landed in `/mnt/outputs/` instead. Verified by checking `ls` before presenting the file.
   - Final file saved as `two-schools-clean.png` in the project root (not committed — marketing asset).
+
+### 2026-06-11
+
+- **Supplier Tracker: full build.** New org-level supplier management tool wired into `AdvancedToolsModal` (6th tile, purple palette). Key surfaces: supplier list with search/filter/status/category, per-supplier detail view with three tabs (Scorecard / Events / Qualification), supplier form with a Details tab + Scorecard tab (10-param APQP sliders + radar chart). Persistence: `suppliers/{id}` + `supplierEvents/{id}` (userId-scoped Firestore collections). Activity logging via `logActivity`. AI Analysis integration: `SupplierSignal` interface in `aiClient.ts`; `api/ai-analyze.ts` prompt section flags unqualified EMS/CM before gate, low-score params, disqualified/on-hold status. Allowlist now in **12 places** (`api/guidelines-upload-token.ts` and `api/guidelines-extract.ts` were already 11 and 12).
+
+- **Supplier picker in General Info (`ProjectDeepDive.tsx`).** `linkedSupplierIds: string[]` added to `DeepDiveProject` interface. On mount, loads all org suppliers from `suppliers` collection (userId-scoped `getDocs`). Linked suppliers persist to the project doc on all 4 save paths. `AIAnalysisPanel` fetches linked supplier docs via `documentId() IN [...]` query (chunked at 10 per Firestore IN limit, no composite index needed) and passes them as `SupplierSignal[]` in `toolContext`. General Info section shows a scrollable checklist of org suppliers with status chips + scores.
+
+- **Entity Tags moved into Supplier Tracker.** Removed Entity Tags tile from `AdvancedToolsModal` (import, tile div, title switch case, render branch, `Tag` icon import). Added `mainView: 'suppliers' | 'entity-tags'` state + tab strip (Suppliers | Entity Tags) to `SupplierTrackerPage.tsx` header. Entity Tags renders inline below the header when `mainView === 'entity-tags'`; the "Add Supplier" button and stats grid are conditionally hidden. `EntityTagsTool` import already present; `Tag` icon was already in `SupplierTrackerPage.tsx` lucide imports.
+
+- **Meetings: Import from Email.** Collapsible "Import from Email" panel at the top of every new/edit meeting form. User pastes raw email text (forwarded thread, calendar invite, meeting recap — any format). Click "Extract & Fill" runs a **pure client-side parser** (`parseEmailText`) with no API call:
+  - `Subject:` → Title (Re:/Fwd: prefixes stripped)
+  - `Date:` header (or date patterns in body) → Date field
+  - `From:` / `To:` / `CC:` lines → Attendees (display names extracted, email addresses dropped)
+  - Body text → Discussion Notes
+  - Lines matching action-item patterns (`Action:`, `TODO:`, `- [ ]`, `@Owner —`, numbered capital-letter items, etc.) → Action Items
+  - All fields are **additive** (appended to existing content, not overwritten). Green "Applied ✓" badge after extraction; panel auto-collapses. New lucide imports: `Mail`, `ChevronDown`, `ChevronUp`, `Wand2`.
+
+- **Supplier Tracker: R&D Supplier status.**
+  - Added `'rnd_supplier'` to `SupplierStatus` union, `STATUS_LABELS` ("R&D Supplier"), and `STATUS_COLORS` (violet palette).
+  - **Form:** Scorecard tab button is greyed out with label "Scorecard · N/A", `cursor-not-allowed`, and a tooltip. Tab body shows a violet N/A placeholder with a prompt to change status when ready to qualify. Tab switch is blocked while `rnd_supplier` is active.
+  - **Detail view:** Score bubble in header replaced by a violet "R&D / No Score" badge. Status track (Candidate → Under Evaluation → Qualified) replaced by a "no qualification pathway required" note. Scorecard tab body shows the same N/A placeholder.
+  - **Stats:** R&D suppliers excluded from the Avg Score calculation.
+  - **Firestore rules fix:** `isValidSupplier` validator's `status` enum did not include `'rnd_supplier'` — every save was rejected with a permissions error. Added `'rnd_supplier'` to the allowed values list. **Must paste updated `firestore.rules` into Firebase Console + verify "Last published" timestamp moves** (same multi-DB deploy lie applies).
+
+- **Open follow-ups (after today):**
+  1. **Deploy `firestore.rules`** — paste into Firebase Console (R&D Supplier status fix). Without this, adding any R&D Supplier will 403.
+  2. **Push to Vercel** (`git push`) so all supplier AI Analysis prompt changes are live in prod.
+  3. **Supplier `project.linkedSupplierIds` in Firestore rules** — no rules change needed; `linkedSupplierIds` is a new field on the existing `projects` collection covered by the existing `isValidProject` validator (only required keys are enforced).
+  4. **Carry-over** — end-of-beta cleanup checklist (allowlist now 12 places), per-UID rate limiting on authenticated AI handlers, Sentry, mobile lockout, SEO meta tags for `/#/intelligence`.

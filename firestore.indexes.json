@@ -112,6 +112,15 @@
         { "fieldPath": "userId", "order": "ASCENDING" },
         { "fieldPath": "dateMs", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "openItems",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "projectId", "order": "ASCENDING" },
+        { "fieldPath": "createdAtMs", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

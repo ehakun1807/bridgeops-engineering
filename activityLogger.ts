@@ -62,6 +62,10 @@ export type ActivityEventType =
   | 'supplier_qualified'
   | 'supplier_disqualified'
   | 'supplier_event_logged'
+  // Open Items
+  | 'open_item_created'
+  | 'open_item_closed'
+  | 'open_item_deleted'
   // AI Analysis
   | 'ai_analysis_run';
 
@@ -78,6 +82,7 @@ export type ActivityTool =
   | 'budget'
   | 'doc_guard'
   | 'suppliers'
+  | 'open_items'
   | 'ai_analysis';
 
 // ---------------------------------------------------------------------------

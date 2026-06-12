@@ -84,6 +84,7 @@ import LessonsLearnedTool from './LessonsLearnedTool.tsx';
 import ControlPlanTool from './ControlPlanTool.tsx';
 import ProjectBudgetTool from './ProjectBudgetTool.tsx';
 import ActivityFeedPanel from './ActivityFeedPanel.tsx';
+import OpenItemsPanel from './OpenItemsPanel.tsx';
 import ScopeEditor from './ScopeEditor.tsx';
 import CoachPanel from './CoachPanel.tsx';
 import StandardsPicker from './StandardsPicker.tsx';
@@ -276,6 +277,10 @@ export interface DeepDiveProject {
   // Stage-gate tracking
   currentGate?: ProductGate;
   gateTargets?: Partial<Record<ProductGate, string>>; // gate -> ISO date
+  // Per-gate schedule status (on_track / at_risk / slipped).
+  // For full-ramp: keyed by ProductGate ('CR', 'PDR', …).
+  // For non-full-ramp: keyed by 'project_start' | 'project_end'.
+  gateStatuses?: Partial<Record<string, GateStatus>>;
   // Time-series of readiness scores — appended on Save when a value changed.
   scoreHistory?: ScoreSnapshot[];
   // AI Analysis cache — last Gemini result, so reopens don't re-bill
@@ -433,8 +438,26 @@ const PROJECT_TOOLS: ProjectToolEntry[] = [
 ];
 const HISTORY_TAB_ID = '__history__';
 const ACTIVITY_TAB_ID = '__activity__';
+const OPEN_ITEMS_TAB_ID = '__open_items__';
 const INFO_STATUS_OPTIONS: InfoStatus[] = ['TBD', 'In Process', 'Completed', 'Cancelled'];
 const GATE_OPTIONS: ProductGate[] = ['CR', 'PDR', 'CDR', 'TRR', 'PRR', 'MP'];
+
+export type GateStatus = 'on_track' | 'at_risk' | 'slipped' | 'done';
+const GATE_STATUS_LABELS: Record<GateStatus, string> = {
+  on_track: 'On Track',
+  at_risk:  'At Risk',
+  slipped:  'Slipped',
+  done:     'Done',
+};
+const GATE_STATUS_STYLES: Record<GateStatus, string> = {
+  on_track: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  at_risk:  'bg-amber-50  text-amber-700  border-amber-200',
+  slipped:  'bg-rose-50   text-rose-700   border-rose-200',
+  done:     'bg-slate-800 text-white       border-slate-800',
+};
+const GATE_STATUS_CYCLE: GateStatus[] = ['on_track', 'at_risk', 'slipped', 'done'];
+const nextGateStatus = (current?: GateStatus): GateStatus =>
+  GATE_STATUS_CYCLE[(GATE_STATUS_CYCLE.indexOf(current ?? 'on_track') + 1) % 4];
 const GATE_LABELS: Record<ProductGate, string> = {
   'CR':  'CR — Concept Review',
   'PDR': 'PDR — Preliminary Design Review',
@@ -734,6 +757,9 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
   const [gateTargets, setGateTargets] = useState<Partial<Record<ProductGate, string>>>(
     migratedProject.gateTargets || {}
   );
+  const [gateStatuses, setGateStatuses] = useState<Partial<Record<string, GateStatus>>>(
+    migratedProject.gateStatuses || {}
+  );
   const [attachments, setAttachments] = useState<ProjectAttachment[]>(project.attachments || []);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [scoreHistory, setScoreHistory] = useState<ScoreSnapshot[]>(
@@ -813,6 +839,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
     setLinkedSupplierIds(project.linkedSupplierIds || []);
     setCurrentGate(mp.currentGate || '');
     setGateTargets(mp.gateTargets || {});
+    setGateStatuses(project.gateStatuses || {});
     setAttachments(project.attachments || []);
     setAttachmentError(null);
     setScoreHistory(mp.scoreHistory || []);
@@ -1034,6 +1061,17 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
         ? state.checkedIds.filter((id) => id !== templateId)
         : [...state.checkedIds, templateId]
     });
+  };
+
+  // Called by OpenItemsPanel to check off a template deliverable from the
+  // unified open-items view — same effect as clicking the checkbox in the
+  // DeliverableChecklist, but triggered remotely.
+  const handleCloseDeliverable = async (itemId: string, deliverableId: string): Promise<void> => {
+    if (readOnly) return;
+    const state = getSubState(itemId);
+    if (!state.checkedIds.includes(deliverableId)) {
+      updateSubState(itemId, { checkedIds: [...state.checkedIds, deliverableId] });
+    }
   };
 
   const addCustomDeliverable = (
@@ -1502,6 +1540,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
         linkedSupplierIds,
         currentGate: currentGate || null,
         gateTargets,
+        gateStatuses,
         attachments,
         scoreHistory: nextHistory,
         deliverables,
@@ -1554,6 +1593,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
         linkedSupplierIds,
         currentGate: currentGate || null,
         gateTargets,
+        gateStatuses,
         attachments,
         scoreHistory: nextHistory,
         deliverables,
@@ -1657,6 +1697,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
         linkedSupplierIds,
         currentGate: currentGate || undefined,
         gateTargets,
+        gateStatuses,
         attachments,
         deliverables,
         disabledItemIds,
@@ -1950,8 +1991,9 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
             iconActiveClass: string;
             count?: number;
           }> = [
-            { id: AI_ANALYSIS_TAB_ID, label: 'AI Analysis', icon: Sparkles,  iconActiveClass: 'text-blue-600' },
-            { id: ACTIVITY_TAB_ID,    label: 'Activity',    icon: Activity,  iconActiveClass: 'text-slate-600' },
+            { id: AI_ANALYSIS_TAB_ID, label: 'AI Analysis', icon: Sparkles,     iconActiveClass: 'text-blue-600'  },
+            { id: OPEN_ITEMS_TAB_ID,  label: 'Open Items',  icon: CheckSquare,  iconActiveClass: 'text-slate-700' },
+            { id: ACTIVITY_TAB_ID,    label: 'Activity',    icon: Activity,     iconActiveClass: 'text-slate-600' },
           ];
           const historyTab = {
             id: HISTORY_TAB_ID,
@@ -2113,6 +2155,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
                 generalInfo,
                 currentGate: currentGate || undefined,
                 gateTargets,
+                gateStatuses,
                 disabledItemIds,
                 templateName: getTemplate(project.templateId).name,
                 // Thread per-item deliverable state so the AI rollups match
@@ -2254,6 +2297,24 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
               readOnly={readOnly}
             />
           </motion.div>
+        ) : activeGroupId === OPEN_ITEMS_TAB_ID ? (
+          <motion.div
+            key={OPEN_ITEMS_TAB_ID}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <OpenItemsPanel
+              projectId={project.id}
+              userId={auth.currentUser?.uid ?? ''}
+              db={db}
+              currentGate={currentGate}
+              deliverables={deliverables}
+              onCloseDeliverable={handleCloseDeliverable}
+              readOnly={readOnly}
+            />
+          </motion.div>
         ) : activeGroupId === ACTIVITY_TAB_ID ? (
           <motion.div
             key={ACTIVITY_TAB_ID}
@@ -2317,6 +2378,10 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
               }
               onChangeCurrentGate={setCurrentGate}
               onChangeGateTarget={setGateTarget}
+              gateStatuses={gateStatuses}
+              onChangeGateStatus={(key, status) =>
+                setGateStatuses((prev) => ({ ...prev, [key]: status }))
+              }
               onAddAttachment={addAttachment}
               onRemoveAttachment={removeAttachment}
               readOnly={readOnly}
@@ -3920,6 +3985,7 @@ const GeneralInfoPanel: React.FC<{
   assignees: string;
   currentGate: ProductGate | '';
   gateTargets: Partial<Record<ProductGate, string>>;
+  gateStatuses: Partial<Record<string, GateStatus>>;
   attachments: ProjectAttachment[];
   attachmentError: string | null;
   templateId?: string;
@@ -3935,6 +4001,7 @@ const GeneralInfoPanel: React.FC<{
   onChangeAssignees: (v: string) => void;
   onChangeCurrentGate: (v: ProductGate | '') => void;
   onChangeGateTarget: (gate: ProductGate, date: string) => void;
+  onChangeGateStatus: (key: string, status: GateStatus) => void;
   onAddAttachment: (name: string, url: string) => void;
   onRemoveAttachment: (att: ProjectAttachment) => void;
   readOnly?: boolean;
@@ -3971,6 +4038,7 @@ const GeneralInfoPanel: React.FC<{
   assignees,
   currentGate,
   gateTargets,
+  gateStatuses,
   attachments,
   attachmentError,
   templateId,
@@ -3986,6 +4054,7 @@ const GeneralInfoPanel: React.FC<{
   onChangeAssignees,
   onChangeCurrentGate,
   onChangeGateTarget,
+  onChangeGateStatus,
   onAddAttachment,
   onRemoveAttachment,
   readOnly = false,
@@ -4022,7 +4091,7 @@ const GeneralInfoPanel: React.FC<{
     setLinkUrl('');
   };
 
-  const dateInvalid = !!(startDate && endDate && endDate < startDate);
+
 
   return (
     <div className="bg-white border border-slate-200 rounded-sm shadow-xl overflow-hidden">
@@ -4090,74 +4159,23 @@ const GeneralInfoPanel: React.FC<{
           disabled={readOnly}
         />
 
-        {/* Dates + Status row */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Start Date */}
-          <div>
-            <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-2">
-              Start Date
-            </label>
-            <div className="relative">
-              <CalendarIcon
-                size={14}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-              />
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => onChangeStartDate(e.target.value)}
-                disabled={readOnly}
-                className="w-full bg-slate-50 border border-slate-200 pl-9 pr-3 py-2.5 text-sm font-medium text-slate-900 focus:border-blue-500 outline-none disabled:opacity-60"
-              />
-            </div>
-          </div>
-
-          {/* End Date */}
-          <div>
-            <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-2">
-              End Date
-            </label>
-            <div className="relative">
-              <CalendarIcon
-                size={14}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-              />
-              <input
-                type="date"
-                value={endDate}
-                min={startDate || undefined}
-                onChange={(e) => onChangeEndDate(e.target.value)}
-                disabled={readOnly}
-                className={`w-full bg-slate-50 border pl-9 pr-3 py-2.5 text-sm font-medium text-slate-900 focus:border-blue-500 outline-none disabled:opacity-60 ${
-                  dateInvalid ? 'border-red-400' : 'border-slate-200'
-                }`}
-              />
-            </div>
-            {dateInvalid && (
-              <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-red-500">
-                End date must be on or after start date
-              </p>
-            )}
-          </div>
-
-          {/* Status */}
-          <div>
-            <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-2">
-              Status
-            </label>
-            <select
-              value={infoStatus}
-              onChange={(e) => onChangeStatus(e.target.value as InfoStatus)}
-              disabled={readOnly}
-              className="w-full bg-slate-50 border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-900 focus:border-blue-500 outline-none disabled:opacity-60 appearance-none cursor-pointer"
-            >
-              {INFO_STATUS_OPTIONS.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* Status row */}
+        <div className="w-48">
+          <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-2">
+            Status
+          </label>
+          <select
+            value={infoStatus}
+            onChange={(e) => onChangeStatus(e.target.value as InfoStatus)}
+            disabled={readOnly}
+            className="w-full bg-slate-50 border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-900 focus:border-blue-500 outline-none disabled:opacity-60 appearance-none cursor-pointer"
+          >
+            {INFO_STATUS_OPTIONS.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Scope row — template + enabled count + edit modal trigger */}
@@ -4199,12 +4217,12 @@ const GeneralInfoPanel: React.FC<{
           </div>
         </div>
 
-        {/* Stage-gate section */}
+        {/* Stage-gate / Schedule section */}
         <div className="border-t border-slate-100 pt-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-                Stage Gates
+                {(templateId ?? 'full_ramp') === 'full_ramp' ? 'Gate Schedule' : 'Project Schedule'}
               </span>
               <span className="relative group inline-flex items-center">
                 <Info
@@ -4216,63 +4234,141 @@ const GeneralInfoPanel: React.FC<{
                   role="tooltip"
                   className="pointer-events-none absolute left-0 top-full mt-2 z-30 w-72 max-w-[calc(100vw-1rem)] px-3 py-2 bg-slate-900 text-white text-[10px] font-medium leading-snug rounded shadow-xl opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
                 >
-                  CR = Concept Review · PDR = Preliminary Design Review · CDR = Critical Design Review · TRR = Test Readiness Review · PRR = Production Readiness Review. Set target dates to help the AI reason about schedule pressure.
+                  {(templateId ?? 'full_ramp') === 'full_ramp'
+                    ? 'Set target dates and schedule status per gate. Click the status pill to cycle it. CR = Concept Review · PDR = Preliminary · CDR = Critical Design · TRR = Test Readiness · PRR = Production Readiness.'
+                    : 'Set target start and end dates and their schedule status. Click the status pill to cycle it.'}
                 </span>
               </span>
             </div>
-            {currentGate && (
-              <span className="text-[9px] font-black uppercase tracking-widest px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200">
-                Currently at {currentGate}
-              </span>
+            {(templateId ?? 'full_ramp') === 'full_ramp' && (
+              <div className="flex items-center gap-2">
+                {currentGate && (
+                  <span className="text-[9px] font-black uppercase tracking-widest px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200">
+                    Currently at {currentGate}
+                  </span>
+                )}
+                <select
+                  value={currentGate}
+                  onChange={(e) =>
+                    onChangeCurrentGate((e.target.value || '') as ProductGate | '')
+                  }
+                  disabled={readOnly}
+                  className="bg-slate-50 border border-slate-200 px-2 py-1.5 text-[11px] font-medium text-slate-700 focus:border-blue-500 outline-none disabled:opacity-60 appearance-none cursor-pointer"
+                >
+                  <option value="">Set current gate…</option>
+                  {GATE_OPTIONS.map((g) => (
+                    <option key={g} value={g}>
+                      {g} — {GATE_LABELS[g]}
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* Current gate dropdown */}
-            <div>
-              <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-2">
-                Current Gate
-              </label>
-              <select
-                value={currentGate}
-                onChange={(e) =>
-                  onChangeCurrentGate((e.target.value || '') as ProductGate | '')
-                }
-                disabled={readOnly}
-                className="w-full bg-slate-50 border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-900 focus:border-blue-500 outline-none disabled:opacity-60 appearance-none cursor-pointer"
-              >
-                <option value="">— Not set —</option>
-                {GATE_OPTIONS.map((g) => (
-                  <option key={g} value={g}>
-                    {GATE_LABELS[g]}
-                  </option>
-                ))}
-              </select>
+          {/* Schedule table */}
+          <div className="border border-slate-200 rounded overflow-hidden">
+            {/* Header row */}
+            <div className="grid grid-cols-[80px_1fr_130px] bg-slate-50 border-b border-slate-200">
+              <div className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-500">Gate</div>
+              <div className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-500 border-l border-slate-200">Target Date</div>
+              <div className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-500 border-l border-slate-200">Status</div>
             </div>
 
-            {/* Target dates for each gate */}
-            {GATE_OPTIONS.map((gate) => (
-              <div key={gate}>
-                <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-2">
-                  {gate} Target
-                </label>
-                <div className="relative">
-                  <CalendarIcon
-                    size={14}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-                  />
-                  <input
-                    type="date"
-                    value={gateTargets[gate] || ''}
-                    onChange={(e) => onChangeGateTarget(gate, e.target.value)}
-                    disabled={readOnly}
-                    className={`w-full bg-slate-50 border pl-9 pr-3 py-2.5 text-sm font-medium text-slate-900 focus:border-blue-500 outline-none disabled:opacity-60 ${
-                      currentGate === gate ? 'border-blue-400' : 'border-slate-200'
-                    }`}
-                  />
-                </div>
-              </div>
-            ))}
+            {(templateId ?? 'full_ramp') === 'full_ramp' ? (
+              /* Full-ramp: one row per gate */
+              GATE_OPTIONS.map((gate, idx) => {
+                const isCurrentGate = currentGate === gate;
+                const status = gateStatuses[gate] as GateStatus | undefined;
+                return (
+                  <div
+                    key={gate}
+                    className={`grid grid-cols-[80px_1fr_130px] ${idx > 0 ? 'border-t border-slate-100' : ''} ${isCurrentGate ? 'bg-blue-50/40' : 'bg-white'}`}
+                  >
+                    {/* Gate label */}
+                    <div className="px-3 py-2.5 flex items-center gap-1.5">
+                      <span className={`text-[11px] font-black ${isCurrentGate ? 'text-blue-700' : 'text-slate-700'}`}>{gate}</span>
+                      {isCurrentGate && (
+                        <span className="text-[8px] font-black uppercase tracking-widest bg-blue-600 text-white px-1 py-0.5 rounded-sm">NOW</span>
+                      )}
+                    </div>
+                    {/* Target date */}
+                    <div className="border-l border-slate-100 px-3 py-2 flex items-center">
+                      <input
+                        type="date"
+                        value={gateTargets[gate] || ''}
+                        onChange={(e) => onChangeGateTarget(gate, e.target.value)}
+                        disabled={readOnly}
+                        className="w-full bg-transparent text-[12px] font-medium text-slate-800 outline-none disabled:opacity-60 cursor-pointer"
+                      />
+                    </div>
+                    {/* Status pill — click to cycle */}
+                    <div className="border-l border-slate-100 px-3 py-2 flex items-center">
+                      <button
+                        type="button"
+                        disabled={readOnly}
+                        onClick={() => onChangeGateStatus(gate, nextGateStatus(status))}
+                        className={`text-[10px] font-bold px-2.5 py-1 border rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                          status
+                            ? GATE_STATUS_STYLES[status]
+                            : 'bg-slate-100 text-slate-400 border-slate-200 hover:bg-slate-200'
+                        }`}
+                      >
+                        {status ? GATE_STATUS_LABELS[status] : '—'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              /* Non-full-ramp: Start row (date only) + End row (date + status) */
+              (['project_start', 'project_end'] as const).map((key, idx) => {
+                const label = key === 'project_start' ? 'Start' : 'End';
+                const dateValue = key === 'project_start' ? startDate : endDate;
+                const onChangeDate = key === 'project_start' ? onChangeStartDate : onChangeEndDate;
+                const status = gateStatuses[key] as GateStatus | undefined;
+                const showStatus = key === 'project_end';
+                return (
+                  <div
+                    key={key}
+                    className={`grid grid-cols-[80px_1fr_130px] ${idx > 0 ? 'border-t border-slate-100' : ''} bg-white`}
+                  >
+                    <div className="px-3 py-2.5 flex items-center">
+                      <span className="text-[11px] font-black text-slate-700">{label}</span>
+                    </div>
+                    <div className="border-l border-slate-100 px-3 py-2 flex items-center">
+                      <input
+                        type="date"
+                        value={dateValue}
+                        onChange={(e) => onChangeDate(e.target.value)}
+                        disabled={readOnly}
+                        className="w-full bg-transparent text-[12px] font-medium text-slate-800 outline-none disabled:opacity-60 cursor-pointer"
+                      />
+                    </div>
+                    <div className="border-l border-slate-100 px-3 py-2 flex items-center">
+                      {showStatus ? (
+                        <button
+                          type="button"
+                          disabled={readOnly}
+                          onClick={() => onChangeGateStatus(key, nextGateStatus(status))}
+                          className={`text-[10px] font-bold px-2.5 py-1 border rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                            status
+                              ? GATE_STATUS_STYLES[status]
+                              : 'bg-slate-100 text-slate-400 border-slate-200 hover:bg-slate-200'
+                          }`}
+                        >
+                          {status
+                            ? (status === 'done' ? 'Delivered' : GATE_STATUS_LABELS[status])
+                            : '—'}
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-slate-300 italic">—</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
 
