@@ -806,32 +806,6 @@ const OpenItemsPanel: React.FC<OpenItemsPanelProps> = ({
                                 className="w-28 text-[10px] text-slate-600 placeholder-slate-300 bg-transparent border-b border-transparent hover:border-slate-200 focus:border-blue-300 outline-none transition-colors" />
                           }
                         </div>
-                        {/* Due date — editable for custom items, read-only for deliverables */}
-                        {item.source !== 'deliverable' && (
-                          <div className="flex items-center gap-1">
-                            <Calendar size={9} className="text-slate-300 flex-shrink-0" />
-                            {readOnly ? (
-                              getDueDateValue(item) ? (
-                                <span className={`text-[10px] font-bold ${
-                                  new Date(getDueDateValue(item) + 'T00:00:00Z').getTime() < Date.now()
-                                    ? 'text-rose-600' : 'text-slate-400'
-                                }`}>
-                                  {new Date(getDueDateValue(item) + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                </span>
-                              ) : null
-                            ) : (
-                              <input
-                                type="date"
-                                value={getDueDateValue(item)}
-                                onChange={(e) => handleDueDateChange(item, e.target.value)}
-                                className={`text-[10px] bg-transparent border-b border-transparent hover:border-slate-200 focus:border-blue-300 outline-none transition-colors cursor-pointer ${
-                                  getDueDateValue(item) && new Date(getDueDateValue(item) + 'T00:00:00Z').getTime() < Date.now()
-                                    ? 'text-rose-600 font-bold' : 'text-slate-400'
-                                }`}
-                              />
-                            )}
-                          </div>
-                        )}
                       </div>
                     )}
                   </div>
@@ -845,6 +819,36 @@ const OpenItemsPanel: React.FC<OpenItemsPanelProps> = ({
                         className="w-3 h-3 rounded-full transition-transform hover:scale-125 disabled:cursor-default flex-shrink-0">
                         <span className={`block w-3 h-3 rounded-full ${pmeta.dotClass}`} />
                       </button>
+                    )}
+
+                    {/* Due date — editable for custom items */}
+                    {!item.closed && item.source !== 'deliverable' && (
+                      readOnly ? (
+                        getDueDateValue(item) ? (
+                          <span className={`flex items-center gap-0.5 text-[10px] font-bold ${
+                            new Date(getDueDateValue(item) + 'T00:00:00Z').getTime() < Date.now() ? 'text-rose-600' : 'text-slate-400'
+                          }`}>
+                            <Calendar size={9} />
+                            {new Date(getDueDateValue(item) + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </span>
+                        ) : null
+                      ) : (
+                        <div className="flex items-center gap-0.5">
+                          <Calendar size={9} className={`flex-shrink-0 ${
+                            getDueDateValue(item) && new Date(getDueDateValue(item) + 'T00:00:00Z').getTime() < Date.now()
+                              ? 'text-rose-500' : 'text-slate-300'
+                          }`} />
+                          <input
+                            type="date"
+                            value={getDueDateValue(item)}
+                            onChange={(e) => handleDueDateChange(item, e.target.value)}
+                            className={`text-[10px] bg-transparent border-b border-transparent hover:border-slate-200 focus:border-blue-300 outline-none transition-colors cursor-pointer ${
+                              getDueDateValue(item) && new Date(getDueDateValue(item) + 'T00:00:00Z').getTime() < Date.now()
+                                ? 'text-rose-600 font-bold' : 'text-slate-400'
+                            }`}
+                          />
+                        </div>
+                      )
                     )}
 
                     {/* Source chip */}
