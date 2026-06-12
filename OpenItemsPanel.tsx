@@ -98,16 +98,18 @@ export interface PushToOpenItemsInlineProps {
 export const PushToOpenItemsInline: React.FC<PushToOpenItemsInlineProps> = ({
   db, userId, projectId, sourceTool, sourceDocId, initialTitle = '',
 }) => {
-  const [open,   setOpen]   = useState(false);
-  const [text,   setText]   = useState('');
-  const [prio,   setPrio]   = useState<OpenItemPriority>('medium');
-  const [saving, setSaving] = useState(false);
-  const [done,   setDone]   = useState(false);
+  const [open,      setOpen]      = useState(false);
+  const [text,      setText]      = useState('');
+  const [prio,      setPrio]      = useState<OpenItemPriority>('medium');
+  const [saving,    setSaving]    = useState(false);
+  const [done,      setDone]      = useState(false);
+  const [pushError, setPushError] = useState<string | null>(null);
 
   const handleOpen = () => {
     setText(initialTitle.slice(0, 150));
     setPrio('medium');
     setDone(false);
+    setPushError(null);
     setOpen(true);
   };
 
@@ -124,6 +126,12 @@ export const PushToOpenItemsInline: React.FC<PushToOpenItemsInlineProps> = ({
       setTimeout(() => { setOpen(false); setDone(false); }, 1500);
     } catch (e) {
       console.warn('[PushToOpenItemsInline] error', e);
+      const msg = (e as any)?.message ?? 'Unknown error';
+      setPushError(
+        msg.includes('insufficient permissions')
+          ? 'Firestore rules not deployed — paste firestore.rules into Firebase Console → Firestore → Rules → Publish.'
+          : `Failed: ${msg}`
+      );
     } finally {
       setSaving(false);
     }
@@ -142,7 +150,11 @@ export const PushToOpenItemsInline: React.FC<PushToOpenItemsInlineProps> = ({
   }
 
   return (
-    <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 px-2 py-1.5 rounded-sm" onClick={(e) => e.stopPropagation()}>
+    <div className="flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
+      {pushError && (
+        <div className="bg-rose-50 border border-rose-200 rounded px-2 py-1.5 text-[10px] text-rose-700 leading-snug">{pushError}</div>
+      )}
+      <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 px-2 py-1.5 rounded-sm">
       <ArrowUpRight size={11} className="text-blue-500 flex-shrink-0" />
       {done ? (
         <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-700">
@@ -190,6 +202,7 @@ export const PushToOpenItemsInline: React.FC<PushToOpenItemsInlineProps> = ({
           </button>
         </>
       )}
+      </div>
     </div>
   );
 };

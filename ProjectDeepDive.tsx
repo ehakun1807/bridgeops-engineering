@@ -95,6 +95,7 @@ import {
 } from './coachClient.ts';
 import type { AIAnalysis } from './aiClient';
 import { generateExecutiveSummary } from './pptxGenerator';
+import { downloadGateReviewPdf } from './utils/gateReviewPdf.ts';
 import {
   type ProjectConnection,
   type ProjectStub,
@@ -795,6 +796,9 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [closeConfirm, setCloseConfirm] = useState<'completed' | 'cancelled' | null>(null);
   const [downloadingSummary, setDownloadingSummary] = useState(false);
+  const [downloadingGateReport, setDownloadingGateReport] = useState(false);
+  const [reportMenuOpen, setReportMenuOpen] = useState(false);
+  const reportMenuRef = useRef<HTMLDivElement>(null);
 
   // Which parent parameter bucket is currently visible.
   const [activeGroupId, setActiveGroupId] = useState<string>(RAMP_GROUPS[0].id);
@@ -820,6 +824,23 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
       document.removeEventListener('keydown', onKey);
     };
   }, [toolsMenuOpen]);
+
+  // Report menu (Project Report ▾ dropdown) — close on outside click or Escape.
+  useEffect(() => {
+    if (!reportMenuOpen) return;
+    const onMouseDown = (e: MouseEvent) => {
+      if (reportMenuRef.current && !reportMenuRef.current.contains(e.target as globalThis.Node)) {
+        setReportMenuOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setReportMenuOpen(false); };
+    document.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [reportMenuOpen]);
 
   // Reseed when the user navigates into a different project. Legacy gate
   // values on the incoming project are migrated before seeding so the UI
@@ -1717,6 +1738,76 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
     }
   };
 
+  // Build a gate-scoped PDF review report from current in-memory state.
+  // Reads from already-persisted projectIntelligence (lastAnalyzedMs + aiAnalysis)
+  // — no fresh Gemini call.
+  const handleDownloadGateReport = async () => {
+    if (downloadingGateReport || !currentGate) return;
+    setDownloadingGateReport(true);
+    setError(null);
+    try {
+      // Flatten deliverables into GateDeliverable[] for the PDF helper.
+      const flatDels: Array<{ id: string; title: string; dueBy?: string; checked: boolean; waived: boolean }> = [];
+      for (const g of RAMP_GROUPS) {
+        for (const item of g.items) {
+          if (disabledItemIds.includes(item.id)) continue;
+          const state = deliverables[item.id] || {};
+          const template = item.deliverables || [];
+          for (const t of template) {
+            if ((state.hiddenTemplateIds || []).includes(t.id)) continue;
+            flatDels.push({
+              id: `${item.id}__${t.id}`,
+              title: t.title,
+              dueBy: t.dueBy,
+              checked: (state.checkedIds || []).includes(t.id),
+              waived: (state.waivedTemplateIds || []).includes(t.id)
+            });
+          }
+          for (const custom of (state.custom || [])) {
+            flatDels.push({
+              id: `${item.id}__custom__${Math.random()}`,
+              title: (custom as any).label || (custom as any).text || 'Custom item',
+              dueBy: (custom as any).gate ?? currentGate,
+              checked: !!(custom as any).done,
+              waived: !!(custom as any).waived
+            });
+          }
+        }
+      }
+
+      const groupScoresForReport = RAMP_GROUPS.map((g) => ({
+        id: g.id,
+        title: g.title,
+        score: scoreForGroup(g, metrics, disabledItemIds, deliverableScores)
+      }));
+
+      await downloadGateReviewPdf({
+        projectName: projectName.trim() || project.name,
+        currentGate,
+        reportDate: new Date(),
+        assignees: assignees || '',
+        overall,
+        groupScores: groupScoresForReport,
+        deliverables: flatDels,
+        statusSnapshot: aiAnalysis?.statusSnapshot,
+        risks: aiAnalysis?.risks,
+        topActions: aiAnalysis?.topActions,
+        analyzedAtMs: lastAnalyzedMs,
+        taktCapacity: project.taktSummary?.capacity,
+        taktStudyName: project.taktSummary?.studyName,
+        taktSec: project.taktSummary?.taktSec,
+        bottleneckSec: project.taktSummary?.bottleneckSec,
+        decisionActive: project.decisionSummary?.activeCount,
+        decisionReversed: project.decisionSummary?.reversedCount
+      });
+    } catch (err: any) {
+      console.error('Gate review PDF failed:', err);
+      setError(err?.message || 'Could not generate gate report.');
+    } finally {
+      setDownloadingGateReport(false);
+    }
+  };
+
   const band = scoreBand(overall);
 
   return (
@@ -1833,19 +1924,60 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
                 <AlertTriangle size={12} /> {error}
               </span>
             )}
-            <button
-              onClick={handleDownloadSummary}
-              disabled={saving || downloadingSummary}
-              title={aiAnalysis ? 'Download editable .pptx Project Health Snapshot (5 slides)' : 'Project Health Snapshot — run AI Analysis first for full deck'}
-              className="text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-blue-600 transition-colors flex items-center gap-1 disabled:opacity-50"
-            >
-              {downloadingSummary ? (
-                <Loader2 size={12} className="animate-spin" />
-              ) : (
-                <Download size={12} />
-              )}
-              Project Health Snapshot
-            </button>
+            {/* Project Report dropdown */}
+            <div className="relative" ref={reportMenuRef}>
+              <button
+                onClick={() => setReportMenuOpen((o) => !o)}
+                disabled={saving || downloadingSummary || downloadingGateReport}
+                className="text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-blue-600 transition-colors flex items-center gap-1 disabled:opacity-50"
+              >
+                {(downloadingSummary || downloadingGateReport) ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <Download size={12} />
+                )}
+                Project Report
+                <ChevronDown size={10} className={`transition-transform ${reportMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+              <AnimatePresence>
+                {reportMenuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.12 }}
+                    className="absolute right-0 top-full mt-1.5 w-56 bg-white border border-slate-200 rounded shadow-lg z-50 py-1"
+                  >
+                    <button
+                      onClick={() => { setReportMenuOpen(false); handleDownloadSummary(); }}
+                      disabled={downloadingSummary}
+                      className="w-full text-left px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 disabled:opacity-50"
+                      title={aiAnalysis ? 'Download editable .pptx (5 slides)' : 'Run AI Analysis first for the full deck'}
+                    >
+                      <FileText size={11} />
+                      <div>
+                        <div>Project Health Snapshot</div>
+                        <div className="text-[9px] font-normal normal-case tracking-normal text-slate-400 mt-0.5">Editable .pptx · 5 slides</div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => { setReportMenuOpen(false); handleDownloadGateReport(); }}
+                      disabled={!currentGate || downloadingGateReport}
+                      className="w-full text-left px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 disabled:opacity-50"
+                      title={!currentGate ? 'Set a current gate in General Info first' : `Generate PDF gate review for ${currentGate}`}
+                    >
+                      <FileIcon size={11} />
+                      <div>
+                        <div>Gate Review Report</div>
+                        <div className="text-[9px] font-normal normal-case tracking-normal text-slate-400 mt-0.5">
+                          {currentGate ? `${currentGate} · PDF · DHF-ready` : 'Set a gate first'}
+                        </div>
+                      </div>
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
             <button
               onClick={() => setCloseConfirm('cancelled')}
               disabled={saving}

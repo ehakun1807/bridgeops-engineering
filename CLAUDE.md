@@ -736,3 +736,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   2. **Push to Vercel** (`git push`) so all supplier AI Analysis prompt changes are live in prod.
   3. **Supplier `project.linkedSupplierIds` in Firestore rules** — no rules change needed; `linkedSupplierIds` is a new field on the existing `projects` collection covered by the existing `isValidProject` validator (only required keys are enforced).
   4. **Carry-over** — end-of-beta cleanup checklist (allowlist now 12 places), per-UID rate limiting on authenticated AI handlers, Sentry, mobile lockout, SEO meta tags for `/#/intelligence`.
+
+### 2026-06-12
+
+- **Open Items — Push button moved from list rows into form/edit pages (all 7 tools).** User reported the `→ Open Items` button was showing under the event title in list view, not in the form. Removed from list views and added to each tool's edit form footer (or equivalent):
+  - **`MeetingsTool.tsx`** — Added to `MeetingForm` footer left side alongside the PDF download button (only when `!isNew && !readOnly`).
+  - **`TaktStudyTool.tsx`** — Added to `StudyForm` footer between the xlsx download and Cancel button (only when `initial.id && !readOnly`).
+  - **`ProcessMapTool.tsx`** — Added to `ProcessMapForm` toolbar after the Save button (only when `initial.id && !readOnly`).
+  - **`DecisionLedgerTool.tsx`** — Added to `DecisionForm` footer left side alongside the required-fields hint (only when `!isNew && !readOnly`).
+  - **`LessonsLearnedTool.tsx`** — Added to `LessonForm` footer left side (only when `!isNew && !readOnly`).
+  - **`ControlPlanTool.tsx`** — Added to the plan form save controls section (only when `editingPlan !== null && !readOnly`); layout changed from `justify-end` to `justify-between`.
+  - **`ProductBomTool.tsx`** — Added to `BomView` header area alongside the "Back to list" button (always visible for a saved record).
+  - **Pattern for all tools:** `isNew = !initial.id` — button only renders for saved records (can't push an unsaved item). `db` is accessible via module-level import in each file.
+
+- **Open Items — Visible error feedback for all save failures.** All three save paths were swallowing errors silently (`console.warn` only); users saw nothing when saves failed. Fixed with visible error states:
+  - **`PushToOpenItemsInline` component (`OpenItemsPanel.tsx`)** — Added `pushError` state. On failure shows a rose error banner above the input inline (not dismissable — stays visible so user knows the push didn't land). Cleared on re-open. Root cause message surfaced: if the error contains "insufficient permissions", shows specific Firebase Console instructions.
+  - **`handleSaveCustom` (Add Item form, `OpenItemsPanel.tsx`)** — Added `saveCustomError` state. Shows rose banner inside the Add Item form above the Cancel/Save buttons. Cancel button also clears the error.
+  - **`persistMetadata`, `handleTogglePriority`, `handleOwnerChange` (`OpenItemsPanel.tsx`)** — Added shared `persistError` state. Shows dismissable (×) rose banner at the top of the Open Items panel whenever a priority change, owner change, or dismiss write fails.
+
+- **Root cause of all failures: Firestore rules not deployed.** The `openItems` and `openItemsDismissed` rules are correctly written in the local `firestore.rules` file but were never published to the named Firestore database (same multi-DB deploy lie gotcha as every prior new collection). Fix: paste `firestore.rules` into Firebase Console → Firestore → Rules → Publish; verify "Last published" timestamp moves. Once deployed, all three save paths work and no error banners appear.
+
+- **`tsc --noEmit` clean** across all changed files.
+
+- **Open follow-ups (after today):**
+  1. **Carry-over** — end-of-beta cleanup checklist (allowlist 12 places), per-UID rate limiting on authenticated AI handlers, Sentry, mobile lockout, SEO meta tags for `/#/intelligence`, ECO Pulse xlsx diff export, Control Plan PDF export.
