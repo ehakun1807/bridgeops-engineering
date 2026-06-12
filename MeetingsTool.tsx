@@ -37,7 +37,7 @@ import {
   Check,
 } from 'lucide-react';
 import { downloadMeetingsPdf } from './utils/meetingsPdf.ts';
-import { pushToOpenItems, type OpenItemPriority } from './OpenItemsPanel.tsx';
+import { PushToOpenItemsInline } from './OpenItemsPanel.tsx';
 import { db, auth } from './firebase.ts';
 import { logActivity } from './activityLogger.ts';
 import {
@@ -407,54 +407,68 @@ const MeetingList: React.FC<MeetingListProps> = ({
             : 'bg-blue-50 text-blue-700 border-blue-200';
         const hasActions = m.actionItems && m.actionItems.trim().length > 0;
         return (
-          <li key={m.id} className="px-6 py-4 flex items-start gap-4 hover:bg-slate-50 transition-colors">
-            <button
-              type="button"
-              onClick={() => onOpen(m)}
-              className="flex-1 text-left"
-            >
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[11px] font-bold uppercase tracking-widest text-slate-500 tabular-nums">
-                  {formatMeetingDate(m.dateMs)}
-                </span>
-                <span
-                  className={`inline-flex items-center gap-1 border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest ${kindClass}`}
-                >
-                  <KindIcon size={10} /> {kindLabel}
-                </span>
-                {hasActions && (
-                  <span className="inline-flex items-center border border-emerald-200 bg-emerald-50 text-emerald-700 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest">
-                    Action items
-                  </span>
-                )}
-              </div>
-              <p className="text-sm font-bold text-slate-900 mt-1 truncate">
-                {m.title || 'Untitled meeting'}
-              </p>
-              {m.attendees && (
-                <p className="text-[11px] text-slate-500 mt-0.5 flex items-start gap-1">
-                  <Users size={11} className="mt-0.5 flex-shrink-0" />
-                  <span className="line-clamp-1">{m.attendees}</span>
-                </p>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => onDownload(m)}
-              title="Download as PDF"
-              className="text-slate-400 hover:text-slate-700 transition-colors p-1"
-            >
-              <Download size={14} />
-            </button>
-            {!readOnly && (
+          <li key={m.id} className="px-6 py-4 hover:bg-slate-50 transition-colors">
+            <div className="flex items-start gap-4">
               <button
                 type="button"
-                onClick={() => onDelete(m)}
-                title="Delete meeting"
-                className="text-slate-400 hover:text-red-600 transition-colors p-1"
+                onClick={() => onOpen(m)}
+                className="flex-1 text-left"
               >
-                <Trash2 size={14} />
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] font-bold uppercase tracking-widest text-slate-500 tabular-nums">
+                    {formatMeetingDate(m.dateMs)}
+                  </span>
+                  <span
+                    className={`inline-flex items-center gap-1 border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest ${kindClass}`}
+                  >
+                    <KindIcon size={10} /> {kindLabel}
+                  </span>
+                  {hasActions && (
+                    <span className="inline-flex items-center border border-emerald-200 bg-emerald-50 text-emerald-700 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest">
+                      Action items
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm font-bold text-slate-900 mt-1 truncate">
+                  {m.title || 'Untitled meeting'}
+                </p>
+                {m.attendees && (
+                  <p className="text-[11px] text-slate-500 mt-0.5 flex items-start gap-1">
+                    <Users size={11} className="mt-0.5 flex-shrink-0" />
+                    <span className="line-clamp-1">{m.attendees}</span>
+                  </p>
+                )}
               </button>
+              <button
+                type="button"
+                onClick={() => onDownload(m)}
+                title="Download as PDF"
+                className="text-slate-400 hover:text-slate-700 transition-colors p-1"
+              >
+                <Download size={14} />
+              </button>
+              {!readOnly && (
+                <button
+                  type="button"
+                  onClick={() => onDelete(m)}
+                  title="Delete meeting"
+                  className="text-slate-400 hover:text-red-600 transition-colors p-1"
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </div>
+            {!readOnly && (
+              <div className="mt-2 pl-0">
+                <PushToOpenItemsInline
+                  db={db}
+                  userId={m.userId}
+                  projectId={m.projectId}
+                  sourceTool="meeting"
+                  sourceDocId={m.id}
+                  initialTitle={m.title || ''}
+                />
+              </div>
             )}
           </li>
         );
@@ -627,48 +641,6 @@ const MeetingForm: React.FC<MeetingFormProps> = ({ initial, onCancel, onSave, re
   const [importOpen, setImportOpen] = useState(false);
   const [emailPaste, setEmailPaste] = useState('');
   const [importApplied, setImportApplied] = useState(false);
-
-  // → Open Items push state
-  const [pushOpen, setPushOpen]   = useState(false);
-  const [pushing,  setPushing]    = useState(false);
-  const [pushDone, setPushDone]   = useState(false);
-  // editable rows: { text, priority, selected }
-  const [pushRows, setPushRows]   = useState<Array<{ text: string; priority: OpenItemPriority; selected: boolean }>>([]);
-
-  const parsedActionLines = useMemo(() =>
-    (draft.actionItems || '')
-      .split('\n')
-      .map((l) => l.replace(/^[-•*]\s*/, '').replace(/^\d+\.\s*/, '').trim())
-      .filter((l) => l.length > 0),
-    [draft.actionItems]
-  );
-
-  const handleOpenPush = () => {
-    setPushRows(parsedActionLines.map((text) => ({ text, priority: 'medium' as OpenItemPriority, selected: true })));
-    setPushDone(false);
-    setPushOpen(true);
-  };
-
-  const handlePushToOpenItems = async () => {
-    const selected = pushRows.filter((r) => r.selected && r.text.trim());
-    if (!selected.length || !auth.currentUser) return;
-    const userId    = auth.currentUser.uid;
-    const projectId = initial.projectId;
-    setPushing(true);
-    try {
-      await pushToOpenItems(db, userId, projectId, selected.map((r) => ({
-        title: r.text.trim(),
-        priority: r.priority,
-        sourceRef: { tool: 'meeting' as const, docId: initial.id || '', originalTitle: draft.title || draft.scope },
-      })));
-      setPushDone(true);
-      setTimeout(() => setPushOpen(false), 1200);
-    } catch (e) {
-      console.warn('[MeetingForm] push error', e);
-    } finally {
-      setPushing(false);
-    }
-  };
 
   const handleImportEmail = () => {
     if (!emailPaste.trim()) return;
@@ -912,55 +884,6 @@ const MeetingForm: React.FC<MeetingFormProps> = ({ initial, onCancel, onSave, re
             {draft.actionItems.length} / {ACTIONS_MAX}
           </div>
 
-          {/* → Open Items push section */}
-          {!readOnly && parsedActionLines.length > 0 && (
-            <div className="mt-3 border border-slate-200 rounded-sm">
-              <button type="button" onClick={() => pushOpen ? setPushOpen(false) : handleOpenPush()}
-                className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-colors">
-                <span className="flex items-center gap-1.5">
-                  <ArrowUpRight size={11} className="text-blue-500" />
-                  Send to Open Items
-                </span>
-                {pushOpen ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-              </button>
-
-              {pushOpen && (
-                <div className="border-t border-slate-200 p-3 space-y-2">
-                  <p className="text-[10px] text-slate-400">Select which action items to follow up on. You can rename them before sending.</p>
-                  {pushRows.map((row, idx) => (
-                    <div key={idx} className={`flex items-center gap-2 p-2 rounded border transition-colors ${row.selected ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200 opacity-60'}`}>
-                      <input type="checkbox" checked={row.selected}
-                        onChange={(e) => setPushRows((prev) => prev.map((r, i) => i === idx ? { ...r, selected: e.target.checked } : r))}
-                        className="flex-shrink-0 accent-blue-600 w-3 h-3" />
-                      <input type="text" value={row.text}
-                        onChange={(e) => setPushRows((prev) => prev.map((r, i) => i === idx ? { ...r, text: e.target.value } : r))}
-                        className="flex-1 text-[11px] text-slate-800 bg-transparent border-none outline-none min-w-0" />
-                      <select value={row.priority}
-                        onChange={(e) => setPushRows((prev) => prev.map((r, i) => i === idx ? { ...r, priority: e.target.value as OpenItemPriority } : r))}
-                        className="text-[10px] text-slate-600 bg-white border border-slate-200 rounded px-1.5 py-0.5 outline-none appearance-none cursor-pointer flex-shrink-0">
-                        <option value="high">High</option>
-                        <option value="medium">Medium</option>
-                        <option value="low">Low</option>
-                      </select>
-                    </div>
-                  ))}
-                  <div className="flex justify-end pt-1">
-                    <button type="button"
-                      disabled={pushing || pushRows.every((r) => !r.selected) || pushRows.filter((r) => r.selected).every((r) => !r.text.trim())}
-                      onClick={handlePushToOpenItems}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-sm transition-colors">
-                      {pushDone
-                        ? <><Check size={11} />Sent!</>
-                        : pushing
-                          ? <><Loader2 size={11} className="animate-spin" />Sending…</>
-                          : <><ArrowUpRight size={11} />Send {pushRows.filter((r) => r.selected).length} item{pushRows.filter((r) => r.selected).length !== 1 ? 's' : ''}</>
-                      }
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </div>
 

@@ -43,6 +43,7 @@ import {
 import { downloadControlPlanXlsx } from './controlPlanXlsx.ts';
 import { db, auth } from './firebase.ts';
 import { logActivity } from './activityLogger.ts';
+import { PushToOpenItemsInline } from './OpenItemsPanel.tsx';
 import {
   collection,
   query,
@@ -884,66 +885,80 @@ const ControlPlanTool: React.FC<ControlPlanToolProps> = ({
                   const critCount = plan.items.filter((it) => it.specialClass === 'critical').length;
                   const sigCount  = plan.items.filter((it) => it.specialClass === 'significant').length;
                   return (
-                    <li key={plan.id} className="flex items-start gap-3 px-6 py-4 hover:bg-slate-50 transition-colors">
-                      <button
-                        type="button"
-                        onClick={() => openEdit(plan)}
-                        className="flex-1 text-left min-w-0"
-                      >
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[11px] text-slate-500">{formatDate(plan.dateMs)}</span>
-                          <span className={`inline-flex items-center border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest ${PLAN_TYPE_COLORS[plan.planType]}`}>
-                            {PLAN_TYPE_LABELS[plan.planType]}
-                          </span>
-                          {plan.revisionLevel && (
-                            <span className="text-[10px] font-mono text-slate-500 border border-slate-200 px-1.5 py-0.5">
-                              {plan.revisionLevel}
+                    <li key={plan.id} className="px-6 py-4 hover:bg-slate-50 transition-colors">
+                      <div className="flex items-start gap-3">
+                        <button
+                          type="button"
+                          onClick={() => openEdit(plan)}
+                          className="flex-1 text-left min-w-0"
+                        >
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[11px] text-slate-500">{formatDate(plan.dateMs)}</span>
+                            <span className={`inline-flex items-center border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest ${PLAN_TYPE_COLORS[plan.planType]}`}>
+                              {PLAN_TYPE_LABELS[plan.planType]}
                             </span>
-                          )}
-                          {critCount > 0 && (
-                            <span className="inline-flex items-center gap-1 border border-rose-200 bg-rose-50 text-rose-700 px-1.5 py-0.5 text-[9px] font-black uppercase">
-                              {critCount} Critical
-                            </span>
-                          )}
-                          {sigCount > 0 && (
-                            <span className="inline-flex items-center gap-1 border border-amber-200 bg-amber-50 text-amber-700 px-1.5 py-0.5 text-[9px] font-black uppercase">
-                              {sigCount} Significant
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-sm font-bold text-slate-900 mt-1">{plan.title}</p>
-                        {plan.partDescription && (
-                          <p className="text-[11px] text-slate-500 mt-0.5 italic">{plan.partDescription}</p>
-                        )}
-                        <p className="text-[11px] text-slate-500 mt-1">
-                          {plan.items.length} control item{plan.items.length !== 1 ? 's' : ''}
-                          {plan.participants ? ` · ${plan.participants.slice(0, 60)}` : ''}
-                        </p>
-                      </button>
-                      {!readOnly && (
-                        deleteConfirm === plan.id ? (
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <span className="text-[10px] text-rose-600">Delete?</span>
-                            <button
-                              type="button"
-                              onClick={() => deletePlan(plan)}
-                              className="text-[10px] font-black text-rose-600 hover:text-rose-800 uppercase"
-                            >Yes</button>
-                            <button
-                              type="button"
-                              onClick={() => setDeleteConfirm(null)}
-                              className="text-[10px] text-slate-500 uppercase"
-                            >No</button>
+                            {plan.revisionLevel && (
+                              <span className="text-[10px] font-mono text-slate-500 border border-slate-200 px-1.5 py-0.5">
+                                {plan.revisionLevel}
+                              </span>
+                            )}
+                            {critCount > 0 && (
+                              <span className="inline-flex items-center gap-1 border border-rose-200 bg-rose-50 text-rose-700 px-1.5 py-0.5 text-[9px] font-black uppercase">
+                                {critCount} Critical
+                              </span>
+                            )}
+                            {sigCount > 0 && (
+                              <span className="inline-flex items-center gap-1 border border-amber-200 bg-amber-50 text-amber-700 px-1.5 py-0.5 text-[9px] font-black uppercase">
+                                {sigCount} Significant
+                              </span>
+                            )}
                           </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => setDeleteConfirm(plan.id)}
-                            className="text-slate-400 hover:text-rose-600 flex-shrink-0 p-1"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        )
+                          <p className="text-sm font-bold text-slate-900 mt-1">{plan.title}</p>
+                          {plan.partDescription && (
+                            <p className="text-[11px] text-slate-500 mt-0.5 italic">{plan.partDescription}</p>
+                          )}
+                          <p className="text-[11px] text-slate-500 mt-1">
+                            {plan.items.length} control item{plan.items.length !== 1 ? 's' : ''}
+                            {plan.participants ? ` · ${plan.participants.slice(0, 60)}` : ''}
+                          </p>
+                        </button>
+                        {!readOnly && (
+                          deleteConfirm === plan.id ? (
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <span className="text-[10px] text-rose-600">Delete?</span>
+                              <button
+                                type="button"
+                                onClick={() => deletePlan(plan)}
+                                className="text-[10px] font-black text-rose-600 hover:text-rose-800 uppercase"
+                              >Yes</button>
+                              <button
+                                type="button"
+                                onClick={() => setDeleteConfirm(null)}
+                                className="text-[10px] text-slate-500 uppercase"
+                              >No</button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setDeleteConfirm(plan.id)}
+                              className="text-slate-400 hover:text-rose-600 flex-shrink-0 p-1"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )
+                        )}
+                      </div>
+                      {!readOnly && (
+                        <div className="mt-2">
+                          <PushToOpenItemsInline
+                            db={db}
+                            userId={plan.userId}
+                            projectId={plan.projectId}
+                            sourceTool="control_plan"
+                            sourceDocId={plan.id}
+                            initialTitle={plan.title || ''}
+                          />
+                        </div>
                       )}
                     </li>
                   );

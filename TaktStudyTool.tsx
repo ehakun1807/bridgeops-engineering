@@ -66,6 +66,7 @@ import {
   type ValidationGap
 } from './taktMath.ts';
 import { downloadStudyXlsx, type TaktXlsxStudy } from './taktXlsx.ts';
+import { PushToOpenItemsInline } from './OpenItemsPanel.tsx';
 
 // ---------------------------------------------------------------------------
 // Data model
@@ -480,46 +481,60 @@ const StudyRow: React.FC<{
     downloadStudyXlsx(payload);
   };
   return (
-    <div className="px-6 py-4 hover:bg-slate-50 transition-colors flex items-center gap-4">
-      <button
-        type="button"
-        onClick={() => onOpen(study)}
-        className="flex-1 min-w-0 text-left flex items-center gap-4"
-      >
-        <StatusBadge status={study.status} />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-black tracking-tight text-slate-900 truncate">
-            {study.name || 'Untitled study'}
-          </p>
-          <p className="text-xs text-slate-500 truncate">
-            {study.productTitle || 'No product title'} · {stepCount} step{stepCount === 1 ? '' : 's'}
-          </p>
-        </div>
-        <div className="text-right flex-shrink-0">
-          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Takt</p>
-          <p className={`text-sm font-black tabular-nums ${isCompleted ? 'text-slate-900' : 'text-slate-500'}`}>
-            {formatSeconds(taktSec)}
-          </p>
-        </div>
-      </button>
-      <button
-        type="button"
-        onClick={handleExport}
-        className="text-slate-400 hover:text-slate-900 transition-colors p-2"
-        title="Download as xlsx"
-        aria-label="Download study as xlsx"
-      >
-        <Download size={14} />
-      </button>
-      {!readOnly && (
+    <div className="px-6 py-4 hover:bg-slate-50 transition-colors">
+      <div className="flex items-center gap-4">
         <button
           type="button"
-          onClick={() => onDelete(study)}
-          className="text-slate-300 hover:text-red-600 transition-colors p-2"
-          title="Delete study"
+          onClick={() => onOpen(study)}
+          className="flex-1 min-w-0 text-left flex items-center gap-4"
         >
-          <Trash2 size={14} />
+          <StatusBadge status={study.status} />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-black tracking-tight text-slate-900 truncate">
+              {study.name || 'Untitled study'}
+            </p>
+            <p className="text-xs text-slate-500 truncate">
+              {study.productTitle || 'No product title'} · {stepCount} step{stepCount === 1 ? '' : 's'}
+            </p>
+          </div>
+          <div className="text-right flex-shrink-0">
+            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Takt</p>
+            <p className={`text-sm font-black tabular-nums ${isCompleted ? 'text-slate-900' : 'text-slate-500'}`}>
+              {formatSeconds(taktSec)}
+            </p>
+          </div>
         </button>
+        <button
+          type="button"
+          onClick={handleExport}
+          className="text-slate-400 hover:text-slate-900 transition-colors p-2"
+          title="Download as xlsx"
+          aria-label="Download study as xlsx"
+        >
+          <Download size={14} />
+        </button>
+        {!readOnly && (
+          <button
+            type="button"
+            onClick={() => onDelete(study)}
+            className="text-slate-300 hover:text-red-600 transition-colors p-2"
+            title="Delete study"
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
+      </div>
+      {!readOnly && (
+        <div className="mt-2 pl-10">
+          <PushToOpenItemsInline
+            db={db}
+            userId={study.userId}
+            projectId={study.projectId}
+            sourceTool="takt"
+            sourceDocId={study.id}
+            initialTitle={study.name || ''}
+          />
+        </div>
       )}
     </div>
   );

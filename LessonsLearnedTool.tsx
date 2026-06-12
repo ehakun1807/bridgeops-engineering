@@ -44,6 +44,7 @@ import {
 import { downloadLessonsXlsx } from './lessonsXlsx.ts';
 import { db, auth } from './firebase.ts';
 import { logActivity } from './activityLogger.ts';
+import { PushToOpenItemsInline } from './OpenItemsPanel.tsx';
 import {
   collection,
   query,
@@ -591,64 +592,78 @@ const LessonList: React.FC<LessonListProps> = ({
           const niceCount    = l.actionItems.filter(a => a.priority === 'nice_to_have').length;
 
           return (
-            <li key={l.id} className="px-6 py-4 flex items-start gap-4 hover:bg-slate-50 transition-colors">
-              <button type="button" onClick={() => onOpen(l)} className="flex-1 text-left min-w-0">
-                {/* Row 1: meta chips */}
-                <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <span className="text-[11px] font-bold uppercase tracking-widest text-slate-500 tabular-nums">
-                    {fmtDate(l.dateMs)}
-                  </span>
-                  {l.gate && (
-                    <span className="border border-slate-200 bg-slate-100 text-slate-600 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest">
-                      {l.gate}
+            <li key={l.id} className="px-6 py-4 hover:bg-slate-50 transition-colors">
+              <div className="flex items-start gap-4">
+                <button type="button" onClick={() => onOpen(l)} className="flex-1 text-left min-w-0">
+                  {/* Row 1: meta chips */}
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="text-[11px] font-bold uppercase tracking-widest text-slate-500 tabular-nums">
+                      {fmtDate(l.dateMs)}
                     </span>
-                  )}
-                  <span className={`inline-flex items-center border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest ${catColor}`}>
-                    {CATEGORY_LABELS[l.category]}
-                  </span>
-                  <span className={`inline-flex items-center border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest ${typeColor}`}>
-                    {TYPE_LABELS[l.lessonType]}
-                  </span>
-                  <span className={`inline-flex items-center gap-1 border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest ${statusColor}`}>
-                    <StatusIcon size={9} />
-                    {STATUS_LABELS[l.status]}
-                  </span>
-                </div>
+                    {l.gate && (
+                      <span className="border border-slate-200 bg-slate-100 text-slate-600 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest">
+                        {l.gate}
+                      </span>
+                    )}
+                    <span className={`inline-flex items-center border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest ${catColor}`}>
+                      {CATEGORY_LABELS[l.category]}
+                    </span>
+                    <span className={`inline-flex items-center border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest ${typeColor}`}>
+                      {TYPE_LABELS[l.lessonType]}
+                    </span>
+                    <span className={`inline-flex items-center gap-1 border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest ${statusColor}`}>
+                      <StatusIcon size={9} />
+                      {STATUS_LABELS[l.status]}
+                    </span>
+                  </div>
 
-                {/* Row 2: title */}
-                <p className="text-sm font-bold truncate text-slate-900">
-                  {l.title || 'Untitled lesson'}
-                </p>
+                  {/* Row 2: title */}
+                  <p className="text-sm font-bold truncate text-slate-900">
+                    {l.title || 'Untitled lesson'}
+                  </p>
 
-                {/* Row 3: root cause preview + action badges */}
-                <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                  {l.rootCause && (
-                    <span className="text-[11px] text-slate-400 line-clamp-1 italic max-w-[300px]">
-                      Root cause: {l.rootCause}
-                    </span>
-                  )}
-                  {mustCount > 0 && (
-                    <span className="text-[10px] font-black bg-red-600 text-white px-1.5 py-0.5 shrink-0">
-                      {mustDone}/{mustCount} MUST
-                    </span>
-                  )}
-                  {niceCount > 0 && (
-                    <span className="text-[10px] font-bold text-slate-500 border border-slate-200 px-1.5 py-0.5 shrink-0">
-                      +{niceCount} nice-to-have
-                    </span>
-                  )}
-                </div>
-              </button>
-
-              {!readOnly && (
-                <button
-                  type="button"
-                  onClick={() => onDelete(l)}
-                  title="Delete lesson"
-                  className="text-slate-400 hover:text-red-600 transition-colors p-1 mt-0.5 shrink-0"
-                >
-                  <Trash2 size={14} />
+                  {/* Row 3: root cause preview + action badges */}
+                  <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                    {l.rootCause && (
+                      <span className="text-[11px] text-slate-400 line-clamp-1 italic max-w-[300px]">
+                        Root cause: {l.rootCause}
+                      </span>
+                    )}
+                    {mustCount > 0 && (
+                      <span className="text-[10px] font-black bg-red-600 text-white px-1.5 py-0.5 shrink-0">
+                        {mustDone}/{mustCount} MUST
+                      </span>
+                    )}
+                    {niceCount > 0 && (
+                      <span className="text-[10px] font-bold text-slate-500 border border-slate-200 px-1.5 py-0.5 shrink-0">
+                        +{niceCount} nice-to-have
+                      </span>
+                    )}
+                  </div>
                 </button>
+
+                {!readOnly && (
+                  <button
+                    type="button"
+                    onClick={() => onDelete(l)}
+                    title="Delete lesson"
+                    className="text-slate-400 hover:text-red-600 transition-colors p-1 mt-0.5 shrink-0"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
+              {!readOnly && (
+                <div className="mt-2">
+                  <PushToOpenItemsInline
+                    db={db}
+                    userId={l.userId}
+                    projectId={l.projectId}
+                    sourceTool="lesson"
+                    sourceDocId={l.id}
+                    initialTitle={l.title || ''}
+                  />
+                </div>
               )}
             </li>
           );

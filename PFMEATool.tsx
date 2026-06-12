@@ -1066,7 +1066,7 @@ const RiskCard: React.FC<RiskCardProps> = ({
   const handleOpenPush = () => {
     const defaultTitle = risk.failureMode
       ? `${risk.processStep ? risk.processStep + ' — ' : ''}${risk.failureMode}`
-      : risk.processStep || `Risk #${index + 1}`;
+      : risk.processStep || '';
     setPushText(defaultTitle.slice(0, 150));
     setPushPrio('high');
     setPushDone(false);

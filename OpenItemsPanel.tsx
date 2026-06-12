@@ -15,7 +15,7 @@ import {
   CheckCircle2, Circle, Plus, Loader2, AlertTriangle,
   ClipboardCheck, SlidersHorizontal,
   ChevronDown, X, EyeOff, RefreshCw, User, Send,
-  ShieldAlert,
+  ShieldAlert, ArrowUpRight, Check,
 } from 'lucide-react';
 import {
   Firestore, collection, query, where, getDocs,
@@ -29,7 +29,7 @@ import { logActivity } from './activityLogger.ts';
 // Types
 // ---------------------------------------------------------------------------
 export type OpenItemPriority = 'high' | 'medium' | 'low';
-export type OpenItemSource = 'deliverable' | 'custom' | 'meeting' | 'pfmea' | 'lesson' | 'decision';
+export type OpenItemSource = 'deliverable' | 'custom' | 'meeting' | 'pfmea' | 'lesson' | 'decision' | 'takt' | 'process_map' | 'bom' | 'control_plan';
 
 export interface UnifiedOpenItem {
   uid: string;
@@ -84,14 +84,129 @@ export async function pushToOpenItems(
 }
 
 // ---------------------------------------------------------------------------
+// Reusable inline push component — import this in any Project Tool
+// ---------------------------------------------------------------------------
+export interface PushToOpenItemsInlineProps {
+  db: Firestore;
+  userId: string;
+  projectId: string;
+  sourceTool: OpenItemSource;
+  sourceDocId: string;
+  initialTitle?: string;
+}
+
+export const PushToOpenItemsInline: React.FC<PushToOpenItemsInlineProps> = ({
+  db, userId, projectId, sourceTool, sourceDocId, initialTitle = '',
+}) => {
+  const [open,   setOpen]   = useState(false);
+  const [text,   setText]   = useState('');
+  const [prio,   setPrio]   = useState<OpenItemPriority>('medium');
+  const [saving, setSaving] = useState(false);
+  const [done,   setDone]   = useState(false);
+
+  const handleOpen = () => {
+    setText(initialTitle.slice(0, 150));
+    setPrio('medium');
+    setDone(false);
+    setOpen(true);
+  };
+
+  const handleSend = async () => {
+    if (!text.trim()) return;
+    setSaving(true);
+    try {
+      await pushToOpenItems(db, userId, projectId, [{
+        title: text.trim(),
+        priority: prio,
+        sourceRef: { tool: sourceTool, docId: sourceDocId },
+      }]);
+      setDone(true);
+      setTimeout(() => { setOpen(false); setDone(false); }, 1500);
+    } catch (e) {
+      console.warn('[PushToOpenItemsInline] error', e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); handleOpen(); }}
+        className="flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest border border-blue-200 text-blue-600 hover:bg-blue-50 rounded-sm transition-colors"
+      >
+        <ArrowUpRight size={10} />Open Items
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 px-2 py-1.5 rounded-sm" onClick={(e) => e.stopPropagation()}>
+      <ArrowUpRight size={11} className="text-blue-500 flex-shrink-0" />
+      {done ? (
+        <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-700">
+          <Check size={11} /> Added
+        </span>
+      ) : (
+        <>
+          <input
+            autoFocus
+            type="text"
+            value={text}
+            maxLength={150}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleSend(); if (e.key === 'Escape') setOpen(false); }}
+            placeholder="Follow-up title…"
+            className="flex-1 bg-transparent text-[11px] text-slate-800 placeholder-slate-400 outline-none min-w-0"
+          />
+          {(['high', 'medium', 'low'] as OpenItemPriority[]).map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => setPrio(p)}
+              className={`text-[9px] font-black uppercase px-1.5 py-0.5 border rounded-sm transition-colors ${
+                prio === p
+                  ? p === 'high' ? 'bg-rose-500 text-white border-rose-500'
+                  : p === 'medium' ? 'bg-amber-400 text-white border-amber-400'
+                  : 'bg-slate-400 text-white border-slate-400'
+                  : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
+              }`}
+            >
+              {p}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={handleSend}
+            disabled={!text.trim() || saving}
+            className="flex items-center gap-1 px-2 py-0.5 bg-blue-600 text-white text-[9px] font-black uppercase tracking-widest hover:bg-blue-700 disabled:opacity-50 transition-colors rounded-sm"
+          >
+            {saving ? <Loader2 size={9} className="animate-spin" /> : <Send size={9} />}
+            Send
+          </button>
+          <button type="button" onClick={() => setOpen(false)} className="text-slate-400 hover:text-slate-700">
+            <X size={12} />
+          </button>
+        </>
+      )}
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 const SOURCE_LABEL: Partial<Record<OpenItemSource, string>> = {
-  meeting:  'Meeting',
-  pfmea:    'PFMEA',
-  lesson:   'Lesson',
-  decision: 'Decision',
-  custom:   'Custom',
+  meeting:      'Meeting',
+  pfmea:        'PFMEA',
+  lesson:       'Lesson',
+  decision:     'Decision',
+  custom:       'Custom',
+  takt:         'Study',
+  process_map:  'Process',
+  bom:          'ECO',
+  control_plan: 'Control',
 };
 
 const PRIORITY_META: Record<OpenItemPriority, { label: string; dotClass: string }> = {
@@ -572,47 +687,44 @@ const OpenItemsPanel: React.FC<OpenItemsPanelProps> = ({
                       : 'bg-white border-slate-200 hover:border-slate-300'
                 }`}
               >
-                <div className="px-3 py-2.5 flex items-center gap-2">
+                <div className="px-3 py-2 flex items-start gap-2">
                   {/* Check */}
-                  <div className="flex-shrink-0">
+                  <div className="flex-shrink-0 pt-0.5">
                     {item.closeable && !readOnly ? (
                       <button type="button" onClick={() => handleClose(item)} disabled={item.closed || isClosing}
                         className="text-slate-400 hover:text-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         title={item.closed ? 'Done' : 'Mark as done'}>
                         {isClosing
-                          ? <Loader2 size={16} className="animate-spin text-slate-400" />
-                          : item.closed ? <CheckCircle2 size={16} className="text-emerald-500" /> : <Circle size={16} />}
+                          ? <Loader2 size={15} className="animate-spin text-slate-400" />
+                          : item.closed ? <CheckCircle2 size={15} className="text-emerald-500" /> : <Circle size={15} />}
                       </button>
                     ) : (
                       <span className="text-slate-300">
-                        {item.closed ? <CheckCircle2 size={16} className="text-emerald-400" /> : <Circle size={16} />}
+                        {item.closed ? <CheckCircle2 size={15} className="text-emerald-400" /> : <Circle size={15} />}
                       </span>
                     )}
                   </div>
 
-                  {/* Title + owner */}
-                  <div className="flex-1 min-w-0 flex items-center gap-2">
-                    <p className={`text-[12px] font-medium leading-none flex-shrink-0 max-w-[48%] truncate ${item.closed ? 'line-through text-slate-400' : 'text-slate-800'}`}>
+                  {/* Title + owner (stacked) */}
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-[12px] font-medium leading-snug truncate ${item.closed ? 'line-through text-slate-400' : 'text-slate-800'}`}>
                       {item.title}
                     </p>
                     {!item.closed && (
-                      <div className="flex items-center gap-1 min-w-0">
+                      <div className="flex items-center gap-1 mt-0.5">
                         <User size={9} className="text-slate-300 flex-shrink-0" />
                         {readOnly
-                          ? ownerValue ? <span className="text-[10px] text-slate-500 truncate">{ownerValue}</span> : null
+                          ? ownerValue ? <span className="text-[10px] text-slate-500">{ownerValue}</span> : null
                           : <input type="text" value={ownerValue} onChange={(e) => handleOwnerChange(item.uid, e.target.value)}
                               placeholder="owner" maxLength={40}
-                              className="w-24 text-[10px] text-slate-600 placeholder-slate-300 bg-transparent border-b border-transparent hover:border-slate-200 focus:border-blue-300 outline-none transition-colors" />
+                              className="w-28 text-[10px] text-slate-600 placeholder-slate-300 bg-transparent border-b border-transparent hover:border-slate-200 focus:border-blue-300 outline-none transition-colors" />
                         }
                       </div>
-                    )}
-                    {item.subtitle && (
-                      <p className="text-[10px] text-slate-400 truncate hidden sm:block">{item.subtitle}</p>
                     )}
                   </div>
 
                   {/* Right meta */}
-                  <div className="flex-shrink-0 flex items-center gap-1.5">
+                  <div className="flex-shrink-0 flex items-center gap-1.5 pt-0.5">
                     {/* Priority dot */}
                     {!item.closed && (
                       <button type="button" onClick={() => handleTogglePriority(item)} disabled={readOnly}
@@ -630,7 +742,7 @@ const OpenItemsPanel: React.FC<OpenItemsPanelProps> = ({
                     )}
                     {isDeliverable && (
                       <span className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 bg-blue-50 text-blue-600 border border-blue-200 rounded-sm flex items-center gap-1">
-                        <ClipboardCheck size={9} />Gate
+                        <ClipboardCheck size={9} />{currentGate ? `${currentGate} Gate` : 'Gate'}
                       </span>
                     )}
 

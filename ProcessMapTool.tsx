@@ -55,6 +55,7 @@ import {
 } from 'lucide-react';
 import { db, auth } from './firebase.ts';
 import { logActivity } from './activityLogger.ts';
+import { PushToOpenItemsInline } from './OpenItemsPanel.tsx';
 import {
   collection,
   query,
@@ -941,50 +942,64 @@ const ProcessMapList: React.FC<ProcessMapListProps> = ({ maps, loading, error, o
           {} as Record<StepKind, number>
         );
         return (
-          <div key={m.id} className="px-6 py-4 hover:bg-slate-50 group flex items-center gap-4">
-            <button
-              type="button"
-              onClick={() => onOpen(m)}
-              className="flex-1 text-left flex items-center gap-3 min-w-0"
-            >
-              <Workflow size={18} className="text-slate-400 shrink-0" />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="font-bold text-slate-900 truncate">{m.title || 'Untitled process map'}</span>
-                  <span className="text-[10px] font-mono text-slate-400 shrink-0">{m.steps.length} steps</span>
+          <div key={m.id} className="px-6 py-4 hover:bg-slate-50 group">
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => onOpen(m)}
+                className="flex-1 text-left flex items-center gap-3 min-w-0"
+              >
+                <Workflow size={18} className="text-slate-400 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="font-bold text-slate-900 truncate">{m.title || 'Untitled process map'}</span>
+                    <span className="text-[10px] font-mono text-slate-400 shrink-0">{m.steps.length} steps</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-bold">
+                    {(['start', 'action', 'decision', 'end'] as StepKind[]).map((k) =>
+                      counts[k] ? (
+                        <span key={k} className={`px-1.5 py-0.5 rounded border ${KIND_THEME[k].chip}`}>
+                          {KIND_THEME[k].label} · {counts[k]}
+                        </span>
+                      ) : null
+                    )}
+                    {m.description ? (
+                      <span className="text-slate-500 font-normal italic ml-1 truncate">{m.description}</span>
+                    ) : null}
+                  </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-bold">
-                  {(['start', 'action', 'decision', 'end'] as StepKind[]).map((k) =>
-                    counts[k] ? (
-                      <span key={k} className={`px-1.5 py-0.5 rounded border ${KIND_THEME[k].chip}`}>
-                        {KIND_THEME[k].label} · {counts[k]}
-                      </span>
-                    ) : null
-                  )}
-                  {m.description ? (
-                    <span className="text-slate-500 font-normal italic ml-1 truncate">{m.description}</span>
-                  ) : null}
+              </button>
+              {!readOnly && (
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    type="button"
+                    onClick={() => onDuplicate(m)}
+                    title="Duplicate"
+                    className="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded"
+                  >
+                    <Copy size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDelete(m)}
+                    title="Delete"
+                    className="p-1.5 text-rose-400 hover:text-rose-700 hover:bg-rose-50 rounded"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
-              </div>
-            </button>
+              )}
+            </div>
             {!readOnly && (
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button
-                  type="button"
-                  onClick={() => onDuplicate(m)}
-                  title="Duplicate"
-                  className="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded"
-                >
-                  <Copy size={14} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDelete(m)}
-                  title="Delete"
-                  className="p-1.5 text-rose-400 hover:text-rose-700 hover:bg-rose-50 rounded"
-                >
-                  <Trash2 size={14} />
-                </button>
+              <div className="mt-2 pl-9">
+                <PushToOpenItemsInline
+                  db={db}
+                  userId={m.userId}
+                  projectId={m.projectId}
+                  sourceTool="process_map"
+                  sourceDocId={m.id}
+                  initialTitle={m.title || ''}
+                />
               </div>
             )}
           </div>

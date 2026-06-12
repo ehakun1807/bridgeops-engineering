@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import { db, auth } from './firebase.ts';
 import { logActivity } from './activityLogger.ts';
+import { PushToOpenItemsInline } from './OpenItemsPanel.tsx';
 import { checkDecisionVsPfmea, type CrossCheckResult } from './crossCheckEngine.ts';
 import CrossCheckBanner from './CrossCheckBanner.tsx';
 import {
@@ -577,54 +578,68 @@ const DecisionList: React.FC<DecisionListProps> = ({
           return (
             <li
               key={d.id}
-              className={`px-6 py-4 flex items-start gap-4 hover:bg-slate-50 transition-colors ${dimmed ? 'opacity-70' : ''}`}
+              className={`px-6 py-4 hover:bg-slate-50 transition-colors ${dimmed ? 'opacity-70' : ''}`}
             >
-              <button type="button" onClick={() => onOpen(d)} className="flex-1 text-left min-w-0">
-                {/* Row 1: date + chips */}
-                <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <span className="text-[11px] font-bold uppercase tracking-widest text-slate-500 tabular-nums">
-                    {fmtDate(d.dateMs)}
-                  </span>
-                  {d.gate && (
-                    <span className="border border-slate-200 bg-slate-100 text-slate-600 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest">
-                      {d.gate}
+              <div className="flex items-start gap-4">
+                <button type="button" onClick={() => onOpen(d)} className="flex-1 text-left min-w-0">
+                  {/* Row 1: date + chips */}
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="text-[11px] font-bold uppercase tracking-widest text-slate-500 tabular-nums">
+                      {fmtDate(d.dateMs)}
                     </span>
-                  )}
-                  <span className={`inline-flex items-center border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest ${catColor}`}>
-                    {CATEGORY_LABELS[d.category]}
-                  </span>
-                  <span className={`inline-flex items-center gap-1 border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest ${statColor}`}>
-                    <StatusIcon size={9} />
-                    {STATUS_LABELS[d.status]}
-                  </span>
-                </div>
-                {/* Row 2: title */}
-                <p className={`text-sm font-bold truncate ${dimmed ? 'text-slate-500' : 'text-slate-900'}`}>
-                  {d.title || 'Untitled decision'}
-                </p>
-                {/* Row 3: decision maker + impact preview */}
-                <div className="flex items-start gap-3 mt-0.5">
-                  {d.decisionMaker && (
-                    <span className="text-[11px] text-slate-500 shrink-0">
-                      By {d.decisionMaker}
+                    {d.gate && (
+                      <span className="border border-slate-200 bg-slate-100 text-slate-600 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest">
+                        {d.gate}
+                      </span>
+                    )}
+                    <span className={`inline-flex items-center border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest ${catColor}`}>
+                      {CATEGORY_LABELS[d.category]}
                     </span>
-                  )}
-                  {d.impact && (
-                    <span className="text-[11px] text-slate-400 line-clamp-1 italic">
-                      Impact: {d.impact}
+                    <span className={`inline-flex items-center gap-1 border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest ${statColor}`}>
+                      <StatusIcon size={9} />
+                      {STATUS_LABELS[d.status]}
                     </span>
-                  )}
-                </div>
-              </button>
-              {!readOnly && (
-                <button
-                  type="button"
-                  onClick={() => onDelete(d)}
-                  title="Delete decision"
-                  className="text-slate-400 hover:text-red-600 transition-colors p-1 mt-0.5 shrink-0"
-                >
-                  <Trash2 size={14} />
+                  </div>
+                  {/* Row 2: title */}
+                  <p className={`text-sm font-bold truncate ${dimmed ? 'text-slate-500' : 'text-slate-900'}`}>
+                    {d.title || 'Untitled decision'}
+                  </p>
+                  {/* Row 3: decision maker + impact preview */}
+                  <div className="flex items-start gap-3 mt-0.5">
+                    {d.decisionMaker && (
+                      <span className="text-[11px] text-slate-500 shrink-0">
+                        By {d.decisionMaker}
+                      </span>
+                    )}
+                    {d.impact && (
+                      <span className="text-[11px] text-slate-400 line-clamp-1 italic">
+                        Impact: {d.impact}
+                      </span>
+                    )}
+                  </div>
                 </button>
+                {!readOnly && (
+                  <button
+                    type="button"
+                    onClick={() => onDelete(d)}
+                    title="Delete decision"
+                    className="text-slate-400 hover:text-red-600 transition-colors p-1 mt-0.5 shrink-0"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
+              {!readOnly && (
+                <div className="mt-2">
+                  <PushToOpenItemsInline
+                    db={db}
+                    userId={d.userId}
+                    projectId={d.projectId}
+                    sourceTool="decision"
+                    sourceDocId={d.id}
+                    initialTitle={d.title || ''}
+                  />
+                </div>
               )}
             </li>
           );

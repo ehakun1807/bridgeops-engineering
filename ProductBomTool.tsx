@@ -57,6 +57,7 @@ import {
 } from 'lucide-react';
 import { db, auth } from './firebase.ts';
 import { logActivity } from './activityLogger.ts';
+import { PushToOpenItemsInline } from './OpenItemsPanel.tsx';
 import { checkBomVsDecisions, type CrossCheckResult } from './crossCheckEngine.ts';
 import CrossCheckBanner from './CrossCheckBanner.tsx';
 import {
@@ -621,8 +622,9 @@ const BomList: React.FC<BomListProps> = ({
         return (
           <li
             key={b.id}
-            className="px-6 py-4 flex items-start gap-4 hover:bg-slate-50 transition-colors"
+            className="px-6 py-4 hover:bg-slate-50 transition-colors"
           >
+            <div className="flex items-start gap-4">
             <button
               type="button"
               onClick={() => onOpen(b)}
@@ -696,6 +698,19 @@ const BomList: React.FC<BomListProps> = ({
               >
                 <Trash2 size={14} />
               </button>
+            )}
+            </div>
+            {!readOnly && (
+              <div className="mt-2">
+                <PushToOpenItemsInline
+                  db={db}
+                  userId={b.userId}
+                  projectId={b.projectId}
+                  sourceTool="bom"
+                  sourceDocId={b.id}
+                  initialTitle={b.versionLabel || b.fileName || ''}
+                />
+              </div>
             )}
           </li>
         );
