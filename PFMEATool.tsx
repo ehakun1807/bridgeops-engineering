@@ -39,9 +39,12 @@ import {
   LayoutGrid,
   Copy,
   Scale,
-  Download
+  Download,
+  ArrowUpRight,
+  Check,
 } from 'lucide-react';
 import { downloadPfmeaXlsx } from './pfmeaXlsx.ts';
+import { pushToOpenItems, type OpenItemPriority } from './OpenItemsPanel.tsx';
 import { db, auth } from './firebase.ts';
 import { logActivity } from './activityLogger.ts';
 import { checkPfmeaVsBom, type CrossCheckResult } from './crossCheckEngine.ts';
@@ -960,6 +963,9 @@ const PFMEAForm: React.FC<PFMEAFormProps> = ({ initial, onCancel, onSave, readOn
                 onDuplicate={() => duplicateRisk(idx)}
                 onDelete={() => deleteRisk(idx)}
                 matchedDecisions={matchedDecisions}
+                userId={initial.userId}
+                projectId={initial.projectId}
+                pfmeaDocId={initial.id || ''}
               />
             );
           })}
@@ -1035,14 +1041,55 @@ interface RiskCardProps {
   onDuplicate: () => void;
   onDelete: () => void;
   matchedDecisions?: DecisionRef[];
+  userId: string;
+  projectId: string;
+  pfmeaDocId: string;
 }
 
-const RiskCard: React.FC<RiskCardProps> = ({ index, risk, readOnly, onChange, onDuplicate, onDelete, matchedDecisions = [] }) => {
+const RiskCard: React.FC<RiskCardProps> = ({
+  index, risk, readOnly, onChange, onDuplicate, onDelete,
+  matchedDecisions = [], userId, projectId, pfmeaDocId,
+}) => {
   const rpn = computeRPN(risk.severity, risk.occurrence, risk.detection);
   const tier = rpnTier(rpn);
   const tierTok = TIER_CHIP[tier];
   const ap = actionPriority(risk.severity, risk.occurrence, risk.detection);
   const apTok = AP_CHIP[ap];
+
+  // → Open Items push
+  const [pushOpen,  setPushOpen]  = useState(false);
+  const [pushText,  setPushText]  = useState('');
+  const [pushPrio,  setPushPrio]  = useState<OpenItemPriority>('high');
+  const [pushing,   setPushing]   = useState(false);
+  const [pushDone,  setPushDone]  = useState(false);
+
+  const handleOpenPush = () => {
+    const defaultTitle = risk.failureMode
+      ? `${risk.processStep ? risk.processStep + ' — ' : ''}${risk.failureMode}`
+      : risk.processStep || `Risk #${index + 1}`;
+    setPushText(defaultTitle.slice(0, 150));
+    setPushPrio('high');
+    setPushDone(false);
+    setPushOpen(true);
+  };
+
+  const handlePushRisk = async () => {
+    if (!pushText.trim()) return;
+    setPushing(true);
+    try {
+      await pushToOpenItems(db, userId, projectId, [{
+        title: pushText.trim(),
+        priority: pushPrio,
+        sourceRef: { tool: 'pfmea' as const, docId: pfmeaDocId, originalTitle: risk.failureMode || risk.processStep },
+      }]);
+      setPushDone(true);
+      setTimeout(() => setPushOpen(false), 1200);
+    } catch (e) {
+      console.warn('[RiskCard] push error', e);
+    } finally {
+      setPushing(false);
+    }
+  };
 
   const hasRevised =
     typeof risk.revisedSeverity === 'number' &&
@@ -1096,25 +1143,47 @@ const RiskCard: React.FC<RiskCardProps> = ({ index, risk, readOnly, onChange, on
         </div>
         {!readOnly && (
           <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={onDuplicate}
-              title="Duplicate row"
-              className="text-slate-400 hover:text-slate-700 p-1"
-            >
+            <button type="button" onClick={handleOpenPush}
+              title="Send this risk to Open Items for follow-up"
+              className={`flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest border rounded-sm transition-colors ${
+                pushOpen ? 'bg-blue-600 text-white border-blue-600' : 'text-blue-600 border-blue-200 hover:bg-blue-50'
+              }`}>
+              <ArrowUpRight size={10} />Open Items
+            </button>
+            <button type="button" onClick={onDuplicate} title="Duplicate row" className="text-slate-400 hover:text-slate-700 p-1">
               <Copy size={13} />
             </button>
-            <button
-              type="button"
-              onClick={onDelete}
-              title="Delete row"
-              className="text-slate-400 hover:text-red-600 p-1"
-            >
+            <button type="button" onClick={onDelete} title="Delete row" className="text-slate-400 hover:text-red-600 p-1">
               <Trash2 size={13} />
             </button>
           </div>
         )}
       </div>
+
+      {/* → Open Items inline push form */}
+      {pushOpen && !readOnly && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border-b border-blue-200">
+          <ArrowUpRight size={11} className="text-blue-500 flex-shrink-0" />
+          <input autoFocus type="text" value={pushText} maxLength={150}
+            onChange={(e) => setPushText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handlePushRisk(); if (e.key === 'Escape') setPushOpen(false); }}
+            placeholder="Follow-up title…"
+            className="flex-1 text-[11px] text-slate-800 bg-white border border-blue-300 rounded px-2 py-1 outline-none focus:border-blue-500 min-w-0" />
+          <select value={pushPrio} onChange={(e) => setPushPrio(e.target.value as OpenItemPriority)}
+            className="text-[10px] text-slate-600 bg-white border border-blue-200 rounded px-1.5 py-1 outline-none appearance-none cursor-pointer flex-shrink-0">
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+          <button type="button" disabled={!pushText.trim() || pushing} onClick={handlePushRisk}
+            className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex-shrink-0">
+            {pushDone ? <><Check size={10} />Done</> : pushing ? <Loader2 size={10} className="animate-spin" /> : <>Send</>}
+          </button>
+          <button type="button" onClick={() => setPushOpen(false)} className="text-slate-400 hover:text-slate-700 flex-shrink-0">
+            <span className="text-[10px]">✕</span>
+          </button>
+        </div>
+      )}
 
       {/* Identification: process step / failure mode / failure effect */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3 border-b border-slate-100">

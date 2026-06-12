@@ -32,9 +32,12 @@ import {
   Mail,
   ChevronDown,
   ChevronUp,
-  Wand2
+  Wand2,
+  ArrowUpRight,
+  Check,
 } from 'lucide-react';
 import { downloadMeetingsPdf } from './utils/meetingsPdf.ts';
+import { pushToOpenItems, type OpenItemPriority } from './OpenItemsPanel.tsx';
 import { db, auth } from './firebase.ts';
 import { logActivity } from './activityLogger.ts';
 import {
@@ -625,6 +628,48 @@ const MeetingForm: React.FC<MeetingFormProps> = ({ initial, onCancel, onSave, re
   const [emailPaste, setEmailPaste] = useState('');
   const [importApplied, setImportApplied] = useState(false);
 
+  // → Open Items push state
+  const [pushOpen, setPushOpen]   = useState(false);
+  const [pushing,  setPushing]    = useState(false);
+  const [pushDone, setPushDone]   = useState(false);
+  // editable rows: { text, priority, selected }
+  const [pushRows, setPushRows]   = useState<Array<{ text: string; priority: OpenItemPriority; selected: boolean }>>([]);
+
+  const parsedActionLines = useMemo(() =>
+    (draft.actionItems || '')
+      .split('\n')
+      .map((l) => l.replace(/^[-•*]\s*/, '').replace(/^\d+\.\s*/, '').trim())
+      .filter((l) => l.length > 0),
+    [draft.actionItems]
+  );
+
+  const handleOpenPush = () => {
+    setPushRows(parsedActionLines.map((text) => ({ text, priority: 'medium' as OpenItemPriority, selected: true })));
+    setPushDone(false);
+    setPushOpen(true);
+  };
+
+  const handlePushToOpenItems = async () => {
+    const selected = pushRows.filter((r) => r.selected && r.text.trim());
+    if (!selected.length || !auth.currentUser) return;
+    const userId    = auth.currentUser.uid;
+    const projectId = initial.projectId;
+    setPushing(true);
+    try {
+      await pushToOpenItems(db, userId, projectId, selected.map((r) => ({
+        title: r.text.trim(),
+        priority: r.priority,
+        sourceRef: { tool: 'meeting' as const, docId: initial.id || '', originalTitle: draft.title || draft.scope },
+      })));
+      setPushDone(true);
+      setTimeout(() => setPushOpen(false), 1200);
+    } catch (e) {
+      console.warn('[MeetingForm] push error', e);
+    } finally {
+      setPushing(false);
+    }
+  };
+
   const handleImportEmail = () => {
     if (!emailPaste.trim()) return;
     const parsed = parseEmailText(emailPaste);
@@ -866,6 +911,56 @@ const MeetingForm: React.FC<MeetingFormProps> = ({ initial, onCancel, onSave, re
           <div className="text-[10px] text-slate-400 mt-1 text-right tabular-nums">
             {draft.actionItems.length} / {ACTIONS_MAX}
           </div>
+
+          {/* → Open Items push section */}
+          {!readOnly && parsedActionLines.length > 0 && (
+            <div className="mt-3 border border-slate-200 rounded-sm">
+              <button type="button" onClick={() => pushOpen ? setPushOpen(false) : handleOpenPush()}
+                className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-colors">
+                <span className="flex items-center gap-1.5">
+                  <ArrowUpRight size={11} className="text-blue-500" />
+                  Send to Open Items
+                </span>
+                {pushOpen ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+              </button>
+
+              {pushOpen && (
+                <div className="border-t border-slate-200 p-3 space-y-2">
+                  <p className="text-[10px] text-slate-400">Select which action items to follow up on. You can rename them before sending.</p>
+                  {pushRows.map((row, idx) => (
+                    <div key={idx} className={`flex items-center gap-2 p-2 rounded border transition-colors ${row.selected ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200 opacity-60'}`}>
+                      <input type="checkbox" checked={row.selected}
+                        onChange={(e) => setPushRows((prev) => prev.map((r, i) => i === idx ? { ...r, selected: e.target.checked } : r))}
+                        className="flex-shrink-0 accent-blue-600 w-3 h-3" />
+                      <input type="text" value={row.text}
+                        onChange={(e) => setPushRows((prev) => prev.map((r, i) => i === idx ? { ...r, text: e.target.value } : r))}
+                        className="flex-1 text-[11px] text-slate-800 bg-transparent border-none outline-none min-w-0" />
+                      <select value={row.priority}
+                        onChange={(e) => setPushRows((prev) => prev.map((r, i) => i === idx ? { ...r, priority: e.target.value as OpenItemPriority } : r))}
+                        className="text-[10px] text-slate-600 bg-white border border-slate-200 rounded px-1.5 py-0.5 outline-none appearance-none cursor-pointer flex-shrink-0">
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                      </select>
+                    </div>
+                  ))}
+                  <div className="flex justify-end pt-1">
+                    <button type="button"
+                      disabled={pushing || pushRows.every((r) => !r.selected) || pushRows.filter((r) => r.selected).every((r) => !r.text.trim())}
+                      onClick={handlePushToOpenItems}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-sm transition-colors">
+                      {pushDone
+                        ? <><Check size={11} />Sent!</>
+                        : pushing
+                          ? <><Loader2 size={11} className="animate-spin" />Sending…</>
+                          : <><ArrowUpRight size={11} />Send {pushRows.filter((r) => r.selected).length} item{pushRows.filter((r) => r.selected).length !== 1 ? 's' : ''}</>
+                      }
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
