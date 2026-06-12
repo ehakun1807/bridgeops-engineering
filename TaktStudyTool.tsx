@@ -524,18 +524,6 @@ const StudyRow: React.FC<{
           </button>
         )}
       </div>
-      {!readOnly && (
-        <div className="mt-2 pl-10">
-          <PushToOpenItemsInline
-            db={db}
-            userId={study.userId}
-            projectId={study.projectId}
-            sourceTool="takt"
-            sourceDocId={study.id}
-            initialTitle={study.name || ''}
-          />
-        </div>
-      )}
     </div>
   );
 };
@@ -1055,6 +1043,16 @@ const StudyForm: React.FC<StudyFormProps> = ({ initial, onCancel, onSave, readOn
         >
           <Download size={12} /> .xlsx
         </button>
+        {initial.id && !readOnly && (
+          <PushToOpenItemsInline
+            db={db}
+            userId={initial.userId}
+            projectId={initial.projectId}
+            sourceTool="takt"
+            sourceDocId={initial.id}
+            initialTitle={name || ''}
+          />
+        )}
         <button
           type="button"
           onClick={onCancel}

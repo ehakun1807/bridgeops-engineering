@@ -629,18 +629,6 @@ const DecisionList: React.FC<DecisionListProps> = ({
                   </button>
                 )}
               </div>
-              {!readOnly && (
-                <div className="mt-2">
-                  <PushToOpenItemsInline
-                    db={db}
-                    userId={d.userId}
-                    projectId={d.projectId}
-                    sourceTool="decision"
-                    sourceDocId={d.id}
-                    initialTitle={d.title || ''}
-                  />
-                </div>
-              )}
             </li>
           );
         })}
@@ -892,9 +880,21 @@ const DecisionForm: React.FC<DecisionFormProps> = ({
 
       {/* Footer */}
       <div className="flex items-center justify-between gap-2 border-t border-slate-200 pt-4">
-        <p className="text-[10px] text-slate-400">
-          Title and "What was decided" are required. All other fields are optional but recommended.
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="text-[10px] text-slate-400">
+            Title and "What was decided" are required.
+          </p>
+          {!isNew && !readOnly && (
+            <PushToOpenItemsInline
+              db={db}
+              userId={initial.userId}
+              projectId={initial.projectId}
+              sourceTool="decision"
+              sourceDocId={initial.id}
+              initialTitle={draft.title || ''}
+            />
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <button
             type="button"

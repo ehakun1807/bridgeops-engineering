@@ -948,18 +948,6 @@ const ControlPlanTool: React.FC<ControlPlanToolProps> = ({
                           )
                         )}
                       </div>
-                      {!readOnly && (
-                        <div className="mt-2">
-                          <PushToOpenItemsInline
-                            db={db}
-                            userId={plan.userId}
-                            projectId={plan.projectId}
-                            sourceTool="control_plan"
-                            sourceDocId={plan.id}
-                            initialTitle={plan.title || ''}
-                          />
-                        </div>
-                      )}
                     </li>
                   );
                 })}
@@ -1128,7 +1116,18 @@ const ControlPlanTool: React.FC<ControlPlanToolProps> = ({
                 <span>{saveError}</span>
               </div>
             )}
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+              {editingPlan && !readOnly ? (
+                <PushToOpenItemsInline
+                  db={db}
+                  userId={editingPlan.userId}
+                  projectId={editingPlan.projectId}
+                  sourceTool="control_plan"
+                  sourceDocId={editingPlan.id}
+                  initialTitle={title || ''}
+                />
+              ) : <span />}
+              <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setView('list')}
@@ -1145,6 +1144,7 @@ const ControlPlanTool: React.FC<ControlPlanToolProps> = ({
                 {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
                 {editingPlan ? 'Update Plan' : 'Save Plan'}
               </button>
+              </div>
             </div>
           </motion.div>
         )}

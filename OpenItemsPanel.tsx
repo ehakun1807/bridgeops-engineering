@@ -277,6 +277,8 @@ const OpenItemsPanel: React.FC<OpenItemsPanelProps> = ({
   const [addingCustom,   setAddingCustom]   = useState(false);
   const [customDraft,    setCustomDraft]    = useState(blankCustom());
   const [savingCustom,   setSavingCustom]   = useState(false);
+  const [saveCustomError, setSaveCustomError] = useState<string | null>(null);
+  const [persistError,   setPersistError]   = useState<string | null>(null);
 
   // ── load ─────────────────────────────────────────────────────────────────
   const loadAll = useCallback(async (isRefresh = false) => {
@@ -315,6 +317,7 @@ const OpenItemsPanel: React.FC<OpenItemsPanelProps> = ({
     oOverrides: Record<string, string>
   ) => {
     try {
+      setPersistError(null);
       await setDoc(
         doc(db, 'openItemsDismissed', metaDocId(userId, projectId)),
         { userId, projectId, dismissedUids: Array.from(uids), priorityOverrides: pOverrides, ownerOverrides: oOverrides },
@@ -322,6 +325,12 @@ const OpenItemsPanel: React.FC<OpenItemsPanelProps> = ({
       );
     } catch (e) {
       console.warn('[OpenItemsPanel] persist metadata error', e);
+      const msg = (e as any)?.message ?? 'Unknown error';
+      setPersistError(
+        msg.includes('insufficient permissions')
+          ? 'Changes not saved: Firestore rules not deployed — paste firestore.rules into Firebase Console → Firestore → Rules → Publish.'
+          : `Save failed: ${msg}`
+      );
     }
   }, [db, userId, projectId]);
 
@@ -459,7 +468,12 @@ const OpenItemsPanel: React.FC<OpenItemsPanelProps> = ({
         await updateDoc(doc(db, 'openItems', item.sourceDocId), { priority: next, updatedAtMs: Date.now() });
         setOpenDocs((prev) => prev.map((d) => d.id === item.sourceDocId ? { ...d, priority: next } : d));
         resortByPriority({ ...priorityOverrides, [item.uid]: next });
-      } catch (e) { console.warn('[OpenItemsPanel] toggle priority error', e); }
+        setPersistError(null);
+      } catch (e) {
+        console.warn('[OpenItemsPanel] toggle priority error', e);
+        const msg = (e as any)?.message ?? 'Unknown error';
+        setPersistError(msg.includes('insufficient permissions') ? 'Changes not saved: Firestore rules not deployed — paste firestore.rules into Firebase Console → Rules → Publish.' : `Save failed: ${msg}`);
+      }
     }
   };
 
@@ -472,7 +486,12 @@ const OpenItemsPanel: React.FC<OpenItemsPanelProps> = ({
         try {
           await updateDoc(doc(db, 'openItems', oDoc.id), { assignee: value.trim(), updatedAtMs: Date.now() });
           setOpenDocs((prev) => prev.map((d) => d.id === oDoc.id ? { ...d, assignee: value.trim() } : d));
-        } catch (e) { console.warn('[OpenItemsPanel] owner update error', e); }
+          setPersistError(null);
+        } catch (e) {
+          console.warn('[OpenItemsPanel] owner update error', e);
+          const msg = (e as any)?.message ?? 'Unknown error';
+          setPersistError(msg.includes('insufficient permissions') ? 'Changes not saved: Firestore rules not deployed — paste firestore.rules into Firebase Console → Rules → Publish.' : `Save failed: ${msg}`);
+        }
       } else {
         const nextOwners = { ...ownerOverrides, [uid]: value.trim() };
         if (!value.trim()) delete nextOwners[uid];
@@ -529,7 +548,15 @@ const OpenItemsPanel: React.FC<OpenItemsPanelProps> = ({
       logActivity({ userId, projectId, eventType: 'open_item_created', tool: 'open_items', title: `Added: ${payload.title.slice(0, 60)}`, timestampMs: Date.now() });
       setCustomDraft(blankCustom());
       setAddingCustom(false);
-    } catch (e) { console.warn('[OpenItemsPanel] save custom error', e); }
+    } catch (e) {
+      console.warn('[OpenItemsPanel] save custom error', e);
+      const msg = (e as any)?.message ?? 'Unknown error';
+      setSaveCustomError(
+        msg.includes('insufficient permissions')
+          ? 'Save failed: Firestore rules not deployed. Paste firestore.rules into Firebase Console → Firestore → Rules → Publish.'
+          : `Save failed: ${msg}`
+      );
+    }
     finally { setSavingCustom(false); }
   };
 
@@ -545,6 +572,13 @@ const OpenItemsPanel: React.FC<OpenItemsPanelProps> = ({
 
   return (
     <div className="space-y-4">
+      {/* Persist error banner */}
+      {persistError && (
+        <div className="flex items-start gap-2 bg-rose-50 border border-rose-200 rounded px-3 py-2 text-[11px] text-rose-700">
+          <span className="flex-1">{persistError}</span>
+          <button type="button" onClick={() => setPersistError(null)} className="flex-shrink-0 text-rose-400 hover:text-rose-700"><X size={12} /></button>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -603,8 +637,11 @@ const OpenItemsPanel: React.FC<OpenItemsPanelProps> = ({
                 <option value="low">Low priority</option>
               </select>
             </div>
+            {saveCustomError && (
+              <div className="bg-rose-50 border border-rose-200 rounded px-3 py-2 text-[11px] text-rose-700">{saveCustomError}</div>
+            )}
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => { setAddingCustom(false); setCustomDraft(blankCustom()); }}
+              <button type="button" onClick={() => { setAddingCustom(false); setCustomDraft(blankCustom()); setSaveCustomError(null); }}
                 className="px-3 py-1.5 text-[11px] font-black uppercase tracking-widest text-slate-500 hover:text-slate-800 transition-colors">Cancel</button>
               <button type="button" disabled={!customDraft.title.trim() || savingCustom} onClick={handleSaveCustom}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 text-white text-[11px] font-black uppercase tracking-widest hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">

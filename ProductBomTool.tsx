@@ -700,18 +700,6 @@ const BomList: React.FC<BomListProps> = ({
               </button>
             )}
             </div>
-            {!readOnly && (
-              <div className="mt-2">
-                <PushToOpenItemsInline
-                  db={db}
-                  userId={b.userId}
-                  projectId={b.projectId}
-                  sourceTool="bom"
-                  sourceDocId={b.id}
-                  initialTitle={b.versionLabel || b.fileName || ''}
-                />
-              </div>
-            )}
           </li>
         );
       })}
@@ -1670,13 +1658,23 @@ const BomView: React.FC<BomViewProps> = ({
     <div className="px-6 py-6 space-y-6">
       {/* Back + meta */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <button
-          type="button"
-          onClick={onBack}
-          className="text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-slate-900 flex items-center gap-1"
-        >
-          <ArrowLeft size={12} /> Back to list
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onBack}
+            className="text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-slate-900 flex items-center gap-1"
+          >
+            <ArrowLeft size={12} /> Back to list
+          </button>
+          <PushToOpenItemsInline
+            db={db}
+            userId={bom.userId}
+            projectId={bom.projectId}
+            sourceTool="bom"
+            sourceDocId={bom.id}
+            initialTitle={bom.versionLabel || bom.fileName || ''}
+          />
+        </div>
         <div className="text-[11px] text-slate-500 flex items-center gap-3 flex-wrap">
           <span className="font-bold text-slate-700">
             Effective {formatEffectiveDate(bom.effectiveDateMs || bom.uploadedAtMs)}

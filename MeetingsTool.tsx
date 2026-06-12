@@ -458,18 +458,6 @@ const MeetingList: React.FC<MeetingListProps> = ({
                 </button>
               )}
             </div>
-            {!readOnly && (
-              <div className="mt-2 pl-0">
-                <PushToOpenItemsInline
-                  db={db}
-                  userId={m.userId}
-                  projectId={m.projectId}
-                  sourceTool="meeting"
-                  sourceDocId={m.id}
-                  initialTitle={m.title || ''}
-                />
-              </div>
-            )}
           </li>
         );
       })}
@@ -897,7 +885,7 @@ const MeetingForm: React.FC<MeetingFormProps> = ({ initial, onCancel, onSave, re
 
       {/* Footer */}
       <div className="flex items-center justify-between gap-2 border-t border-slate-200 pt-4">
-        <div>
+        <div className="flex items-center gap-3">
           {!isNew && (
             <button
               type="button"
@@ -920,6 +908,16 @@ const MeetingForm: React.FC<MeetingFormProps> = ({ initial, onCancel, onSave, re
               {downloading ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
               Download PDF
             </button>
+          )}
+          {!isNew && !readOnly && (
+            <PushToOpenItemsInline
+              db={db}
+              userId={initial.userId}
+              projectId={initial.projectId}
+              sourceTool="meeting"
+              sourceDocId={initial.id}
+              initialTitle={draft.title || ''}
+            />
           )}
         </div>
         <div className="flex items-center gap-2">

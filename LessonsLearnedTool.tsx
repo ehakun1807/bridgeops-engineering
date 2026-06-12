@@ -653,18 +653,6 @@ const LessonList: React.FC<LessonListProps> = ({
                   </button>
                 )}
               </div>
-              {!readOnly && (
-                <div className="mt-2">
-                  <PushToOpenItemsInline
-                    db={db}
-                    userId={l.userId}
-                    projectId={l.projectId}
-                    sourceTool="lesson"
-                    sourceDocId={l.id}
-                    initialTitle={l.title || ''}
-                  />
-                </div>
-              )}
             </li>
           );
         })}
@@ -956,9 +944,21 @@ const LessonForm: React.FC<LessonFormProps> = ({
 
       {/* Footer */}
       <div className="flex items-center justify-between gap-2 border-t border-slate-200 pt-4">
-        <p className="text-[10px] text-slate-400">
-          Title and "What Happened" are required. Root cause and actions are strongly recommended.
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="text-[10px] text-slate-400">
+            Title and "What Happened" are required.
+          </p>
+          {!isNew && !readOnly && (
+            <PushToOpenItemsInline
+              db={db}
+              userId={initial.userId}
+              projectId={initial.projectId}
+              sourceTool="lesson"
+              sourceDocId={initial.id}
+              initialTitle={draft.title || ''}
+            />
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <button
             type="button"

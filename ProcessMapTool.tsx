@@ -990,18 +990,6 @@ const ProcessMapList: React.FC<ProcessMapListProps> = ({ maps, loading, error, o
                 </div>
               )}
             </div>
-            {!readOnly && (
-              <div className="mt-2 pl-9">
-                <PushToOpenItemsInline
-                  db={db}
-                  userId={m.userId}
-                  projectId={m.projectId}
-                  sourceTool="process_map"
-                  sourceDocId={m.id}
-                  initialTitle={m.title || ''}
-                />
-              </div>
-            )}
           </div>
         );
       })}
@@ -1191,6 +1179,16 @@ const ProcessMapForm: React.FC<ProcessMapFormProps> = ({ initial, onCancel, onSa
               {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
               {initial.id ? 'Save changes' : 'Create map'}
             </button>
+          )}
+          {initial.id && !readOnly && (
+            <PushToOpenItemsInline
+              db={db}
+              userId={initial.userId}
+              projectId={initial.projectId}
+              sourceTool="process_map"
+              sourceDocId={initial.id}
+              initialTitle={title || ''}
+            />
           )}
         </div>
       </div>
