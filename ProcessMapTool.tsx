@@ -660,11 +660,12 @@ function safeFileStem(s: string): string {
 interface ProcessMapToolProps {
   projectId: string;
   readOnly?: boolean;
+  focusDocId?: string | null;
 }
 
 type Mode = { kind: 'list' } | { kind: 'edit'; map: ProcessMap };
 
-const ProcessMapTool: React.FC<ProcessMapToolProps> = ({ projectId, readOnly = false }) => {
+const ProcessMapTool: React.FC<ProcessMapToolProps> = ({ projectId, readOnly = false, focusDocId }) => {
   const [maps, setMaps] = useState<ProcessMap[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -695,13 +696,17 @@ const ProcessMapTool: React.FC<ProcessMapToolProps> = ({ projectId, readOnly = f
         };
       });
       setMaps(rows);
+      if (focusDocId) {
+        const found = rows.find((r) => r.id === focusDocId);
+        if (found) setMode({ kind: 'edit', map: found });
+      }
     } catch (e: any) {
       console.error('[ProcessMapTool] load failed', e);
       setError(e?.message || 'Failed to load process maps');
     } finally {
       setLoading(false);
     }
-  }, [uid, projectId]);
+  }, [uid, projectId, focusDocId]); // eslint-disable-line
 
   useEffect(() => { load(); }, [load]);
 

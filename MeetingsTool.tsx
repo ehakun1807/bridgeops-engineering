@@ -142,11 +142,12 @@ interface MeetingsToolProps {
   projectId: string;
   projectName?: string;
   readOnly?: boolean;
+  focusDocId?: string | null;
 }
 
 type Mode = { kind: 'list' } | { kind: 'edit'; meeting: Meeting };
 
-const MeetingsTool: React.FC<MeetingsToolProps> = ({ projectId, projectName = '', readOnly = false }) => {
+const MeetingsTool: React.FC<MeetingsToolProps> = ({ projectId, projectName = '', readOnly = false, focusDocId }) => {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -175,6 +176,11 @@ const MeetingsTool: React.FC<MeetingsToolProps> = ({ projectId, projectName = ''
         return { ...data, id: d.id };
       });
       setMeetings(rows);
+      // Deep-link: open a specific record from search navigation
+      if (focusDocId) {
+        const found = rows.find((r) => r.id === focusDocId);
+        if (found) setMode({ kind: 'edit', meeting: found });
+      }
     } catch (e: any) {
       console.error('[MeetingsTool] load failed', e);
       setError(e?.message || 'Failed to load meetings');

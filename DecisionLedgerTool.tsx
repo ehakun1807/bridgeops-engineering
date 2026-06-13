@@ -187,6 +187,7 @@ interface DecisionLedgerToolProps {
   projectName?: string;
   currentGate?: string;
   readOnly?: boolean;
+  focusDocId?: string | null;
 }
 
 type Mode = { kind: 'list' } | { kind: 'edit'; decision: Decision };
@@ -195,7 +196,8 @@ const DecisionLedgerTool: React.FC<DecisionLedgerToolProps> = ({
   projectId,
   projectName = 'Project',
   currentGate,
-  readOnly = false
+  readOnly = false,
+  focusDocId
 }) => {
   const [decisions, setDecisions] = useState<Decision[]>([]);
   const [loading,   setLoading]   = useState(true);
@@ -222,6 +224,10 @@ const DecisionLedgerTool: React.FC<DecisionLedgerToolProps> = ({
       ));
       const loaded = snap.docs.map(d => ({ ...d.data() as Omit<Decision, 'id'>, id: d.id }));
       setDecisions(loaded);
+      if (focusDocId) {
+        const found = loaded.find((d) => d.id === focusDocId);
+        if (found) setMode({ kind: 'edit', decision: found });
+      }
       return loaded;
     } catch (e: any) {
       console.error('[DecisionLedgerTool] load failed', e);

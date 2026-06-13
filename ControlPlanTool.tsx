@@ -503,6 +503,7 @@ interface ControlPlanToolProps {
   projectName: string;
   currentGate?: string;
   readOnly?: boolean;
+  focusDocId?: string | null;
 }
 
 type ToolView = 'list' | 'form';
@@ -512,6 +513,7 @@ const ControlPlanTool: React.FC<ControlPlanToolProps> = ({
   projectName,
   currentGate,
   readOnly = false,
+  focusDocId,
 }) => {
   const userId = auth.currentUser?.uid ?? '';
 
@@ -555,9 +557,12 @@ const ControlPlanTool: React.FC<ControlPlanToolProps> = ({
           orderBy('dateMs', 'desc')
         )
       );
-      setPlans(
-        snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<ControlPlan, 'id'>) }))
-      );
+      const loaded = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<ControlPlan, 'id'>) }));
+      setPlans(loaded);
+      if (focusDocId) {
+        const found = loaded.find((p) => p.id === focusDocId);
+        if (found) openEdit(found);
+      }
     } catch (e) {
       console.error('[ControlPlanTool] load failed', e);
     } finally {

@@ -315,7 +315,7 @@ interface ProjectSearchModalProps {
   projectName: string;
   db: Firestore;
   onClose: () => void;
-  onNavigate: (tabId: string) => void;
+  onNavigate: (tabId: string, docId?: string) => void;
 }
 
 const ProjectSearchModal: React.FC<ProjectSearchModalProps> = ({
@@ -372,7 +372,7 @@ const ProjectSearchModal: React.FC<ProjectSearchModalProps> = ({
 
   const handleSelect = useCallback(
     (result: SearchResult) => {
-      onNavigate(result.tabId);
+      onNavigate(result.tabId, result.docId);
       onClose();
     },
     [onNavigate, onClose]

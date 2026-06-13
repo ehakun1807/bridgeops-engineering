@@ -257,6 +257,7 @@ interface ProductBomToolProps {
   templateName?: string;
   disabledItemIds?: string[];
   readOnly?: boolean;
+  focusDocId?: string | null;
 }
 
 type Mode =
@@ -273,7 +274,8 @@ const ProductBomTool: React.FC<ProductBomToolProps> = ({
   standards,
   templateName,
   disabledItemIds,
-  readOnly = false
+  readOnly = false,
+  focusDocId
 }) => {
   const [boms, setBoms] = useState<ProductBom[]>([]);
   const [loading, setLoading] = useState(true);
@@ -344,6 +346,10 @@ const ProductBomTool: React.FC<ProductBomToolProps> = ({
         return { ...data, id: d.id };
       });
       setBoms(rows);
+      if (focusDocId) {
+        const found = rows.find((r) => r.id === focusDocId);
+        if (found) setMode({ kind: 'view', bomId: found.id });
+      }
     } catch (e: any) {
       console.error('[ProductBomTool] load failed', e);
       setError(e?.message || 'Failed to load BOMs');

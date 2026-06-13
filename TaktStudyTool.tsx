@@ -152,6 +152,7 @@ interface TaktStudyToolProps {
   projectId: string;
   productType: string;
   readOnly?: boolean;
+  focusDocId?: string | null;
 }
 
 type Mode = { kind: 'list' } | { kind: 'edit'; study: TaktStudy };
@@ -159,7 +160,8 @@ type Mode = { kind: 'list' } | { kind: 'edit'; study: TaktStudy };
 const TaktStudyTool: React.FC<TaktStudyToolProps> = ({
   projectId,
   productType,
-  readOnly = false
+  readOnly = false,
+  focusDocId
 }) => {
   const [studies, setStudies] = useState<TaktStudy[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -192,6 +194,10 @@ const TaktStudyTool: React.FC<TaktStudyToolProps> = ({
         return { ...data, id: d.id };
       });
       setStudies(rows);
+      if (focusDocId) {
+        const found = rows.find((r) => r.id === focusDocId);
+        if (found) setMode({ kind: 'edit', study: found });
+      }
     } catch (e: any) {
       console.error('[TaktStudyTool] load failed', e);
       setError(e?.message || 'Failed to load studies');

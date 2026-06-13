@@ -320,11 +320,12 @@ interface PFMEAToolProps {
   projectId: string;
   projectName?: string;
   readOnly?: boolean;
+  focusDocId?: string | null;
 }
 
 type Mode = { kind: 'list' } | { kind: 'edit'; pfmea: PFMEA };
 
-const PFMEATool: React.FC<PFMEAToolProps> = ({ projectId, projectName = '', readOnly = false }) => {
+const PFMEATool: React.FC<PFMEAToolProps> = ({ projectId, projectName = '', readOnly = false, focusDocId }) => {
   const [items, setItems] = useState<PFMEA[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -381,6 +382,10 @@ const PFMEATool: React.FC<PFMEAToolProps> = ({ projectId, projectName = '', read
         return { ...data, id: d.id, risks: Array.isArray((data as any).risks) ? (data as any).risks : [] };
       });
       setItems(rows);
+      if (focusDocId) {
+        const found = rows.find((r) => r.id === focusDocId);
+        if (found) setMode({ kind: 'edit', pfmea: found });
+      }
     } catch (e: any) {
       console.error('[PFMEATool] load failed', e);
       setError(e?.message || 'Failed to load PFMEAs');

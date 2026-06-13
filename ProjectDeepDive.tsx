@@ -826,8 +826,9 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
   // Which parent parameter bucket is currently visible.
   const [activeGroupId, setActiveGroupId] = useState<string>(RAMP_GROUPS[0].id);
 
-  // Cmd+K project search modal
+  // Project search modal + deep-link target
   const [searchOpen, setSearchOpen] = useState(false);
+  const [searchFocusDocId, setSearchFocusDocId] = useState<string | null>(null);
 
   // Project Tools launcher popover open/closed. Closes on outside click,
   // Escape, or when a tool is picked.
@@ -851,17 +852,6 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
     };
   }, [toolsMenuOpen]);
 
-  // Cmd+K (or Ctrl+K) opens the project search modal
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        setSearchOpen((prev) => !prev);
-      }
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, []);
 
   // Report menu (Project Report ▾ dropdown) — close on outside click or Escape.
   useEffect(() => {
@@ -1988,10 +1978,9 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
             <button
               onClick={() => setSearchOpen(true)}
               className="text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-blue-600 transition-colors flex items-center gap-1"
-              title="Search this project (⌘K)"
+              title="Search this project"
             >
               <Search size={12} /> Search
-              <kbd className="ml-1 text-[9px] bg-slate-100 border border-slate-200 rounded px-1 py-0.5 text-slate-400 normal-case font-normal tracking-normal">⌘K</kbd>
             </button>
 
             {/* Project Report dropdown */}
@@ -2389,6 +2378,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
               projectId={project.id}
               productType={productType || project.productType || ''}
               readOnly={readOnly}
+              focusDocId={searchFocusDocId}
             />
           </motion.div>
         ) : activeGroupId === MEETINGS_TAB_ID ? (
@@ -2399,7 +2389,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
           >
-            <MeetingsTool projectId={project.id} projectName={projectName} readOnly={readOnly} />
+            <MeetingsTool projectId={project.id} projectName={projectName} readOnly={readOnly} focusDocId={searchFocusDocId} />
           </motion.div>
         ) : activeGroupId === PFMEA_TAB_ID ? (
           <motion.div
@@ -2409,7 +2399,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
           >
-            <PFMEATool projectId={project.id} projectName={projectName} readOnly={readOnly} />
+            <PFMEATool projectId={project.id} projectName={projectName} readOnly={readOnly} focusDocId={searchFocusDocId} />
           </motion.div>
         ) : activeGroupId === PROCESS_MAP_TAB_ID ? (
           <motion.div
@@ -2419,7 +2409,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
           >
-            <ProcessMapTool projectId={project.id} readOnly={readOnly} />
+            <ProcessMapTool projectId={project.id} readOnly={readOnly} focusDocId={searchFocusDocId} />
           </motion.div>
         ) : activeGroupId === PRODUCT_BOM_TAB_ID ? (
           <motion.div
@@ -2438,6 +2428,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
               standards={projectStandards}
               disabledItemIds={disabledItemIds}
               readOnly={readOnly}
+              focusDocId={searchFocusDocId}
             />
           </motion.div>
         ) : activeGroupId === DECISION_LEDGER_TAB_ID ? (
@@ -2453,6 +2444,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
               projectName={projectName}
               currentGate={currentGate}
               readOnly={readOnly}
+              focusDocId={searchFocusDocId}
             />
           </motion.div>
         ) : activeGroupId === LESSONS_TAB_ID ? (
@@ -2468,6 +2460,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
               projectName={projectName}
               currentGate={currentGate}
               readOnly={readOnly}
+              focusDocId={searchFocusDocId}
             />
           </motion.div>
         ) : activeGroupId === CONTROL_PLAN_TAB_ID ? (
@@ -2483,6 +2476,7 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
               projectName={projectName}
               currentGate={currentGate}
               readOnly={readOnly}
+              focusDocId={searchFocusDocId}
             />
           </motion.div>
         ) : activeGroupId === BUDGET_TAB_ID ? (
@@ -2760,9 +2754,14 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
             projectName={projectName || project.name}
             db={db}
             onClose={() => setSearchOpen(false)}
-            onNavigate={(tabId) => {
+            onNavigate={(tabId, docId) => {
               setActiveGroupId(tabId);
+              setSearchFocusDocId(docId ?? null);
               setSearchOpen(false);
+              // Reset the focus target after 4s — by then the tool has
+              // loaded its records and consumed the deep-link. This prevents
+              // re-triggering if the user navigates away and returns.
+              if (docId) setTimeout(() => setSearchFocusDocId(null), 4000);
             }}
           />
         )}

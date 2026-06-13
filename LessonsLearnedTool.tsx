@@ -236,6 +236,7 @@ interface LessonsLearnedToolProps {
   projectName?: string;
   currentGate?: string;
   readOnly?: boolean;
+  focusDocId?: string | null;
 }
 
 type Mode = { kind: 'list' } | { kind: 'edit'; lesson: Lesson };
@@ -244,7 +245,8 @@ const LessonsLearnedTool: React.FC<LessonsLearnedToolProps> = ({
   projectId,
   projectName = 'Project',
   currentGate,
-  readOnly = false
+  readOnly = false,
+  focusDocId
 }) => {
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
@@ -268,6 +270,10 @@ const LessonsLearnedTool: React.FC<LessonsLearnedToolProps> = ({
       ));
       const loaded = snap.docs.map(d => ({ ...d.data() as Omit<Lesson, 'id'>, id: d.id }));
       setLessons(loaded);
+      if (focusDocId) {
+        const found = loaded.find((l) => l.id === focusDocId);
+        if (found) setMode({ kind: 'edit', lesson: found });
+      }
       return loaded;
     } catch (e: any) {
       console.error('[LessonsLearnedTool] load failed', e);
