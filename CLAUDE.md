@@ -760,3 +760,41 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Open follow-ups (after today):**
   1. **Carry-over** — end-of-beta cleanup checklist (allowlist 12 places), per-UID rate limiting on authenticated AI handlers, Sentry, mobile lockout, SEO meta tags for `/#/intelligence`, ECO Pulse xlsx diff export, Control Plan PDF export.
+
+### 2026-06-12 (continued) — Full codebase audit + AI wiring fixes
+
+- **Full quality audit.** End-to-end scan of the entire codebase for bugs, inconsistencies, dead code, missing wiring, type safety gaps, and open follow-ups. Ten prioritised findings surfaced; all high-severity items fixed in this session.
+
+- **Bug fix: `x in [...]` — JavaScript operator misuse (`AIAnalysisPanel.tsx`, 5 locations).** `value in array` in JavaScript checks for array *index* membership, not value membership — always returns `false` for non-numeric strings. All five locations used this pattern to validate Firestore enum fields before passing them to the AI prompt, meaning every field always fell back to its default literal:
+  - Line ~255: `d.status in ['active', 'superseded', 'reversed']` → decisions always appeared as `'active'`; reversed decisions were never flagged as instability signals.
+  - Lines ~289–291: `l.lessonType in [...]` + `l.status in [...]` → all lessons appeared as `lessonType: 'problem'` / `status: 'open'` regardless of actual values.
+  - Line ~331: `cp.planType in [...]` → all control plans appeared as `'prototype'` to the AI.
+  - Line ~625: same pattern in the connected-projects decisions block.
+  - Fix: replaced all five with `(['a','b','c'] as string[]).includes(value)`.
+
+- **Bug fix: meetings `kind` vs `meetingType` field mismatch (`AIAnalysisPanel.tsx` line ~170).** `MeetingsTool` saves meetings with field `kind: 'internal' | 'external'`. `fetchToolContext` was reading `data.meetingType` (non-existent field) — all meetings appeared as `'Internal'` to the AI regardless of actual type. Fixed: `data.kind === 'external' ? 'External' : 'Internal'`.
+
+- **Bug fix: ECO-only saves rejected by Firestore rule (`firestore.rules` line 190).** `isValidProductBom` required `data.fileName.size() > 0`. The ECO-only (no-file) save path introduced in the 2026-05-28 session writes `fileName: ''`. Every ECO-only save was rejected with a permissions error. Fixed: removed `> 0` so any string (including empty) is accepted.
+
+- **Stale tooltip fix (`Dashboard.tsx` line 482).** Tools button hover tooltip still read "Alt BOM · Quote Compare · Doc Guard · Entity Tags". Entity Tags was moved into the Supplier Tracker in the 2026-06-11 session. Updated to "Alt BOM · Quote Compare · Doc Guard · SOP Radar · Suppliers".
+
+- **Dead code identified: `EntityTagsModal.tsx`.** 289 lines, zero imports anywhere in the codebase (superseded when Entity Tags UX moved into `AdvancedToolsModal`). Also uses the old `framer-motion` import path instead of `motion/react`. Not deleted this session but flagged for cleanup.
+
+- **AI wiring audit — `hasToolContext` guard too narrow (`api/ai-analyze.ts` line 512).** The guard conditioned the entire `## Live Tool Signals` block on: takt, pfmeas, meetings, BOM, decisions, guidelines, suppliers. Missing: `lessons`, `controlPlan`, `processMap`. A project with only lessons + a control plan but no PFMEA/BOM/meetings would have `hasToolContext = false` and the entire live signals block would be silently omitted from the Gemini prompt. Fixed: added `tc.lessons?.length || tc.controlPlan || tc.processMap` to the guard.
+
+- **AI wiring fix: `504` in `RETRY_STATUSES` (`api/bom-impact-analyze.ts`, `api/quote-compare.ts`, `api/find-equivalent.ts`).** The 2026-05-20 session explicitly removed `504` from `RETRY_STATUSES` in `docguard.ts` with the rationale: retrying a Gemini timeout burns the remaining Vercel function budget, guaranteeing a second timeout. `ai-analyze`, `ai-coach`, and `org-insights` were already correct (no 504). Three handlers still had it. Fixed: removed `504` from all three `RETRY_STATUSES` sets with an explanatory comment.
+
+- **AI wiring fix: supplier `lastEventSummary` never populated (`AIAnalysisPanel.tsx`).** `SupplierSignal.lastEventSummary` was defined in `aiClient.ts` and used in the `api/ai-analyze.ts` prompt builder, but `fetchToolContext` never queried `supplierEvents` — the field always arrived as `undefined`. Fixed: added a secondary query to `supplierEvents` collection (per supplier chunk, `orderBy dateMs desc`, `limit chunk.length × 2`), picks the first event per `supplierId`, formats as `"<title> — <outcome/nextSteps>"` (≤150 chars). Doc IDs are now captured via `{ ...d.data(), _docId: d.id }` in the suppliers fetch so the lookup key is correct. Non-fatal — events query failure is silently skipped.
+
+- **Confirmed wired (Task #7 closed): Process Map in AI Analysis.** Audit confirmed `ProcessMapSignal` is fully defined in `aiClient.ts`, `fetchToolContext` correctly fetches `processMaps`, and `api/ai-analyze.ts` has a complete `### Process Map` prompt section. Task was marked in-progress but the work was already done. Closed.
+
+- **`tsc --noEmit` clean** across all changed files.
+
+- **Open follow-ups (after today):**
+  1. **Deploy `firestore.rules`** — paste into Firebase Console (ECO-only fileName fix must be live before ECO-only saves work in prod). Verify "Last published" moves.
+  2. **Push to Vercel** (`git push`) so all AI wiring fixes, bug fixes, and tooltip update are live in prod.
+  3. **Delete `EntityTagsModal.tsx`** — dead code, safe to remove anytime.
+  4. **Add missing composite indexes to `firestore.indexes.json`:** `taktStudies (userId asc, projectId asc, createdAt desc)` and `orgGuidelines (userId asc, uploadedAtMs desc)` — both exist in the Firebase Console but are not tracked in the JSON file (will break on fresh project deploy).
+  5. **Wire `logActivity` into `SupplierTrackerPage`** — all supplier mutations (add, edit, qualify, disqualify, delete, event log) produce zero Activity Feed entries despite event types being defined in `activityLogger.ts`.
+  6. **Wire `logActivity` into `CompanyGuidelinesTool`** — SOP uploads and deletions are invisible in the Activity Feed.
+  7. **Carry-over** — end-of-beta cleanup checklist (allowlist 12 places, re-add `email_verified`), per-UID rate limiting on authenticated AI handlers, Sentry, mobile lockout, SEO meta tags for `/#/intelligence`, ECO Pulse xlsx diff export, Control Plan PDF export, summary mirrors for Lessons/Budget/ProcessMap/BOM (lessonsSummary, budgetSummary, processMapSummary, latestBomSummary header pills).

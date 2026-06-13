@@ -107,6 +107,7 @@ import {
   removeBidirectionalConnection
 } from './projectConnectionsClient.ts';
 import type { Supplier as OrgSupplier } from './SupplierTrackerPage.tsx';
+import ProjectSearchModal from './ProjectSearchModal.tsx';
 
 export type InfoStatus = 'TBD' | 'In Process' | 'Completed' | 'Cancelled';
 
@@ -825,6 +826,9 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
   // Which parent parameter bucket is currently visible.
   const [activeGroupId, setActiveGroupId] = useState<string>(RAMP_GROUPS[0].id);
 
+  // Cmd+K project search modal
+  const [searchOpen, setSearchOpen] = useState(false);
+
   // Project Tools launcher popover open/closed. Closes on outside click,
   // Escape, or when a tool is picked.
   const [toolsMenuOpen, setToolsMenuOpen] = useState(false);
@@ -846,6 +850,18 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
       document.removeEventListener('keydown', onKey);
     };
   }, [toolsMenuOpen]);
+
+  // Cmd+K (or Ctrl+K) opens the project search modal
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setSearchOpen((prev) => !prev);
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
 
   // Report menu (Project Report ▾ dropdown) — close on outside click or Escape.
   useEffect(() => {
@@ -1968,6 +1984,16 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
                 <AlertTriangle size={12} /> {error}
               </span>
             )}
+            {/* Cmd+K search trigger */}
+            <button
+              onClick={() => setSearchOpen(true)}
+              className="text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-blue-600 transition-colors flex items-center gap-1"
+              title="Search this project (⌘K)"
+            >
+              <Search size={12} /> Search
+              <kbd className="ml-1 text-[9px] bg-slate-100 border border-slate-200 rounded px-1 py-0.5 text-slate-400 normal-case font-normal tracking-normal">⌘K</kbd>
+            </button>
+
             {/* Project Report dropdown */}
             <div className="relative" ref={reportMenuRef}>
               <button
@@ -2723,6 +2749,24 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
           setScopeEditorOpen(false);
         }}
       />
+
+      {/* Cmd+K project search modal — portalled to document.body (Framer Motion
+          transform gotcha: fixed children of transformed ancestors need a portal) */}
+      <AnimatePresence>
+        {searchOpen && (
+          <ProjectSearchModal
+            projectId={project.id}
+            userId={auth.currentUser?.uid ?? ''}
+            projectName={projectName || project.name}
+            db={db}
+            onClose={() => setSearchOpen(false)}
+            onNavigate={(tabId) => {
+              setActiveGroupId(tabId);
+              setSearchOpen(false);
+            }}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Close / cancel confirm modal */}
       <AnimatePresence>
