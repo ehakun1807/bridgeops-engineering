@@ -41,6 +41,7 @@ import {
   XCircle,
   Rocket,
   GraduationCap,
+  BookOpen,
   ChevronDown,
   Trash2,
   Wrench,
@@ -66,6 +67,7 @@ import PortfolioHeatmap from './PortfolioHeatmap.tsx';
 import AuthModal from './AuthModal.tsx';
 import AdvancedToolsModal from './AdvancedToolsModal.tsx';
 import BridgeOpsAcademy from './BridgeOpsAcademy.tsx';
+import Playbook from './Playbook.tsx';
 import {
   scoreBand,
   scoreForProject,
@@ -130,7 +132,7 @@ interface ProjectRecord {
   bomColumnMap?: Record<string, unknown>;
 }
 
-type TabKey = 'active' | 'archive' | 'academy';
+type TabKey = 'active' | 'archive' | 'academy' | 'playbook';
 
 const Dashboard: React.FC = () => {
   // --- Auth state --------------------------------------------------------
@@ -692,12 +694,20 @@ const Dashboard: React.FC = () => {
           icon={<GraduationCap size={14} />}
           label="BridgeOps Academy"
         />
+        <TabButton
+          active={activeTab === 'playbook'}
+          onClick={() => setActiveTab('playbook')}
+          icon={<BookOpen size={14} />}
+          label="Playbook"
+        />
       </div>
 
       {activeTab === 'academy' ? (
         // Academy tab is content, not data — render immediately without the
         // loading spinner (Firestore isn't involved).
         <BridgeOpsAcademy />
+      ) : activeTab === 'playbook' ? (
+        <Playbook />
       ) : loading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="animate-spin text-blue-600" size={32} />
