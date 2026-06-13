@@ -20,7 +20,6 @@ import {
   Search,
   X,
   ChevronRight,
-  Clock,
   Loader2,
   BarChart2,
   Users,
@@ -32,6 +31,8 @@ import {
   ClipboardList,
   Wallet,
   FlaskConical,
+  FileText,
+  UserCheck,
 } from 'lucide-react';
 import {
   collection,
@@ -43,11 +44,13 @@ import {
   Firestore,
 } from 'firebase/firestore';
 import { loadEntityAliases, EntityAliasMap } from './orgAliasesClient.ts';
+import { RAMP_GROUPS } from './rampGroups.ts';
 
 // ---------------------------------------------------------------------------
 // Tab IDs (mirrors ProjectDeepDive constants)
 // ---------------------------------------------------------------------------
 const TAB = {
+  GENERAL_INFO: '__general_info__',
   STUDIES:      '__studies__',
   MEETINGS:     '__meetings__',
   PFMEA:        '__pfmea__',
@@ -58,6 +61,18 @@ const TAB = {
   CONTROL_PLAN: '__control_plan__',
   BUDGET:       '__budget__',
 } as const;
+
+// ---------------------------------------------------------------------------
+// Build item ID → RAMP group ID mapping (for metric notes navigation)
+// ---------------------------------------------------------------------------
+const ITEM_TO_GROUP: Record<string, string> = {};
+const ITEM_TITLES: Record<string, string> = {};
+for (const group of RAMP_GROUPS) {
+  for (const item of group.items) {
+    ITEM_TO_GROUP[item.id] = group.id;
+    ITEM_TITLES[item.id] = item.title;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -459,6 +474,88 @@ const ProjectSearchModal: React.FC<ProjectSearchModalProps> = ({
           }
         }
 
+        // ----------------------------------------------------------------
+        // Search the project document itself:
+        //   - metric notes (project.notes: Record<itemId, string>)
+        //   - general info text (project.generalInfo)
+        //   - team & roles (project.assignees)
+        //   - custom deliverable titles (project.deliverables[itemId].custom[].title)
+        // ----------------------------------------------------------------
+        try {
+          const projSnap = await getDoc(doc(db, 'projects', projectId));
+          if (projSnap.exists()) {
+            const pd = projSnap.data() as Record<string, unknown>;
+
+            // General info notes
+            if (matchesTokens(pd.generalInfo as string | undefined, tokens)) {
+              allResults.push({
+                tabId: TAB.GENERAL_INFO,
+                toolLabel: 'Project Info',
+                icon: <FileText size={13} />,
+                title: 'General Info Notes',
+                snippet: String(pd.generalInfo || '').slice(0, 100),
+                docId: '',
+              });
+            }
+
+            // Team & roles / assignees
+            if (matchesTokens(pd.assignees as string | undefined, tokens)) {
+              allResults.push({
+                tabId: TAB.GENERAL_INFO,
+                toolLabel: 'Project Info',
+                icon: <UserCheck size={13} />,
+                title: 'Project Team & Roles',
+                snippet: String(pd.assignees || '').slice(0, 100),
+                docId: '',
+              });
+            }
+
+            // Metric notes — project.notes is Record<itemId, string>
+            const metricNotes = pd.notes as Record<string, string> | undefined;
+            if (metricNotes) {
+              for (const [itemId, noteText] of Object.entries(metricNotes)) {
+                if (!noteText || !matchesTokens(noteText, tokens)) continue;
+                const groupId = ITEM_TO_GROUP[itemId];
+                if (!groupId) continue;
+                const itemTitle = ITEM_TITLES[itemId] ?? itemId;
+                allResults.push({
+                  tabId: groupId,
+                  toolLabel: 'RAMP Scores',
+                  icon: <BarChart2 size={13} />,
+                  title: itemTitle,
+                  snippet: noteText.slice(0, 100),
+                  docId: '',
+                });
+              }
+            }
+
+            // Custom deliverables — project.deliverables[itemId].custom[].title
+            const delivs = pd.deliverables as Record<string, Record<string, unknown>> | undefined;
+            if (delivs) {
+              for (const [itemId, state] of Object.entries(delivs)) {
+                const custom = state?.custom as Array<{ id: string; title: string }> | undefined;
+                if (!Array.isArray(custom)) continue;
+                for (const cd of custom) {
+                  if (!matchesTokens(cd.title, tokens)) continue;
+                  const groupId = ITEM_TO_GROUP[itemId];
+                  if (!groupId) continue;
+                  const parentTitle = ITEM_TITLES[itemId] ?? itemId;
+                  allResults.push({
+                    tabId: groupId,
+                    toolLabel: 'RAMP Scores',
+                    icon: <BarChart2 size={13} />,
+                    title: cd.title,
+                    snippet: `Custom deliverable under "${parentTitle}"`,
+                    docId: '',
+                  });
+                }
+              }
+            }
+          }
+        } catch {
+          // non-fatal — project doc read failure doesn't block tool results
+        }
+
         if (!cancelled) {
           setResults(allResults);
           setHasSearched(true);
@@ -542,7 +639,7 @@ const ProjectSearchModal: React.FC<ProjectSearchModalProps> = ({
                 Type to search across all tools for this project
               </p>
               <p className="text-xs text-slate-300 mt-1">
-                Meetings, Decisions, PFMEA, Studies, BOM, Lessons, and more
+                Metric notes, meetings, decisions, PFMEA, BOM, lessons, and more
               </p>
             </div>
           )}
