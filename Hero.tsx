@@ -29,7 +29,7 @@ const Hero: React.FC<HeroProps> = ({ onNavigate }) => {
           </h1>
           
           <p className="text-lg md:text-xl text-slate-200 mb-8 leading-relaxed max-w-3xl font-medium border-l-4 border-blue-600 pl-6 py-2">
-            BridgeOps helps Hardware Startups and Tech Companies fix the <span className="text-blue-400 font-bold underline decoration-blue-500/50">hidden gaps between Engineering and Manufacturing</span> before they turn into delays, overruns, and broken teams.
+            BridgeOps helps Complex Hardware Startups and Tech Companies fix the <span className="text-blue-400 font-bold underline decoration-blue-500/50">hidden gaps between Engineering and Manufacturing</span> before they turn into delays, overruns, and broken teams.
           </p>
 
           <div className="space-y-4 mb-12 max-w-3xl pl-7">
