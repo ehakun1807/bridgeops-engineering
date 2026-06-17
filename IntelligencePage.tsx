@@ -68,7 +68,7 @@ const IntelligencePage: React.FC<IntelligencePageProps> = ({ onNavigate, onReque
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-4xl">
             <span className="text-blue-500 font-black uppercase tracking-[0.4em] text-[10px] mb-8 block">
-              BridgeOps Intelligence · Operational AI Platform
+              BridgeOps Intelligence · Built In-House · Ships With Every Engagement
             </span>
             <h1 className="text-5xl md:text-7xl font-black text-white tracking-tighter uppercase leading-[0.85] mb-8">
               The Operating System<br />
@@ -78,7 +78,8 @@ const IntelligencePage: React.FC<IntelligencePageProps> = ({ onNavigate, onReque
             <p className="text-slate-400 text-lg font-medium max-w-2xl leading-relaxed mb-12">
               From concept release to mass production, hardware teams track risks in PFMEA
               spreadsheets, BOM changes in email, and decisions in Slack threads — with nothing
-              connecting any of it. BridgeOps Intelligence changes that.
+              connecting any of it. I built BridgeOps Intelligence to fix that — and it runs
+              inside every engagement I deliver.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <button
@@ -126,7 +127,7 @@ const IntelligencePage: React.FC<IntelligencePageProps> = ({ onNavigate, onReque
               {[
                 { stat: '#1', label: 'Root cause of ramp slip — risks visible in silos, invisible as a connected system' },
                 { stat: 'Post-CDR', label: 'When most teams discover what should have been caught at PDR — after the cost multiplied' },
-                { stat: 'Built for NPI', label: 'The only operational intelligence platform purpose-built for hardware transfer to production' },
+                { stat: 'Built for NPI', label: 'Purpose-built from 20+ years of hardware transfer experience — not a generic PM tool adapted for manufacturing' },
                 { stat: 'CR→MP', label: 'Full gate coverage from concept release to mass production' },
               ].map((item) => (
                 <div key={item.stat} className="bg-slate-900 p-6 relative overflow-hidden">
@@ -310,16 +311,17 @@ const IntelligencePage: React.FC<IntelligencePageProps> = ({ onNavigate, onReque
             <div className="absolute inset-0 blueprint-grid-dark opacity-10"></div>
             <div className="relative z-10 max-w-xl">
               <span className="text-blue-500 font-black uppercase tracking-[0.4em] text-[10px] mb-4 block">
-                Early Access · Closed Beta
+                Invitation Only · Annual License or Engagement
               </span>
               <h2 className="text-3xl md:text-5xl font-black text-white uppercase tracking-tighter leading-none mb-6">
                 Ready to See It <br />
                 <span className="text-blue-500">In Your Program?</span>
               </h2>
               <p className="text-slate-400 text-base font-medium leading-relaxed">
-                BridgeOps Intelligence is currently in closed beta with a small group of hardware
-                teams. Request access and we'll reach out to schedule a walkthrough tailored to
-                your NPI stage.
+                BridgeOps Intelligence ships with every BridgeOps engagement — you get the full
+                platform from day one. It's also available as a standalone annual license for teams
+                that want it independently. Either way, access is invitation-only. Reach out and
+                I'll review your program personally.
               </p>
             </div>
             <div className="relative z-10 flex flex-col gap-4 w-full md:w-auto">
