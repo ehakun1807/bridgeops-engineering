@@ -315,7 +315,7 @@ const Pricing: React.FC<PricingProps> = ({ onSelectPlan, onNavigate }) => {
               <img
                 src="/e7b805_b505880a124d443ea7daa61229023685~mv2.avif"
                 alt="Field Medical"
-                className="h-8 w-auto"
+                className="h-8 w-auto brightness-0"
               />
             </a>
             <div className="h-5 w-[1px] bg-slate-200 hidden sm:block" />
