@@ -798,3 +798,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   5. **Wire `logActivity` into `SupplierTrackerPage`** — all supplier mutations (add, edit, qualify, disqualify, delete, event log) produce zero Activity Feed entries despite event types being defined in `activityLogger.ts`.
   6. **Wire `logActivity` into `CompanyGuidelinesTool`** — SOP uploads and deletions are invisible in the Activity Feed.
   7. **Carry-over** — end-of-beta cleanup checklist (allowlist 12 places, re-add `email_verified`), per-UID rate limiting on authenticated AI handlers, Sentry, mobile lockout, SEO meta tags for `/#/intelligence`, ECO Pulse xlsx diff export, Control Plan PDF export, summary mirrors for Lessons/Budget/ProcessMap/BOM (lessonsSummary, budgetSummary, processMapSummary, latestBomSummary header pills).
+
+### 2026-07-21
+- **GitHub PAT "bridgeops-engineering deploy" regenerated.** Token was expiring in 7 days (original expiry Jul 27, 2026). Regenerated via the link in GitHub's expiry email (`https://github.com/settings/tokens/4251699993/regenerate`). Kept `repo` scope.
+- **Vercel does NOT use this token.** Investigated Vercel → Settings → Git and Settings → Environment Variables. Vercel is connected to `ehakun1807/bridgeops-engineering` via the **GitHub App (OAuth)** — not a PAT. No token stored in Vercel's env vars or Git settings. No Vercel update was needed.
+- **Token value not needed.** Since Vercel uses GitHub App and terminal git pushes use the "eran-mac" token (in Mac Keychain, expires Aug 16, 2026), the "bridgeops-engineering deploy" PAT has no active consumer. Token value was discarded after regeneration; if GitHub auth ever fails due to this token, simply regenerate again at that point.
+- **Open follow-ups:** None new — carry-over from 2026-06-12 unchanged.

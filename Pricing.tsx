@@ -301,8 +301,42 @@ const Pricing: React.FC<PricingProps> = ({ onSelectPlan, onNavigate }) => {
           </div>
         </div>
 
+        {/* Current Clients -------------------------------------------------- */}
+        <div className="mt-12 pt-10 border-t border-slate-100">
+          <p className="text-[10px] font-black uppercase tracking-[0.35em] text-slate-400 mb-6">Current Clients</p>
+          <div className="flex flex-wrap items-center gap-10">
+            <a
+              href="https://www.fieldmedicalinc.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 opacity-50 hover:opacity-90 transition-opacity duration-300"
+              aria-label="Field Medical Inc"
+            >
+              <img
+                src="/e7b805_b505880a124d443ea7daa61229023685~mv2.avif"
+                alt="Field Medical"
+                className="h-8 w-auto"
+              />
+            </a>
+            <div className="h-5 w-[1px] bg-slate-200 hidden sm:block" />
+            <a
+              href="https://www.brain.space"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 opacity-50 hover:opacity-90 transition-opacity duration-300"
+              aria-label="brain.space"
+            >
+              <img
+                src="/logo-white_brain.space.svg"
+                alt="brain.space"
+                className="h-6 w-auto brightness-0"
+              />
+            </a>
+          </div>
+        </div>
+
         {/* Trust strip ------------------------------------------------------ */}
-        <div className="mt-20 pt-10 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-8">
+        <div className="mt-16 pt-10 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-8">
           <div className="flex flex-col md:flex-row items-center md:items-start gap-6 text-center md:text-left">
             <div className="flex items-center space-x-3 px-4 py-2 border border-slate-200 bg-slate-50 flex-shrink-0">
               <Shield size={16} className="text-blue-600" />

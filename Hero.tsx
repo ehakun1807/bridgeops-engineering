@@ -65,6 +65,45 @@ const Hero: React.FC<HeroProps> = ({ onNavigate }) => {
                <span className="text-white font-bold text-[11px] uppercase tracking-widest">Browse Our Solutions</span>
             </button>
           </div>
+
+          {/* Trusted by strip */}
+          <div className="mt-12 pt-10 border-t border-white/10">
+            <p className="text-[10px] font-black uppercase tracking-[0.35em] text-slate-500 mb-6">Trusted by</p>
+            <div className="flex flex-wrap items-center gap-10">
+              {/* Field Medical */}
+              <a
+                href="https://www.fieldmedicalinc.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 opacity-60 hover:opacity-100 transition-opacity duration-300 group"
+                aria-label="Field Medical Inc"
+              >
+                <img
+                  src="/e7b805_b505880a124d443ea7daa61229023685~mv2.avif"
+                  alt="Field Medical"
+                  className="h-8 w-auto brightness-0 invert"
+                />
+              </a>
+
+              {/* Divider */}
+              <div className="h-6 w-[1px] bg-white/15 hidden sm:block" />
+
+              {/* brain.space */}
+              <a
+                href="https://www.brain.space"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 opacity-60 hover:opacity-100 transition-opacity duration-300 group"
+                aria-label="brain.space"
+              >
+                <img
+                  src="/logo-white_brain.space.svg"
+                  alt="brain.space"
+                  className="h-6 w-auto"
+                />
+              </a>
+            </div>
+          </div>
         </div>
       </div>
       
