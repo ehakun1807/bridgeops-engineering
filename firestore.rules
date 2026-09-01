@@ -639,5 +639,13 @@ service cloud.firestore {
                        ];
       allow read, update, delete: if isAdmin();
     }
+
+    // ── Client dashboards ────────────────────────────────────────────────────
+    // Read: anyone (token-gated at the app layer via URL key)
+    // Write: admin only
+    match /clients/{clientId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
   }
 }
