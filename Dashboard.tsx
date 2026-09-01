@@ -547,25 +547,28 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Client Dashboards — quick access for Eran */}
-          <a
-            href="#/clients/fmi?key=fmi2026&edit=1"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-white border border-slate-200 text-slate-900 px-6 py-3 rounded-sm shadow-sm flex items-center hover:border-blue-500 hover:text-blue-600 transition-all"
-          >
-            <span className="text-[10px] font-black uppercase tracking-widest">Clients</span>
-          </a>
+          {/* Clients-FMI group — Eran only, hidden from beta users */}
+          {user?.email && !['beta1@bridgeops.local', 'beta2@bridgeops.local'].includes(user.email) && (
+            <>
+              <a
+                href="#/clients/fmi?key=fmi2026&edit=1"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-white border border-slate-200 text-slate-900 px-6 py-3 rounded-sm shadow-sm flex items-center hover:border-blue-500 hover:text-blue-600 transition-all"
+              >
+                <span className="text-[10px] font-black uppercase tracking-widest">Clients-FMI</span>
+              </a>
 
-          {/* FMI To Do */}
-          <button
-            onClick={() => setTodoOpen(o => !o)}
-            className="bg-white border border-slate-200 text-slate-900 px-6 py-3 rounded-sm shadow-sm flex items-center hover:border-blue-500 hover:text-blue-600 transition-all"
-          >
-            <ListTodo size={16} className="mr-2" />
-            <span className="text-[10px] font-black uppercase tracking-widest">FMI To Do</span>
-            {todoOpen ? <ChevronUp size={12} className="ml-1.5" /> : null}
-          </button>
+              <button
+                onClick={() => setTodoOpen(o => !o)}
+                className="bg-white border border-slate-200 text-slate-900 px-6 py-3 rounded-sm shadow-sm flex items-center hover:border-blue-500 hover:text-blue-600 transition-all"
+              >
+                <ListTodo size={16} className="mr-2" />
+                <span className="text-[10px] font-black uppercase tracking-widest">FMI To Do</span>
+                {todoOpen ? <ChevronUp size={12} className="ml-1.5" /> : null}
+              </button>
+            </>
+          )}
         </div>
 
       </div>
