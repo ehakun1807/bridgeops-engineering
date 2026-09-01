@@ -505,6 +505,16 @@ const Dashboard: React.FC = () => {
               Cross-project AI scan — patterns, recurring risks &amp; org-level recommendations
             </div>
           </div>
+
+          {/* Client Dashboards — quick access for Eran */}
+          <a
+            href="#/clients/fmi?key=fmi2026"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-white border border-slate-200 text-slate-900 px-6 py-3 rounded-sm shadow-sm flex items-center hover:border-blue-500 hover:text-blue-600 transition-all"
+          >
+            <span className="text-[10px] font-black uppercase tracking-widest">Clients</span>
+          </a>
         </div>
 
       </div>
