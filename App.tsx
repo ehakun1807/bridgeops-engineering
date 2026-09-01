@@ -19,6 +19,7 @@ import { isAdminUser } from './config.ts';
 const RampScoreTool = lazy(() => import('./RampScoreTool.tsx'));
 const Dashboard = lazy(() => import('./Dashboard.tsx'));
 const IntelligencePage = lazy(() => import('./IntelligencePage.tsx'));
+const ClientDashboard = lazy(() => import('./ClientDashboard.tsx'));
 
 // URL <-> view mapping. Hash routing keeps things simple and works on any static host.
 const VIEW_TO_PATH: Record<View, string> = {
@@ -31,6 +32,7 @@ const VIEW_TO_PATH: Record<View, string> = {
   pricing: '/pricing',
   dashboard: '/dashboard',
   intelligence: '/intelligence',
+  client_fmi: '/clients/fmi',
 };
 
 const PATH_TO_VIEW: Record<string, View> = Object.fromEntries(
@@ -47,10 +49,12 @@ const VIEW_TITLES: Record<View, string> = {
   pricing: 'Engagements | BridgeOps.ENGINEERING',
   dashboard: 'Dashboard | BridgeOps.ENGINEERING',
   intelligence: 'BridgeOps Intelligence | Operational AI Platform',
+  client_fmi: 'FMI Ops Dashboard | BridgeOps',
 };
 
 function getViewFromHash(): View {
-  const raw = window.location.hash.replace(/^#/, '') || '/';
+  // Strip query string (?key=...) before looking up the path so client URLs work.
+  const raw = (window.location.hash.replace(/^#/, '') || '/').split('?')[0];
   return PATH_TO_VIEW[raw] ?? 'home';
 }
 
@@ -377,6 +381,9 @@ const App: React.FC = () => {
         );
 
 
+      case 'client_fmi':
+        return null; // rendered outside the nav/footer shell below
+
       case 'dashboard': {
         // While we're still resolving auth state, show the loader so the
         // page doesn't flash the private-beta screen for a signed-in admin.
@@ -433,6 +440,15 @@ const App: React.FC = () => {
       }
     }
   };
+
+  // Client dashboards render standalone — no nav, no footer.
+  if (currentView === 'client_fmi') {
+    return (
+      <Suspense fallback={<ViewLoader />}>
+        <ClientDashboard />
+      </Suspense>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#fcfcfd]">
