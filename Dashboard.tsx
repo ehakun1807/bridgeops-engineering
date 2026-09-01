@@ -508,7 +508,7 @@ const Dashboard: React.FC = () => {
 
           {/* Client Dashboards — quick access for Eran */}
           <a
-            href="#/clients/fmi?key=fmi2026"
+            href="#/clients/fmi?key=fmi2026&edit=1"
             target="_blank"
             rel="noopener noreferrer"
             className="bg-white border border-slate-200 text-slate-900 px-6 py-3 rounded-sm shadow-sm flex items-center hover:border-blue-500 hover:text-blue-600 transition-all"
