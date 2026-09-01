@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from './firebase.ts';
 import { fmiData as staticFmiData, FMI_CLIENT_KEY, type FMIData, type Workstream, type Task, type ActionItem, type Risk } from './clients/fmi.ts';
-import { ChevronDown, ChevronUp, Shield, AlertTriangle, CheckCircle2, Clock, Circle, Save, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Shield, AlertTriangle, CheckCircle2, Clock, Circle, Save, Loader2, ListTodo, Square, CheckSquare, Plus } from 'lucide-react';
 
 // ─── URL param helpers ────────────────────────────────────────────────────────
 function useHashParams(): URLSearchParams {
@@ -194,6 +194,16 @@ async function loadFromFirestore(): Promise<FMIData | null> {
 }
 async function saveToFirestore(data: FMIData) { await setDoc(doc(db, FMI_DOC), data); }
 
+// ─── To Do types ─────────────────────────────────────────────────────────────
+interface FmiTodo { id: string; text: string; done: boolean; createdAt: number; doneAt?: number; }
+const TODOS_DOC = 'clients/fmi_todos';
+
+async function loadTodosFromFirestore(): Promise<FmiTodo[]> {
+  try { const s = await getDoc(doc(db, TODOS_DOC)); return s.exists() ? (s.data().todos as FmiTodo[]) || [] : []; }
+  catch { return []; }
+}
+async function saveTodosToFirestore(todos: FmiTodo[]) { await setDoc(doc(db, TODOS_DOC), { todos }); }
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 const ClientDashboard: React.FC = () => {
   const authorized = useClientKey(FMI_CLIENT_KEY);
@@ -231,6 +241,31 @@ const ClientDashboard: React.FC = () => {
   const updateRisk = useCallback((updated: Risk) => {
     setData(p => ({ ...p, risks: p.risks.map(r => r.id === updated.id ? updated : r) }));
   }, []);
+
+  // ── To Do state (edit mode only) ──────────────────────────────────────────
+  const [todos, setTodos] = useState<FmiTodo[]>([]);
+  const [todoInput, setTodoInput] = useState('');
+  const [todoArchiveOpen, setTodoArchiveOpen] = useState(false);
+
+  useEffect(() => {
+    if (!editMode) return;
+    loadTodosFromFirestore().then(setTodos);
+  }, [editMode]);
+
+  const saveTodos = useCallback(async (updated: FmiTodo[]) => {
+    setTodos(updated);
+    await saveTodosToFirestore(updated);
+  }, []);
+
+  const addTodo = useCallback(async () => {
+    const text = todoInput.trim(); if (!text) return;
+    await saveTodos([{ id: `t${Date.now()}`, text, done: false, createdAt: Date.now() }, ...todos]);
+    setTodoInput('');
+  }, [todoInput, todos, saveTodos]);
+
+  const toggleTodo = useCallback(async (id: string) => {
+    await saveTodos(todos.map(t => t.id === id ? { ...t, done: !t.done, doneAt: !t.done ? Date.now() : undefined } : t));
+  }, [todos, saveTodos]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -396,6 +431,68 @@ const ClientDashboard: React.FC = () => {
               {data.risks.map(r => <RiskCard key={r.id} risk={r} editMode={editMode} onChange={updateRisk} />)}
             </div>
           </section>
+
+          {/* To Do — edit mode only */}
+          {editMode && (
+            <section>
+              <div className="flex items-center gap-2 mb-4">
+                <ListTodo size={13} className="text-blue-500" />
+                <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">FMI To Do</p>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                {/* Add */}
+                <div className="px-5 pt-4 pb-3 border-b border-slate-100 flex gap-3">
+                  <input
+                    type="text" value={todoInput}
+                    onChange={e => setTodoInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') addTodo(); }}
+                    placeholder="New task…"
+                    className="flex-1 border border-slate-200 rounded px-3 py-2 text-[13px] text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                  <button onClick={addTodo} disabled={!todoInput.trim()}
+                    className="bg-slate-900 text-white px-4 py-2 rounded flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all disabled:opacity-40">
+                    <Plus size={13} /> Add
+                  </button>
+                </div>
+                {/* Active */}
+                <div className="px-5 py-4 flex flex-col gap-2">
+                  {todos.filter(t => !t.done).length === 0 && (
+                    <p className="text-[12px] text-slate-400 italic text-center py-3">No open tasks.</p>
+                  )}
+                  {todos.filter(t => !t.done).map(todo => (
+                    <div key={todo.id} className="flex items-start gap-3 py-2 border-b border-slate-50">
+                      <button onClick={() => toggleTodo(todo.id)} className="mt-0.5 flex-shrink-0 text-slate-400 hover:text-emerald-500 transition-colors">
+                        <Square size={16} />
+                      </button>
+                      <span className="text-[13px] text-slate-800 flex-1 leading-snug">{todo.text}</span>
+                    </div>
+                  ))}
+                </div>
+                {/* Archive */}
+                {todos.filter(t => t.done).length > 0 && (
+                  <div className="px-5 pb-4">
+                    <button onClick={() => setTodoArchiveOpen(o => !o)}
+                      className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 mb-3 transition-colors">
+                      {todoArchiveOpen ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                      Archive ({todos.filter(t => t.done).length})
+                    </button>
+                    {todoArchiveOpen && (
+                      <div className="flex flex-col gap-2">
+                        {todos.filter(t => t.done).map(todo => (
+                          <div key={todo.id} className="flex items-start gap-3 py-1.5 border-b border-slate-50">
+                            <button onClick={() => toggleTodo(todo.id)} className="mt-0.5 flex-shrink-0 text-emerald-500 hover:text-slate-400 transition-colors">
+                              <CheckSquare size={16} />
+                            </button>
+                            <span className="text-[12px] text-slate-400 line-through flex-1">{todo.text}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
 
         </div>
       )}

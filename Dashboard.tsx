@@ -559,14 +559,6 @@ const Dashboard: React.FC = () => {
                 <span className="text-[10px] font-black uppercase tracking-widest">Clients-FMI</span>
               </a>
 
-              <button
-                onClick={() => setTodoOpen(o => !o)}
-                className="bg-white border border-slate-200 text-slate-900 px-6 py-3 rounded-sm shadow-sm flex items-center hover:border-blue-500 hover:text-blue-600 transition-all"
-              >
-                <ListTodo size={16} className="mr-2" />
-                <span className="text-[10px] font-black uppercase tracking-widest">FMI To Do</span>
-                {todoOpen ? <ChevronUp size={12} className="ml-1.5" /> : null}
-              </button>
             </>
           )}
         </div>
@@ -735,95 +727,6 @@ const Dashboard: React.FC = () => {
       {/* Top-level Tools modal — same component used inside ProjectDeepDive */}
       <AdvancedToolsModal isOpen={showTools} onClose={() => setShowTools(false)} />
 
-      {/* FMI To Do panel */}
-      <AnimatePresence>
-        {todoOpen && (
-          <motion.div
-            key="fmi-todos"
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-            className="mb-10 border border-slate-200 bg-white rounded-sm shadow-sm overflow-hidden"
-          >
-            {/* Header */}
-            <div className="bg-slate-900 px-6 py-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <ListTodo size={16} className="text-blue-400" />
-                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-400">FMI · To Do List</p>
-              </div>
-            </div>
-
-            {/* Add input */}
-            <div className="px-6 pt-5 pb-3 border-b border-slate-100 flex gap-3">
-              <input
-                type="text"
-                value={todoInput}
-                onChange={e => setTodoInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') addTodo(); }}
-                placeholder="New task…"
-                className="flex-1 border border-slate-200 rounded px-3 py-2 text-[13px] text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
-              />
-              <button
-                onClick={addTodo}
-                disabled={!todoInput.trim()}
-                className="bg-slate-900 text-white px-4 py-2 rounded flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all disabled:opacity-40"
-              >
-                <Plus size={13} /> Add
-              </button>
-            </div>
-
-            {/* Task list */}
-            <div className="px-6 py-4">
-              {todoLoading ? (
-                <div className="flex justify-center py-8"><Loader2 size={18} className="animate-spin text-blue-500" /></div>
-              ) : (
-                <>
-                  {/* Active tasks */}
-                  <div className="flex flex-col gap-2 mb-4">
-                    {todos.filter(t => !t.done).length === 0 && (
-                      <p className="text-[12px] text-slate-400 italic py-4 text-center">No open tasks — add one above.</p>
-                    )}
-                    {todos.filter(t => !t.done).map(todo => (
-                      <div key={todo.id} className="flex items-start gap-3 group py-2 border-b border-slate-50">
-                        <button onClick={() => toggleTodo(todo.id)} className="mt-0.5 flex-shrink-0 text-slate-400 hover:text-emerald-500 transition-colors">
-                          <Square size={16} />
-                        </button>
-                        <span className="text-[13px] text-slate-800 flex-1 leading-snug">{todo.text}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Archive */}
-                  {todos.filter(t => t.done).length > 0 && (
-                    <div>
-                      <button
-                        onClick={() => setTodoArchiveOpen(o => !o)}
-                        className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 mb-3 transition-colors"
-                      >
-                        {todoArchiveOpen ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-                        Archive ({todos.filter(t => t.done).length})
-                      </button>
-                      {todoArchiveOpen && (
-                        <div className="flex flex-col gap-2 pl-1">
-                          {todos.filter(t => t.done).map(todo => (
-                            <div key={todo.id} className="flex items-start gap-3 py-1.5 border-b border-slate-50">
-                              <button onClick={() => toggleTodo(todo.id)} className="mt-0.5 flex-shrink-0 text-emerald-500 hover:text-slate-400 transition-colors">
-                                <CheckSquare size={16} />
-                              </button>
-                              <span className="text-[12px] text-slate-400 line-through flex-1">{todo.text}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
 
       {/* Tabs */}
