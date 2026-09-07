@@ -194,6 +194,18 @@ const IntelligencePage: React.FC<IntelligencePageProps> = ({ onNavigate, onReque
       {/* ── Bridget ── */}
       <section className="bg-slate-950 py-20 border-b border-slate-800">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          {/* Bridget avatar */}
+          <div className="flex justify-center mb-8">
+            <div className="relative">
+              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-600 to-blue-500 flex items-center justify-center shadow-xl shadow-blue-600/30">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2a4 4 0 0 1 4 4v1h1a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-1v1a4 4 0 0 1-8 0v-1H7a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1V6a4 4 0 0 1 4-4z"/>
+                  <path d="M9 10h.01M15 10h.01M9.5 15a3.5 3.5 0 0 0 5 0"/>
+                </svg>
+              </div>
+              <div className="absolute bottom-1 right-1 w-4 h-4 rounded-full bg-emerald-400 border-2 border-slate-950"></div>
+            </div>
+          </div>
           <div className="flex items-center justify-center space-x-2 mb-6">
             <div className="w-8 h-[1px] bg-blue-500"></div>
             <span className="text-[10px] font-black uppercase tracking-widest text-blue-500">Meet Bridget</span>
