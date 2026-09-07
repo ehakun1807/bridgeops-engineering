@@ -216,7 +216,7 @@ const IntelligencePage: React.FC<IntelligencePageProps> = ({ onNavigate, onReque
                 className="w-28 h-28 rounded-full object-cover shadow-2xl shadow-blue-600/60"
                 style={{objectPosition: 'center 10%'}}
               />
-              <div className="absolute bottom-1 right-1 w-4 h-4 rounded-full bg-emerald-400 border-2 border-slate-950"></div>
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-emerald-400 border-2 border-slate-950"></div>
             </div>
           </div>
           <div className="flex items-center justify-center space-x-2 mb-6">
