@@ -197,10 +197,27 @@ const IntelligencePage: React.FC<IntelligencePageProps> = ({ onNavigate, onReque
           {/* Bridget avatar */}
           <div className="flex justify-center mb-8">
             <div className="relative">
-              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-600 to-blue-500 flex items-center justify-center shadow-xl shadow-blue-600/30">
-                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 2a4 4 0 0 1 4 4v1h1a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-1v1a4 4 0 0 1-8 0v-1H7a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1V6a4 4 0 0 1 4-4z"/>
-                  <path d="M9 10h.01M15 10h.01M9.5 15a3.5 3.5 0 0 0 5 0"/>
+              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-600 to-blue-400 flex items-center justify-center shadow-xl shadow-blue-600/30">
+                <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
+                  {/* Face base */}
+                  <circle cx="26" cy="26" r="26" fill="url(#faceGrad)" />
+                  {/* Hair */}
+                  <path d="M10 22 C10 10 42 10 42 22" fill="rgba(255,255,255,0.15)" />
+                  {/* Eyes */}
+                  <ellipse cx="19.5" cy="24" rx="2.5" ry="2.8" fill="white" opacity="0.95"/>
+                  <ellipse cx="32.5" cy="24" rx="2.5" ry="2.8" fill="white" opacity="0.95"/>
+                  <circle cx="20" cy="24.5" r="1.2" fill="rgba(30,58,138,0.85)"/>
+                  <circle cx="33" cy="24.5" r="1.2" fill="rgba(30,58,138,0.85)"/>
+                  <circle cx="20.5" cy="23.8" r="0.4" fill="white"/>
+                  <circle cx="33.5" cy="23.8" r="0.4" fill="white"/>
+                  {/* Smile */}
+                  <path d="M19.5 32 Q26 37 32.5 32" stroke="white" strokeWidth="1.8" strokeLinecap="round" fill="none" opacity="0.9"/>
+                  <defs>
+                    <radialGradient id="faceGrad" cx="40%" cy="35%" r="65%">
+                      <stop offset="0%" stopColor="#60A5FA"/>
+                      <stop offset="100%" stopColor="#1D4ED8"/>
+                    </radialGradient>
+                  </defs>
                 </svg>
               </div>
               <div className="absolute bottom-1 right-1 w-4 h-4 rounded-full bg-emerald-400 border-2 border-slate-950"></div>
