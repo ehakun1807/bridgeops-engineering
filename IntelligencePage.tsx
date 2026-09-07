@@ -12,29 +12,29 @@ const PILLARS = [
   {
     icon: Database,
     eyebrow: 'Pillar 01',
-    title: 'Structured capture across the full NPI lifecycle',
-    body: 'Every engineering discipline has a purpose-built workspace. PFMEA, BOM revisions, takt studies, decision records, process maps, meetings, document audits — data is structured from first entry, not reverse-engineered from spreadsheets at gate review.',
+    title: 'Every decision, every team. In one place.',
+    body: 'Nothing falls through the cracks.',
     tools: ['PFMEA', 'ECO Pulse', 'Takt Studies', 'Decision Ledger', 'Process Map', 'Doc Guard', 'SOP Radar'],
   },
   {
     icon: BarChart3,
     eyebrow: 'Pillar 02',
-    title: 'Gate-aware readiness scoring — the RAMP framework',
-    body: 'A proprietary readiness framework scores your program continuously across manufacturing, quality, supply chain, and engineering dimensions — relative to your current gate. Not a status color. A real number that moves when your data moves.',
+    title: 'Always know if you\'re ready to launch.',
+    body: 'Live readiness score. No spreadsheet required.',
     tools: ['CR → PDR → CDR → PRR → MP', 'Live RAMP %', 'Deliverable tracking'],
   },
   {
     icon: Brain,
     eyebrow: 'Pillar 03',
-    title: 'AI that connects signals across tools',
-    body: "The AI doesn't analyze each tool in isolation. It reads all of them together — detecting when a BOM supplier swap puts a high-RPN PFMEA risk in play, when a downstream change contradicts an earlier engineering decision, or when takt capacity is incompatible with the gate's demand target.",
+    title: 'Nothing gets missed between teams.',
+    body: 'Your AI reads every tool together — not one at a time.',
     tools: ['Cross-tool scan', 'Decision drift detection', 'Risk pattern recognition'],
   },
   {
     icon: ShieldCheck,
     eyebrow: 'Pillar 04',
-    title: 'Proactive risk interception — not post-mortems',
-    body: 'A live activity feed logs every engineering event as it happens. High-signal events trigger automatic cross-checks. Risks surface weeks before a gate review — not during it. The platform watches your program so you stay ahead of it.',
+    title: 'Problems caught before they cost you.',
+    body: 'Risks surface weeks before your gate review — not during it.',
     tools: ['Live activity feed', 'High-signal alerts', 'Audit trail'],
   },
 ];
@@ -117,18 +117,17 @@ const IntelligencePage: React.FC<IntelligencePageProps> = ({ onNavigate, onReque
                 <span className="text-blue-600">transfer to production.</span>
               </h2>
               <p className="text-slate-500 text-base font-medium leading-relaxed">
-                PLM manages your CAD. ERP manages your orders. But the critical gap — the engineering
-                intelligence layer that monitors readiness, connects risks across disciplines, and
-                flags what's about to go wrong during NPI — has never had a dedicated platform.
-                Until now.
+                PLM has your CAD. ERP has your orders.<br />
+                Nobody has your transfer.<br />
+                <span className="text-blue-600 font-black">Until now.</span>
               </p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               {[
-                { stat: '#1', label: 'Root cause of ramp slip — risks visible in silos, invisible as a connected system' },
-                { stat: 'Post-CDR', label: 'When most teams discover what should have been caught at PDR — after the cost multiplied' },
-                { stat: 'Built for NPI', label: 'Purpose-built from 20+ years of hardware transfer experience — not a generic PM tool adapted for manufacturing' },
-                { stat: 'CR→MP', label: 'Full gate coverage from concept release to mass production' },
+                { stat: '#1', label: 'The hidden cost of disconnected teams.' },
+                { stat: 'Post-CDR', label: 'Too late is when most teams find out.' },
+                { stat: 'Built for NPI', label: '20+ years of hardware transfers. Built for this, not adapted.' },
+                { stat: 'CR→MP', label: 'Every gate. Start to production.' },
               ].map((item) => (
                 <div key={item.stat} className="bg-slate-900 p-6 relative overflow-hidden">
                   <div className="absolute inset-0 blueprint-grid-dark opacity-10"></div>
@@ -206,18 +205,10 @@ const IntelligencePage: React.FC<IntelligencePageProps> = ({ onNavigate, onReque
                 <span className="text-blue-600">your first three projects.</span>
               </h2>
               <p className="text-slate-500 text-base font-medium leading-relaxed mb-6">
-                Most tools reset when a project closes. The lessons stay in someone's head,
-                the risks disappear from the dashboard, and the next team starts from zero.
-              </p>
-              <p className="text-slate-500 text-base font-medium leading-relaxed mb-6">
-                BridgeOps Intelligence is different. Every AI Analysis run is persisted —
-                not discarded. As projects accumulate, the platform starts asking questions
-                no single-project tool can ask: Which risks keep showing up regardless of
-                team or product type? Which gate consistently breaks down? Which supplier
-                relationship keeps generating late-stage changes?
+                Most tools reset when a project closes. Your next team starts from zero.
               </p>
               <p className="text-slate-900 text-base font-black leading-relaxed uppercase tracking-wide">
-                That's institutional memory as a feature —<br />not a byproduct.
+                BridgeOps remembers.<br />Every project makes the next one smarter.
               </p>
             </div>
 
@@ -227,22 +218,22 @@ const IntelligencePage: React.FC<IntelligencePageProps> = ({ onNavigate, onReque
                   stage: 'After project 1',
                   color: 'bg-slate-100',
                   labelColor: 'text-slate-500',
-                  title: 'Single-project intelligence',
-                  body: 'AI reads PFMEA, BOM, decisions, and takt together. Risks are surfaced in context, not in isolation. You get a full-program scan in seconds instead of a gate-review deck assembled the night before.',
+                  title: 'You stop losing knowledge.',
+                  body: 'Baseline established. Patterns start forming.',
                 },
                 {
                   stage: 'After project 3',
                   color: 'bg-blue-50',
                   labelColor: 'text-blue-600',
-                  title: 'Patterns begin to emerge',
-                  body: 'The platform cross-references your completed programs and flags what they have in common — recurring risk categories, gates where readiness consistently lags, supplier relationships that keep generating late changes. The org starts learning.',
+                  title: 'Cross-project signals activate.',
+                  body: 'Blind spots disappear.',
                 },
                 {
                   stage: 'After project 5+',
                   color: 'bg-slate-900',
                   labelColor: 'text-blue-400',
-                  title: 'Compounding organizational advantage',
-                  body: 'New projects benefit from everything that came before. Risks that would take weeks to surface get flagged in the first review. Process gaps that burned you twice don\'t get a third chance. The platform turns program history into a competitive edge.',
+                  title: 'Your team learns from itself.',
+                  body: 'Org-level memory. Every launch gets faster.',
                   dark: true,
                 },
               ].map((item) => (
