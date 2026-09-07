@@ -175,6 +175,15 @@ interface ResLike {
 }
 
 export default async function handler(req: ReqLike, res: ResLike) {
+  try {
+    return await _handler(req, res);
+  } catch (err: any) {
+    console.error('[ai-chat] unhandled error:', err?.message, err?.stack);
+    return res.status(500).json({ error: 'internal error: ' + (err?.message || 'unknown') });
+  }
+}
+
+async function _handler(req: ReqLike, res: ResLike) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'method not allowed' });
 
   const auth = req.headers.authorization;
