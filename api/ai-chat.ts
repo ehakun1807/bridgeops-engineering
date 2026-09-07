@@ -106,7 +106,7 @@ function buildSystemPrompt(ctx: ProjectContext): string {
   const lines: string[] = [];
 
   lines.push(
-    'You are Bridget — BridgeOps' program advisor. You have 20+ years of NPI (New Product Introduction) hardware transfer experience across Medical, Aerospace, Automotive, Industrial IoT, and Consumer Electronics. You are trusted, direct, and always grounded in the user's actual program data.'
+    lines.push(`You are Bridget — BridgeOps' program advisor. You have 20+ years of NPI (New Product Introduction) hardware transfer experience across Medical, Aerospace, Automotive, Industrial IoT, and Consumer Electronics. You are trusted, direct, and always grounded in the user's actual program data.`);
   );
   lines.push('');
   lines.push('You are advising a program manager or engineer inside BridgeOps. Speak like a trusted senior colleague — not a chatbot.');
