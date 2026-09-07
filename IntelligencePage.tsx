@@ -199,25 +199,23 @@ const IntelligencePage: React.FC<IntelligencePageProps> = ({ onNavigate, onReque
             <div className="relative">
               <div className="w-28 h-28 rounded-full flex items-center justify-center shadow-2xl shadow-blue-600/50" style={{background: 'radial-gradient(circle at 38% 30%, #60A5FA, #1D4ED8 60%, #1e3a8a 100%)'}}>
                 <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
-                  {/* BridgeOps share/network mark — top portion */}
-                  {/* Connector lines */}
-                  <line x1="40" y1="20" x2="24" y2="36" stroke="white" strokeWidth="2.2" strokeLinecap="round" opacity="0.85"/>
-                  <line x1="40" y1="20" x2="56" y2="36" stroke="white" strokeWidth="2.2" strokeLinecap="round" opacity="0.85"/>
-                  {/* Three nodes */}
-                  <circle cx="40" cy="18" r="6" fill="white" opacity="0.95"/>
-                  <circle cx="22" cy="38" r="6" fill="white" opacity="0.95"/>
-                  <circle cx="58" cy="38" r="6" fill="white" opacity="0.95"/>
-                  {/* Inner dots for depth */}
-                  <circle cx="40" cy="18" r="2.5" fill="#1D4ED8"/>
-                  <circle cx="22" cy="38" r="2.5" fill="#1D4ED8"/>
-                  <circle cx="58" cy="38" r="2.5" fill="#1D4ED8"/>
-                  {/* Eyes */}
-                  <ellipse cx="30" cy="56" rx="3" ry="3.2" fill="white" opacity="0.95"/>
-                  <ellipse cx="50" cy="56" rx="3" ry="3.2" fill="white" opacity="0.95"/>
-                  <circle cx="31" cy="57" r="1.4" fill="rgba(30,58,138,0.9)"/>
-                  <circle cx="51" cy="57" r="1.4" fill="rgba(30,58,138,0.9)"/>
-                  {/* Smile */}
-                  <path d="M27 65 Q40 73 53 65" stroke="white" strokeWidth="2.2" strokeLinecap="round" fill="none" opacity="0.9"/>
+                  {/* BridgeOps mark — offset right, tilted like a hair accessory */}
+                  <g transform="rotate(-22, 44, 26) translate(8, -3)">
+                    <line x1="40" y1="20" x2="24" y2="36" stroke="white" strokeWidth="2.2" strokeLinecap="round" opacity="0.8"/>
+                    <line x1="40" y1="20" x2="56" y2="36" stroke="white" strokeWidth="2.2" strokeLinecap="round" opacity="0.8"/>
+                    <circle cx="40" cy="18" r="5.5" fill="white" opacity="0.95"/>
+                    <circle cx="22" cy="38" r="5.5" fill="white" opacity="0.95"/>
+                    <circle cx="58" cy="38" r="5.5" fill="white" opacity="0.95"/>
+                    <circle cx="40" cy="18" r="2.2" fill="#1D4ED8"/>
+                    <circle cx="22" cy="38" r="2.2" fill="#1D4ED8"/>
+                    <circle cx="58" cy="38" r="2.2" fill="#1D4ED8"/>
+                  </g>
+                  {/* Face — centered, lower half */}
+                  <ellipse cx="30" cy="57" rx="3" ry="3.2" fill="white" opacity="0.95"/>
+                  <ellipse cx="50" cy="57" rx="3" ry="3.2" fill="white" opacity="0.95"/>
+                  <circle cx="31" cy="58" r="1.4" fill="rgba(30,58,138,0.9)"/>
+                  <circle cx="51" cy="58" r="1.4" fill="rgba(30,58,138,0.9)"/>
+                  <path d="M27 66 Q40 74 53 66" stroke="white" strokeWidth="2.2" strokeLinecap="round" fill="none" opacity="0.9"/>
                 </svg>
               </div>
               <div className="absolute bottom-1 right-1 w-4 h-4 rounded-full bg-emerald-400 border-2 border-slate-950"></div>
@@ -228,9 +226,13 @@ const IntelligencePage: React.FC<IntelligencePageProps> = ({ onNavigate, onReque
             <span className="text-[10px] font-black uppercase tracking-widest text-blue-500">Meet Bridget</span>
             <div className="w-8 h-[1px] bg-blue-500"></div>
           </div>
-          <h2 className="text-4xl font-black text-white tracking-tighter uppercase leading-tight mb-4">
-            Your program advisor.<br />
-            <span className="text-blue-500">Always in context.</span>
+          <h2 className="text-4xl font-black text-white tracking-tighter leading-tight mb-4">
+            <span className="relative inline-block">
+              <span className="relative z-10 text-white" style={{fontStyle: 'italic', letterSpacing: '-0.02em'}}>Bridget</span>
+              <span className="absolute bottom-0 left-0 w-full h-[3px] rounded-full" style={{background: 'linear-gradient(90deg, #3B82F6, #60A5FA)'}}></span>
+            </span>
+            <span className="uppercase text-white font-black tracking-tighter"> is your program advisor.</span><br />
+            <span className="text-blue-400 uppercase tracking-tighter">Always in context.</span>
           </h2>
           <p className="text-slate-400 text-base font-medium leading-relaxed mb-10 max-w-xl mx-auto">
             One click. Bridget already knows your PFMEA, your BOM, and your gate — and checks the outside world before she answers.
