@@ -108,6 +108,7 @@ import {
 } from './projectConnectionsClient.ts';
 import type { Supplier as OrgSupplier } from './SupplierTrackerPage.tsx';
 import ProjectSearchModal from './ProjectSearchModal.tsx';
+import { ProjectAIChat } from './ProjectAIChat.tsx';
 
 export type InfoStatus = 'TBD' | 'In Process' | 'Completed' | 'Cancelled';
 
@@ -2808,6 +2809,14 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
         )}
       </AnimatePresence>
 
+      <ProjectAIChat context={{
+        projectId: project.id,
+        projectName: projectName,
+        productType: productType || undefined,
+        currentGate: currentGate || undefined,
+        rampScore: overall,
+        standards: projectStandards,
+      }} />
     </div>
   );
 };
