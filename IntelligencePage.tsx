@@ -214,7 +214,7 @@ const IntelligencePage: React.FC<IntelligencePageProps> = ({ onNavigate, onReque
               <div className="flex flex-col gap-3 mb-8">
                 {[
                   'Am I ready for CDR?',
-                  'What's blocking my RAMP score?',
+                  "What's blocking my RAMP score?",
                   'Should I explore an alternative supplier?',
                 ].map((q) => (
                   <div key={q} className="flex items-center gap-3 bg-slate-900 border border-slate-700 px-4 py-3">
