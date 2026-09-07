@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// ProjectAIChat — floating AI Advisor chat panel.
+// ProjectAIChat — floating Bridget chat panel.
 // Renders a FAB (bottom-right of any project page) that opens a slide-in
 // panel. Sends messages to /api/ai-chat with live project context.
 // ---------------------------------------------------------------------------
@@ -32,10 +32,10 @@ interface Message {
 }
 
 const STARTERS = [
-  'Am I ready for this gate?',
-  'What are my top 3 risks?',
-  "What's blocking my RAMP score?",
-  'Summarize my open decisions.',
+  'Bridget, am I ready for this gate?',
+  'What\'s my biggest risk right now?',
+  'Help me prep for this gate.',
+  'Should I explore an alternative supplier?',
 ];
 
 export const ProjectAIChat: React.FC<{ context: ProjectChatContext }> = ({ context }) => {
@@ -140,7 +140,7 @@ export const ProjectAIChat: React.FC<{ context: ProjectChatContext }> = ({ conte
             whileTap={{ scale: 0.94 }}
             onClick={() => setOpen(true)}
             className="fixed bottom-6 right-6 z-50 w-12 h-12 rounded-full bg-blue-600 text-white shadow-lg shadow-blue-600/40 flex items-center justify-center hover:bg-blue-500 transition-colors"
-            title="AI Advisor"
+            title="Bridget"
           >
             <BrainCircuit size={20} />
           </motion.button>
@@ -163,7 +163,7 @@ export const ProjectAIChat: React.FC<{ context: ProjectChatContext }> = ({ conte
                 <BrainCircuit size={15} className="text-white" />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-bold text-slate-100 leading-tight">AI Advisor</div>
+                <div className="text-sm font-bold text-slate-100 leading-tight">Bridget</div>
                 <div className="text-[10px] text-slate-400 mt-0.5 truncate flex items-center gap-1.5">
                   <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                   {context.projectName}
@@ -205,7 +205,7 @@ export const ProjectAIChat: React.FC<{ context: ProjectChatContext }> = ({ conte
                     <BrainCircuit size={18} className="text-blue-400" />
                   </div>
                   <p className="text-xs text-slate-500 max-w-[220px] mx-auto leading-relaxed">
-                    Ask anything about this project. I have full context of your program data.
+                    Ask me anything about this program. I know your data — and I check the outside world before I answer.
                   </p>
                 </div>
               )}
@@ -213,7 +213,7 @@ export const ProjectAIChat: React.FC<{ context: ProjectChatContext }> = ({ conte
               {messages.map(msg => (
                 <div key={msg.id} className={`flex flex-col gap-1 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                   <span className={`text-[9.5px] font-semibold uppercase tracking-wider ${msg.role === 'user' ? 'text-blue-500/60 pr-1' : 'text-slate-500 pl-1'}`}>
-                    {msg.role === 'user' ? 'You' : 'AI Advisor'}
+                    {msg.role === 'user' ? 'You' : 'Bridget'}
                   </span>
                   <div
                     className={`max-w-[88%] px-3.5 py-2.5 text-[12.5px] leading-relaxed ${
@@ -227,7 +227,7 @@ export const ProjectAIChat: React.FC<{ context: ProjectChatContext }> = ({ conte
                   </div>
                   {msg.role === 'assistant' && msg.grounded && (
                     <span className="text-[9px] font-semibold text-emerald-500/70 pl-1 tracking-wide">
-                      ✓ Validated against current industry data
+                      ✓ Bridget checked this externally
                     </span>
                   )}
                 </div>
@@ -235,7 +235,7 @@ export const ProjectAIChat: React.FC<{ context: ProjectChatContext }> = ({ conte
 
               {loading && (
                 <div className="flex flex-col items-start gap-1">
-                  <span className="text-[9.5px] font-semibold uppercase tracking-wider text-slate-500 pl-1">AI Advisor</span>
+                  <span className="text-[9.5px] font-semibold uppercase tracking-wider text-slate-500 pl-1">Bridget</span>
                   <div className="bg-slate-800 border border-slate-700/50 rounded-xl rounded-tl-sm px-4 py-3 flex gap-1.5 items-center">
                     <span className="w-1.5 h-1.5 rounded-full bg-slate-500 animate-bounce [animation-delay:0ms]"></span>
                     <span className="w-1.5 h-1.5 rounded-full bg-slate-500 animate-bounce [animation-delay:150ms]"></span>

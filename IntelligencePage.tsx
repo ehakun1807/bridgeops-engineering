@@ -191,6 +191,98 @@ const IntelligencePage: React.FC<IntelligencePageProps> = ({ onNavigate, onReque
         </div>
       </section>
 
+      {/* ── Bridget ── */}
+      <section className="bg-slate-950 py-24 border-b border-slate-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+
+            {/* Left — identity */}
+            <div>
+              <div className="flex items-center space-x-2 mb-6">
+                <div className="w-10 h-[1px] bg-blue-500"></div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-blue-500">Meet Bridget</span>
+              </div>
+              <h2 className="text-4xl font-black text-white tracking-tighter uppercase leading-tight mb-4">
+                Your program advisor.<br />
+                <span className="text-blue-500">Always in context.</span>
+              </h2>
+              <p className="text-slate-400 text-base font-medium leading-relaxed mb-8">
+                Bridget knows your PFMEA, your BOM, your decisions — and checks the outside world before she answers.
+              </p>
+
+              {/* Sample questions */}
+              <div className="flex flex-col gap-3 mb-8">
+                {[
+                  'Am I ready for CDR?',
+                  'What's blocking my RAMP score?',
+                  'Should I explore an alternative supplier?',
+                ].map((q) => (
+                  <div key={q} className="flex items-center gap-3 bg-slate-900 border border-slate-700 px-4 py-3">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0"></div>
+                    <span className="text-slate-300 text-sm font-medium italic">"{q}"</span>
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-slate-600 text-xs font-semibold uppercase tracking-widest">
+                Available inside every project — one click away.
+              </p>
+            </div>
+
+            {/* Right — chat panel mockup */}
+            <div className="bg-slate-900 border border-slate-700/60 shadow-2xl">
+              {/* Header */}
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-700/60">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-700 to-blue-500 flex items-center justify-center flex-shrink-0">
+                  <span className="text-white text-xs font-black">B</span>
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-bold text-slate-100">Bridget</div>
+                  <div className="text-[10px] text-slate-400 flex items-center gap-1.5">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    Actuator Rev C · CDR
+                  </div>
+                </div>
+              </div>
+              {/* Context strip */}
+              <div className="flex gap-2 px-4 py-2 border-b border-slate-700/40 bg-blue-950/20 flex-wrap">
+                {['Gate: CDR', 'RAMP 71%', '3 high-RPN'].map((tag, i) => (
+                  <span key={tag} className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${i === 2 ? 'bg-amber-950/40 border-amber-700/30 text-amber-400' : 'bg-blue-950/40 border-blue-700/30 text-blue-400'}`}>
+                    {tag}
+                  </span>
+                ))}
+              </div>
+              {/* Messages */}
+              <div className="px-4 py-5 flex flex-col gap-4">
+                <div className="flex flex-col items-end gap-1">
+                  <span className="text-[9px] font-semibold uppercase tracking-wider text-blue-500/60 pr-1">You</span>
+                  <div className="max-w-[88%] px-3.5 py-2.5 text-[12px] leading-relaxed bg-blue-900/60 border border-blue-700/30 text-blue-50 rounded-xl rounded-tr-sm">
+                    Polymertal gave us a poor quote — $2/unit + $10K NRE for 10K electrodes. Should I explore alternatives?
+                  </div>
+                </div>
+                <div className="flex flex-col items-start gap-1">
+                  <span className="text-[9px] font-semibold uppercase tracking-wider text-slate-500 pl-1">Bridget</span>
+                  <div className="max-w-[88%] px-3.5 py-2.5 text-[12px] leading-relaxed bg-slate-800 border border-slate-700/50 text-slate-200 rounded-xl rounded-tl-sm">
+                    Yes — at 10K units that NRE doesn't amortize well. Based on your Supply Chain RAMP (55%) and CDR timeline, I'd qualify one backup now before it becomes a critical path item.
+                  </div>
+                  <span className="text-[9px] font-semibold text-emerald-500/70 pl-1">✓ Bridget checked this externally</span>
+                </div>
+              </div>
+              {/* Input */}
+              <div className="px-4 pb-4">
+                <div className="flex gap-2 items-center bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5">
+                  <span className="text-slate-600 text-[12px] flex-1">Ask Bridget anything about your program…</span>
+                  <div className="w-6 h-6 rounded bg-blue-600 flex items-center justify-center flex-shrink-0">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
       {/* ── Institutional Memory ── */}
       <section className="bg-white py-24 border-b border-slate-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
