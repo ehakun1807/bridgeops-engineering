@@ -353,7 +353,7 @@ const ClientDashboard: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
               {data.workstreams.map((ws, i) => (
                 <div key={ws.id} className={ws.number === 5 ? 'md:col-span-2' : ''}>
-                  <WorkstreamCard ws={ws} defaultOpen={i === 0} editMode={editMode} onChange={updateWorkstream} />
+                  <WorkstreamCard ws={ws} defaultOpen={true} editMode={editMode} onChange={updateWorkstream} />
                 </div>
               ))}
             </div>
