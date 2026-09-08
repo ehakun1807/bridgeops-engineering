@@ -361,7 +361,7 @@ const ClientDashboard: React.FC = () => {
 
           {/* Priority Actions */}
           <section>
-            <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400 mb-4">Priority Action Items — Next 60 Days</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400 mb-4">Priority Action Items</p>
             <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
