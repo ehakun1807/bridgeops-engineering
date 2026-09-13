@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from './firebase.ts';
 import { fmiData as staticFmiData, FMI_CLIENT_KEY, type FMIData, type Workstream, type Task, type ActionItem, type Risk } from './clients/fmi.ts';
-import { ChevronDown, ChevronUp, Shield, AlertTriangle, CheckCircle2, Clock, Circle, Save, Loader2, ListTodo, Square, CheckSquare, Plus } from 'lucide-react';
+import { ChevronDown, ChevronUp, Shield, AlertTriangle, CheckCircle2, Clock, Circle, Save, Loader2, ListTodo, Square, CheckSquare, Plus, FileDown } from 'lucide-react';
 
 // ─── URL param helpers ────────────────────────────────────────────────────────
 function useHashParams(): URLSearchParams {
@@ -277,6 +277,14 @@ const ClientDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <style>{`
+        @media print {
+          .no-print { display: none !important; }
+          body { background: white !important; }
+          .sticky { position: relative !important; }
+          @page { margin: 1.5cm; size: A4; }
+        }
+      `}</style>
 
       {/* ── Edit banner ── */}
       {editMode && (
@@ -306,10 +314,20 @@ const ClientDashboard: React.FC = () => {
       {/* ── Header ── */}
       <div className="bg-slate-900 text-white sticky z-50 border-b border-white/5 shadow-xl" style={{ top: editMode ? 44 : 0 }}>
         <div className="max-w-6xl mx-auto px-5 sm:px-8 py-5">
-          <div>
+          <div className="flex items-start justify-between gap-4">
+            <div>
             <p className="text-[10px] font-black uppercase tracking-[0.15em] text-blue-400 mb-0.5">Field Medical · BridgeOps</p>
             <h1 className="text-[18px] sm:text-xl font-black tracking-tight leading-tight">Operational Readiness Dashboard</h1>
             <p className="text-[11px] text-slate-400 mt-0.5">{data.subtitle} · Updated {data.updatedAt}</p>
+            </div>
+            <button
+              onClick={() => window.print()}
+              className="no-print flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/8 hover:bg-white/14 border border-white/10 text-[10px] font-bold uppercase tracking-widest text-slate-300 hover:text-white transition-all flex-shrink-0 mt-1"
+              title="Export as PDF"
+            >
+              <FileDown size={12} />
+              Export PDF
+            </button>
           </div>
           <div className="flex flex-wrap gap-5 mt-4">
             {[
