@@ -346,13 +346,7 @@ const ClientDashboard: React.FC = () => {
               </React.Fragment>
             ))}
           </div>
-          <div className="flex items-center gap-3 mt-3.5">
-            <span className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">Overall Readiness</span>
-            <div className="flex-1 max-w-xs h-[5px] bg-white/10 rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full transition-all duration-700 ease-out" style={{ width: `${barWidth}%` }} />
-            </div>
-            <span className="text-[12px] font-bold text-blue-400 tabular-nums">{data.overallReadiness}%</span>
-          </div>
+
         </div>
       </div>
 
