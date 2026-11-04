@@ -47,7 +47,8 @@ import {
   CompanyGuidelineSignal,
   BudgetSignal,
   SupplierSignal,
-  ProcessMapSignal
+  ProcessMapSignal,
+  DesignReviewSignal
 } from './aiClient';
 import { loadOrgGuidelines } from './orgGuidelinesClient.ts';
 import type { ProjectStub } from './projectConnectionsClient.ts';
@@ -383,6 +384,38 @@ async function fetchToolContext(
     }
   } catch (e) {
     console.warn('[AIAnalysisPanel] processMaps fetch failed', e);
+  }
+
+  // Design Reviews — most-recent 3 reviews for the project.
+  try {
+    const drSnap = await getDocs(
+      query(
+        collection(db, 'designReviews'),
+        where('userId', '==', userId),
+        where('projectId', '==', projectId),
+        orderBy('dateMs', 'desc'),
+        limit(3)
+      )
+    );
+    if (!drSnap.empty) {
+      ctx.designReviews = drSnap.docs.map((d) => {
+        const data = d.data() as any;
+        const items: any[] = Array.isArray(data.reviewItems) ? data.reviewItems : [];
+        const actions: any[] = Array.isArray(data.actionItems) ? data.actionItems : [];
+        return {
+          title:         String(data.title || 'Untitled').slice(0, 100),
+          reviewType:    String(data.reviewType || 'design_review'),
+          gate:          data.gate ? String(data.gate) : undefined,
+          dateMs:        Number(data.dateMs || 0),
+          outcome:       String(data.outcome || 'pending'),
+          failItemCount: items.filter((i: any) => i.status === 'fail').length,
+          mustPending:   actions.filter((a: any) => a.priority === 'must' && !a.done).length,
+          chairperson:   data.chairperson ? String(data.chairperson).slice(0, 60) : undefined,
+        } satisfies DesignReviewSignal;
+      });
+    }
+  } catch (e) {
+    console.warn('[AIAnalysisPanel] designReviews fetch failed', e);
   }
 
   // Company Guidelines — org-level SOPs extracted by CompanyGuidelinesTool.

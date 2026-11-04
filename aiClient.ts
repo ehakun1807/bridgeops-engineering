@@ -193,6 +193,17 @@ export interface ProcessMapSignal {
   updatedAtMs: number;
 }
 
+export interface DesignReviewSignal {
+  title: string;
+  reviewType: string;
+  gate?: string;
+  dateMs: number;
+  outcome: string;
+  failItemCount: number;
+  mustPending: number;
+  chairperson?: string;
+}
+
 export interface ToolContext {
   takt?: TaktSignal;
   pfmeas?: PFMEASignal[];            // up to 3 most-recent
@@ -205,6 +216,7 @@ export interface ToolContext {
   companyGuidelines?: CompanyGuidelineSignal[]; // org-level SOPs/procedures
   budget?: BudgetSignal;             // project budget: estimate vs. actual
   suppliers?: SupplierSignal[];      // suppliers linked to this project via General Info picker
+  designReviews?: DesignReviewSignal[]; // up to 3 most-recent design reviews
 }
 
 /**

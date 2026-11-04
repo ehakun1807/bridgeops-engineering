@@ -334,6 +334,18 @@ interface ProcessMapSignal {
   updatedAtMs: number;
 }
 
+// Mirrors aiClient.ts DesignReviewSignal — inlined per Vercel bundler .ts gotcha.
+interface DesignReviewSignal {
+  title: string;
+  reviewType: string;
+  gate?: string;
+  dateMs: number;
+  outcome: string;
+  failItemCount: number;
+  mustPending: number;
+  chairperson?: string;
+}
+
 interface ToolContext {
   takt?: TaktSignal;
   pfmeas?: PFMEASignal[];
@@ -346,6 +358,7 @@ interface ToolContext {
   companyGuidelines?: CompanyGuidelineSignal[];
   budget?: BudgetSignal;
   suppliers?: SupplierSignal[];
+  designReviews?: DesignReviewSignal[];
 }
 
 // Mirrors aiClient.ts ConnectedProjectContext — inlined per Vercel bundler
@@ -512,7 +525,8 @@ function buildPrompt(p: ProjectInput): string {
   const hasToolContext = tc && (
     tc.takt || tc.pfmeas?.length || tc.recentMeetings?.length || tc.latestBom ||
     tc.decisions?.length || tc.companyGuidelines?.length || tc.suppliers?.length ||
-    tc.lessons?.length || tc.controlPlan || tc.processMap
+    tc.lessons?.length || tc.controlPlan || tc.processMap ||
+    tc.designReviews?.length || tc.budget
   );
 
   if (hasToolContext) {
@@ -825,6 +839,25 @@ function buildPrompt(p: ProjectInput): string {
     lines.push('- "Disqualified" or "On Hold" suppliers = investigate if there is an approved alternate or gap in the supply chain.');
     lines.push('- If no qualified EMS/CM is linked but the project is past PDR, flag as a topAction.');
     lines.push('- Do NOT flag qualified suppliers with score ≥ 7 and no weak areas as risks.');
+  }
+
+  // -------------------------------------------------------------------
+  // Design Reviews — structured review log from Review Studio.
+  // -------------------------------------------------------------------
+  if (tc && tc.designReviews && tc.designReviews.length > 0) {
+    lines.push('');
+    lines.push('### Design Reviews (Review Studio)');
+    for (const dr of tc.designReviews) {
+      const dateFmt = new Date(dr.dateMs).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+      lines.push(`- **${dr.title}** (${dr.reviewType.replace(/_/g, ' ')}, ${dateFmt}${dr.gate ? ', gate ' + dr.gate : ''})`);
+      lines.push(`  Outcome: ${dr.outcome.replace(/_/g, ' ')} | Fail items: ${dr.failItemCount} | Open MUST actions: ${dr.mustPending}`);
+    }
+    lines.push('');
+    lines.push('Instructions for design review signals:');
+    lines.push('- If any review has outcome "needs_rework" or "rejected", flag this as a HIGH risk with specific follow-up actions.');
+    lines.push('- If any review has outcome "approved_with_conditions", surface open conditions as topActions.');
+    lines.push('- Open MUST actions from reviews past due (gate already passed) = HIGH risk.');
+    lines.push('- Multiple fail items on a review before a gate = risk of scope slip or design instability.');
   }
 
   // -------------------------------------------------------------------

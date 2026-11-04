@@ -53,7 +53,8 @@ import {
   Unlink,
   Lightbulb,
   Wallet,
-  Truck
+  Truck,
+  Presentation
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db, auth } from './firebase.ts';
@@ -83,6 +84,7 @@ import DecisionLedgerTool from './DecisionLedgerTool.tsx';
 import LessonsLearnedTool from './LessonsLearnedTool.tsx';
 import ControlPlanTool from './ControlPlanTool.tsx';
 import ProjectBudgetTool from './ProjectBudgetTool.tsx';
+import ReviewStudioTool from './ReviewStudioTool.tsx';
 import ActivityFeedPanel from './ActivityFeedPanel.tsx';
 import OpenItemsPanel from './OpenItemsPanel.tsx';
 import ScopeEditor from './ScopeEditor.tsx';
@@ -356,6 +358,7 @@ const DECISION_LEDGER_TAB_ID = '__decisions__';
 const LESSONS_TAB_ID         = '__lessons__';
 const CONTROL_PLAN_TAB_ID    = '__control_plan__';
 const BUDGET_TAB_ID          = '__budget__';
+const REVIEW_STUDIO_TAB_ID   = '__review_studio__';
 
 // ---------------------------------------------------------------------------
 // Project Tools registry — sub-app surfaces that live inside the deep-dive
@@ -459,6 +462,15 @@ const PROJECT_TOOLS: ProjectToolEntry[] = [
     iconActiveClass: 'text-green-600',
     tileBg: 'bg-green-50 border-green-200',
     tileIcon: 'text-green-700'
+  },
+  {
+    id: REVIEW_STUDIO_TAB_ID,
+    label: 'Review Studio',
+    description: 'Log design reviews (DR, TRR, CDR, PRR) and generate a gate-ready PPTX package from live project data',
+    icon: Presentation,
+    iconActiveClass: 'text-sky-600',
+    tileBg: 'bg-sky-50 border-sky-200',
+    tileIcon: 'text-sky-700'
   }
 ];
 const HISTORY_TAB_ID = '__history__';
@@ -2491,6 +2503,29 @@ const ProjectDeepDive: React.FC<ProjectDeepDiveProps> = ({
             <ProjectBudgetTool
               projectId={project.id}
               projectName={projectName}
+              readOnly={readOnly}
+            />
+          </motion.div>
+        ) : activeGroupId === REVIEW_STUDIO_TAB_ID ? (
+          <motion.div
+            key={REVIEW_STUDIO_TAB_ID}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <ReviewStudioTool
+              projectId={project.id}
+              projectName={projectName}
+              currentGate={currentGate}
+              project={project}
+              groupScores={Object.fromEntries(
+                RAMP_GROUPS.map((g) => [
+                  g.id,
+                  scoreForGroup(g, metrics, disabledItemIds, deliverableScores)
+                ])
+              )}
+              overall={overall}
               readOnly={readOnly}
             />
           </motion.div>

@@ -38,7 +38,8 @@ import {
   ClipboardList,
   Wallet,
   Truck,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Presentation
 } from 'lucide-react';
 import { db, auth } from './firebase.ts';
 import {
@@ -82,6 +83,7 @@ const TOOL_META: Record<ActivityTool, {
   suppliers:    { label: 'Suppliers',          icon: Truck,         dotClass: 'bg-purple-400',  textClass: 'text-purple-700',  bgClass: 'bg-purple-50',   borderClass: 'border-purple-200'  },
   open_items:   { label: 'Open Items',  icon: SlidersHorizontal, dotClass: 'bg-slate-500', textClass: 'text-slate-700', bgClass: 'bg-slate-50',   borderClass: 'border-slate-200'   },
   ai_analysis:  { label: 'AI Analysis', icon: Sparkles,     dotClass: 'bg-blue-500',    textClass: 'text-blue-700',    bgClass: 'bg-blue-50',     borderClass: 'border-blue-200'    },
+  design_review:{ label: 'Review Studio', icon: Presentation, dotClass: 'bg-sky-400',   textClass: 'text-sky-700',     bgClass: 'bg-sky-50',      borderClass: 'border-sky-200'     },
 };
 
 const HIGH_SIGNAL_EVENTS = new Set<ActivityEventType>([
@@ -91,6 +93,7 @@ const HIGH_SIGNAL_EVENTS = new Set<ActivityEventType>([
   'eco_flagged',
   'decision_reversed',
   'ai_analysis_run',
+  'review_package_generated',
 ]);
 
 // ---------------------------------------------------------------------------

@@ -624,6 +624,34 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
+    // Design Reviews (Review Studio) — per-project structured review log.
+    // userId + projectId scoped. Always editable (update allowed), mirrors meetings posture.
+    function isValidDesignReview(data) {
+      return data.keys().hasAll(['userId', 'projectId', 'reviewType', 'title', 'dateMs', 'outcome']) &&
+             data.userId == request.auth.uid &&
+             data.projectId is string && data.projectId.size() > 0 &&
+             data.reviewType in ['design_review', 'preliminary_design', 'test_readiness', 'gate_review', 'production_readiness', 'other'] &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 150 &&
+             data.dateMs is number &&
+             data.outcome in ['pending', 'approved', 'approved_with_conditions', 'needs_rework', 'rejected'] &&
+             (!('gate' in data) || data.gate is string) &&
+             (!('chairperson' in data) || (data.chairperson is string && data.chairperson.size() <= 100)) &&
+             (!('attendees' in data) || (data.attendees is string && data.attendees.size() <= 500)) &&
+             (!('objectives' in data) || (data.objectives is string && data.objectives.size() <= 500)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 800)) &&
+             (!('reviewItems' in data) || data.reviewItems is list) &&
+             (!('actionItems' in data) || data.actionItems is list);
+    }
+
+    match /designReviews/{reviewId} {
+      allow get:    if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list:   if isAuthenticated();
+      allow create: if isAuthenticated() && isValidDesignReview(request.resource.data);
+      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin()) &&
+                       isValidDesignReview(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
     // Leads / waitlist captures (ramp-score email grabs + Pricing waitlist signups).
     // Public can create, only admin can read — keeps the list private.
     match /leads/{leadId} {

@@ -67,7 +67,12 @@ export type ActivityEventType =
   | 'open_item_closed'
   | 'open_item_deleted'
   // AI Analysis
-  | 'ai_analysis_run';
+  | 'ai_analysis_run'
+  // Review Studio
+  | 'design_review_created'
+  | 'design_review_updated'
+  | 'design_review_deleted'
+  | 'review_package_generated';
 
 // Which tool emitted the event — used for color coding and filtering in the Feed.
 export type ActivityTool =
@@ -83,7 +88,8 @@ export type ActivityTool =
   | 'doc_guard'
   | 'suppliers'
   | 'open_items'
-  | 'ai_analysis';
+  | 'ai_analysis'
+  | 'design_review';
 
 // ---------------------------------------------------------------------------
 // ActivityEvent — the shape written to Firestore and read by the Feed.
