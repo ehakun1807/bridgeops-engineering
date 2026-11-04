@@ -624,6 +624,40 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
+    // NCR Tracker — per-project non-conformance reports.
+    // userId + projectId scoped. Always editable (update allowed), mirrors meetings posture.
+    function isValidNCR(data) {
+      return data.keys().hasAll(['userId', 'projectId', 'ncrNumber', 'title', 'dateMs', 'category', 'severity', 'status', 'disposition', 'description']) &&
+             data.userId == request.auth.uid &&
+             data.projectId is string && data.projectId.size() > 0 &&
+             data.ncrNumber is string && data.ncrNumber.size() > 0 &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 150 &&
+             data.dateMs is number &&
+             data.category in ['product', 'process', 'supplier', 'material', 'documentation', 'other'] &&
+             data.severity in ['critical', 'major', 'minor'] &&
+             data.status in ['open', 'under_investigation', 'capa_in_progress', 'closed', 'cancelled'] &&
+             data.disposition in ['pending', 'use_as_is', 'rework', 'repair', 'scrap', 'return_to_vendor'] &&
+             data.description is string && data.description.size() > 0 && data.description.size() <= 600 &&
+             (!('gate' in data)             || data.gate is string) &&
+             (!('partProcess' in data)      || (data.partProcess is string && data.partProcess.size() <= 200)) &&
+             (!('qtyAffected' in data)      || (data.qtyAffected is string && data.qtyAffected.size() <= 50)) &&
+             (!('detectedBy' in data)       || (data.detectedBy is string && data.detectedBy.size() <= 100)) &&
+             (!('containment' in data)      || (data.containment is string && data.containment.size() <= 500)) &&
+             (!('rootCause' in data)        || (data.rootCause is string && data.rootCause.size() <= 600)) &&
+             (!('correctiveAction' in data) || (data.correctiveAction is string && data.correctiveAction.size() <= 600)) &&
+             (!('preventiveAction' in data) || (data.preventiveAction is string && data.preventiveAction.size() <= 500)) &&
+             (!('verificationNote' in data) || (data.verificationNote is string && data.verificationNote.size() <= 400));
+    }
+
+    match /ncrs/{ncrId} {
+      allow get:    if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list:   if isAuthenticated();
+      allow create: if isAuthenticated() && isValidNCR(request.resource.data);
+      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin()) &&
+                       isValidNCR(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
     // Design Reviews (Review Studio) — per-project structured review log.
     // userId + projectId scoped. Always editable (update allowed), mirrors meetings posture.
     function isValidDesignReview(data) {

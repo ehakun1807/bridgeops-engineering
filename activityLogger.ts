@@ -72,7 +72,12 @@ export type ActivityEventType =
   | 'design_review_created'
   | 'design_review_updated'
   | 'design_review_deleted'
-  | 'review_package_generated';
+  | 'review_package_generated'
+  // NCR Tracker
+  | 'ncr_created'
+  | 'ncr_updated'
+  | 'ncr_closed'
+  | 'ncr_deleted';
 
 // Which tool emitted the event — used for color coding and filtering in the Feed.
 export type ActivityTool =
@@ -89,7 +94,8 @@ export type ActivityTool =
   | 'suppliers'
   | 'open_items'
   | 'ai_analysis'
-  | 'design_review';
+  | 'design_review'
+  | 'ncr';
 
 // ---------------------------------------------------------------------------
 // ActivityEvent — the shape written to Firestore and read by the Feed.

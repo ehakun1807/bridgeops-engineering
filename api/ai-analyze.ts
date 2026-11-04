@@ -346,6 +346,21 @@ interface DesignReviewSignal {
   chairperson?: string;
 }
 
+// Mirrors aiClient.ts NCRSignal — inlined per Vercel bundler .ts gotcha.
+interface NCRSignal {
+  ncrNumber: string;
+  title: string;
+  severity: 'critical' | 'major' | 'minor';
+  category: string;
+  status: string;
+  gate?: string;
+  partProcess?: string;
+  disposition: string;
+  hasRootCause: boolean;
+  hasCorrectiveAction: boolean;
+  dateMs: number;
+}
+
 interface ToolContext {
   takt?: TaktSignal;
   pfmeas?: PFMEASignal[];
@@ -359,6 +374,7 @@ interface ToolContext {
   budget?: BudgetSignal;
   suppliers?: SupplierSignal[];
   designReviews?: DesignReviewSignal[];
+  ncrs?: NCRSignal[];
 }
 
 // Mirrors aiClient.ts ConnectedProjectContext — inlined per Vercel bundler
@@ -526,7 +542,7 @@ function buildPrompt(p: ProjectInput): string {
     tc.takt || tc.pfmeas?.length || tc.recentMeetings?.length || tc.latestBom ||
     tc.decisions?.length || tc.companyGuidelines?.length || tc.suppliers?.length ||
     tc.lessons?.length || tc.controlPlan || tc.processMap ||
-    tc.designReviews?.length || tc.budget
+    tc.designReviews?.length || tc.budget || tc.ncrs?.length
   );
 
   if (hasToolContext) {
@@ -858,6 +874,31 @@ function buildPrompt(p: ProjectInput): string {
     lines.push('- If any review has outcome "approved_with_conditions", surface open conditions as topActions.');
     lines.push('- Open MUST actions from reviews past due (gate already passed) = HIGH risk.');
     lines.push('- Multiple fail items on a review before a gate = risk of scope slip or design instability.');
+  }
+
+  // -------------------------------------------------------------------
+  // NCR Tracker — open/active non-conformance reports.
+  // -------------------------------------------------------------------
+  if (tc && tc.ncrs && tc.ncrs.length > 0) {
+    lines.push('');
+    lines.push('### NCR Tracker (Non-Conformance Reports)');
+    const criticalNcrs = tc.ncrs.filter(n => n.severity === 'critical');
+    const majorNcrs    = tc.ncrs.filter(n => n.severity === 'major');
+    for (const n of tc.ncrs) {
+      const dateFmt = new Date(n.dateMs).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+      const capaStatus = n.hasCorrectiveAction ? 'CAPA defined' : n.hasRootCause ? 'root cause only' : 'no CAPA';
+      lines.push(`- **${n.ncrNumber}** ${n.severity.toUpperCase()} · ${n.category} · ${n.title.slice(0, 80)}`);
+      lines.push(`  Status: ${n.status.replace(/_/g,' ')} | Disposition: ${n.disposition.replace(/_/g,' ')} | ${capaStatus}${n.gate ? ' | Gate: ' + n.gate : ''}`);
+    }
+    lines.push('');
+    lines.push('Instructions for NCR signals:');
+    lines.push('- CRITICAL NCRs with status "open" or "under_investigation" = HIGH risk; must appear in risks[] with source "NCR Tracker · <ncrNumber>".');
+    lines.push('- MAJOR NCRs without a corrective action = topAction: define CAPA immediately.');
+    lines.push(`- ${criticalNcrs.length} critical, ${majorNcrs.length} major NCRs currently open.`);
+    lines.push('- NCRs with disposition "pending" or "scrap" near a gate (CDR, PRR, MP) indicate unresolved quality escapes — high schedule risk.');
+    lines.push('- If no root cause is defined for a CRITICAL NCR, flag as HIGH risk — the problem will recur.');
+    lines.push('- Multiple NCRs in the same category (e.g. 3+ supplier NCRs) = systemic gap, not isolated incidents.');
+    lines.push('- Closed/cancelled NCRs are NOT included; do not flag already-resolved items.');
   }
 
   // -------------------------------------------------------------------

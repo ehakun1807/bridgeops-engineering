@@ -193,6 +193,20 @@ export interface ProcessMapSignal {
   updatedAtMs: number;
 }
 
+export interface NCRSignal {
+  ncrNumber: string;
+  title: string;
+  severity: 'critical' | 'major' | 'minor';
+  category: string;
+  status: string;
+  gate?: string;
+  partProcess?: string;
+  disposition: string;
+  hasRootCause: boolean;
+  hasCorrectiveAction: boolean;
+  dateMs: number;
+}
+
 export interface DesignReviewSignal {
   title: string;
   reviewType: string;
@@ -217,6 +231,7 @@ export interface ToolContext {
   budget?: BudgetSignal;             // project budget: estimate vs. actual
   suppliers?: SupplierSignal[];      // suppliers linked to this project via General Info picker
   designReviews?: DesignReviewSignal[]; // up to 3 most-recent design reviews
+  ncrs?: NCRSignal[];                   // up to 5 most-recent open/active NCRs
 }
 
 /**

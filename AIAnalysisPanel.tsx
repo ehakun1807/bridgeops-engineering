@@ -48,7 +48,8 @@ import {
   BudgetSignal,
   SupplierSignal,
   ProcessMapSignal,
-  DesignReviewSignal
+  DesignReviewSignal,
+  NCRSignal
 } from './aiClient';
 import { loadOrgGuidelines } from './orgGuidelinesClient.ts';
 import type { ProjectStub } from './projectConnectionsClient.ts';
@@ -416,6 +417,37 @@ async function fetchToolContext(
     }
   } catch (e) {
     console.warn('[AIAnalysisPanel] designReviews fetch failed', e);
+  }
+
+  // NCRs — open/active non-conformance reports for this project.
+  try {
+    const ncrSnap = await getDocs(query(
+      collection(db, 'ncrs'),
+      where('userId', '==', userId),
+      where('projectId', '==', projectId),
+      orderBy('dateMs', 'desc'),
+      limit(5)
+    ));
+    const activeNcrs = ncrSnap.docs
+      .map(d => d.data())
+      .filter((d: any) => d.status !== 'closed' && d.status !== 'cancelled');
+    if (activeNcrs.length > 0) {
+      ctx.ncrs = activeNcrs.map((data: any): NCRSignal => ({
+        ncrNumber:          String(data.ncrNumber || ''),
+        title:              String(data.title || '').slice(0, 100),
+        severity:           (['critical','major','minor'] as const).includes(data.severity) ? data.severity : 'major',
+        category:           String(data.category || 'other'),
+        status:             String(data.status || 'open'),
+        gate:               data.gate ? String(data.gate) : undefined,
+        partProcess:        data.partProcess ? String(data.partProcess).slice(0, 80) : undefined,
+        disposition:        String(data.disposition || 'pending'),
+        hasRootCause:       !!(data.rootCause && String(data.rootCause).trim().length > 0),
+        hasCorrectiveAction:!!(data.correctiveAction && String(data.correctiveAction).trim().length > 0),
+        dateMs:             Number(data.dateMs || 0),
+      }));
+    }
+  } catch (e) {
+    console.warn('[AIAnalysisPanel] ncrs fetch failed', e);
   }
 
   // Company Guidelines — org-level SOPs extracted by CompanyGuidelinesTool.
