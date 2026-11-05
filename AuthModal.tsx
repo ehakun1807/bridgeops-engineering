@@ -130,8 +130,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => 
 
   return (
     <div className="fixed inset-0 z-[100] overflow-y-auto">
-      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={onClose}></div>
-      <div className="flex min-h-full items-center justify-center p-4 py-10">
+      <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={onClose}></div>
+      <div className="flex min-h-screen items-center justify-center p-4 py-10 relative">
       <div className="relative bg-white w-full max-w-md p-8 shadow-2xl rounded-sm overflow-hidden border border-slate-200">
         <div className="absolute top-0 right-0 p-4">
           <button onClick={onClose} aria-label="Close" className="text-slate-400 hover:text-slate-600">
