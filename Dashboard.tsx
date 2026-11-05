@@ -156,14 +156,6 @@ const Dashboard: React.FC = () => {
   const [orgInsightsOpen, setOrgInsightsOpen]       = useState(false);
   const [orgInsightsLoading, setOrgInsightsLoading] = useState(false);
 
-  // --- Welcome card (first-run, localStorage-gated) -----------------------
-  const [showWelcome, setShowWelcome] = useState(() => {
-    try { return !localStorage.getItem('bo_welcomed'); } catch { return false; }
-  });
-  const dismissWelcome = React.useCallback(() => {
-    try { localStorage.setItem('bo_welcomed', '1'); } catch { /* ignore */ }
-    setShowWelcome(false);
-  }, []);
 
   // ── FMI To Do list ──────────────────────────────────────────────────────────
   interface FmiTodo { id: string; text: string; done: boolean; createdAt: number; doneAt?: number; }
@@ -573,92 +565,6 @@ const Dashboard: React.FC = () => {
         </div>
 
       </div>
-
-      {/* ── First-run welcome card ── */}
-      <AnimatePresence>
-        {showWelcome && (
-          <motion.div
-            key="welcome-card"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.25 }}
-            className="mb-8 bg-slate-900 border border-blue-900/50 rounded-sm overflow-hidden shadow-lg"
-          >
-            <div className="bg-blue-600 px-6 py-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-white">
-                  Welcome to BridgeOps Intelligence
-                </span>
-              </div>
-              <button
-                onClick={dismissWelcome}
-                className="text-white/60 hover:text-white transition-colors p-1"
-                aria-label="Dismiss welcome card"
-              >
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                  <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-              </button>
-            </div>
-            <div className="px-6 py-5">
-              <p className="text-slate-400 text-sm mb-5 leading-relaxed max-w-2xl">
-                You're in. Here's how to get the most out of your first session — four steps, 10 minutes total.
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                {[
-                  {
-                    step: '01',
-                    title: 'Create a project',
-                    desc: 'Hit "New Project", set a name, pick a template (Full Ramp, PCBA, Pilot…), and set your current gate.',
-                    color: 'text-blue-400',
-                    bg: 'bg-blue-500/10 border-blue-800/60',
-                  },
-                  {
-                    step: '02',
-                    title: 'Open a Project Tool',
-                    desc: 'Click into a project, then hit "Project Tools" in the tab strip — try PFMEA, Meetings, or ECO Pulse first.',
-                    color: 'text-emerald-400',
-                    bg: 'bg-emerald-500/10 border-emerald-800/60',
-                  },
-                  {
-                    step: '03',
-                    title: 'Run AI Analysis',
-                    desc: 'Click the AI Analysis tab. The more tools you have filled in, the richer the cross-tool scan.',
-                    color: 'text-violet-400',
-                    bg: 'bg-violet-500/10 border-violet-800/60',
-                  },
-                  {
-                    step: '04',
-                    title: 'Check Activity Feed',
-                    desc: 'The Activity tab shows a live event stream — every tool action timestamped. High-signal events are flagged automatically.',
-                    color: 'text-amber-400',
-                    bg: 'bg-amber-500/10 border-amber-800/60',
-                  },
-                ].map((s) => (
-                  <div key={s.step} className={`border rounded-sm px-4 py-3.5 ${s.bg}`}>
-                    <div className={`text-[9px] font-black uppercase tracking-widest ${s.color} mb-1`}>Step {s.step}</div>
-                    <p className="text-white font-semibold text-xs mb-1.5">{s.title}</p>
-                    <p className="text-slate-400 text-[11px] leading-relaxed">{s.desc}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-4 flex items-center justify-between flex-wrap gap-3">
-                <p className="text-slate-600 text-[10px] uppercase tracking-wider">
-                  12 tools · One AI scan · Everything connected.
-                </p>
-                <button
-                  onClick={dismissWelcome}
-                  className="text-[10px] text-slate-500 hover:text-slate-300 transition-colors font-semibold uppercase tracking-wider"
-                >
-                  Dismiss →
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Org Insights panel */}
       <AnimatePresence>
