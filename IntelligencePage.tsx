@@ -2,6 +2,7 @@
 import React from 'react';
 import { ArrowRight, Database, BarChart3, Brain, ShieldCheck, X, Check, TrendingUp } from 'lucide-react';
 import type { NavigateFn } from './types';
+import ProductTour from './ProductTour.tsx';
 
 interface IntelligencePageProps {
   onNavigate: NavigateFn;
@@ -190,6 +191,9 @@ const IntelligencePage: React.FC<IntelligencePageProps> = ({ onNavigate, onReque
           </div>
         </div>
       </section>
+
+      {/* ── Product Tour ── */}
+      <ProductTour />
 
       {/* ── Bridget ── */}
       <section className="bg-slate-950 py-20 border-b border-slate-800 overflow-hidden" style={{position: 'relative'}}>
