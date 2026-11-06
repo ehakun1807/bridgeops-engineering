@@ -90,6 +90,33 @@ interface ProjectContext {
   supplyChainScore?: number;
   qualityScore?: number;
   manufacturingScore?: number;
+  // Tool data loaded from Firestore by ProjectAIChat on panel open
+  meetings?: Array<{
+    dateMs: number;
+    title: string;
+    kind?: string;
+    attendees?: string;
+    discussionNotes?: string;
+    actionItems?: string;
+  }>;
+  decisions?: Array<{
+    dateMs: number;
+    title: string;
+    description?: string;
+    rationale?: string;
+    category?: string;
+    status?: string;
+  }>;
+  lessons?: Array<{
+    dateMs?: number;
+    title: string;
+    category?: string;
+    lessonType?: string;
+    status?: string;
+    description?: string;
+    rootCause?: string;
+    openMustCount?: number;
+  }>;
 }
 
 interface ChatRequest {
@@ -105,9 +132,7 @@ interface ChatRequest {
 function buildSystemPrompt(ctx: ProjectContext): string {
   const lines: string[] = [];
 
-  lines.push(
-    lines.push(`You are Bridget — BridgeOps' program advisor. You have 20+ years of NPI (New Product Introduction) hardware transfer experience across Medical, Aerospace, Automotive, Industrial IoT, and Consumer Electronics. You are trusted, direct, and always grounded in the user's actual program data.`);
-  );
+  lines.push(`You are Bridget — BridgeOps' program advisor. You have 20+ years of NPI (New Product Introduction) hardware transfer experience across Medical, Aerospace, Automotive, Industrial IoT, and Consumer Electronics. You are trusted, direct, and always grounded in the user's actual program data.`);
   lines.push('');
   lines.push('You are advising a program manager or engineer inside BridgeOps. Speak like a trusted senior colleague — not a chatbot.');
   lines.push('You have full context of their live project data (below). Use it to give specific, grounded advice — not generic guidance.');
@@ -142,6 +167,48 @@ function buildSystemPrompt(ctx: ProjectContext): string {
     lines.push('');
     lines.push('BOM flags / recent changes:');
     ctx.bomFlags.forEach(b => lines.push(`  - ${b}`));
+  }
+
+  // Meetings
+  if (ctx.meetings && ctx.meetings.length > 0) {
+    lines.push('');
+    lines.push('── MEETINGS (most recent first) ──');
+    ctx.meetings.forEach(m => {
+      const date = m.dateMs ? new Date(m.dateMs).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'Unknown date';
+      const kind = m.kind === 'external' ? 'External' : 'Internal';
+      lines.push(`${date} · ${kind} · "${m.title}"`);
+      if (m.attendees) lines.push(`  Attendees: ${m.attendees}`);
+      if (m.discussionNotes) lines.push(`  Notes: ${m.discussionNotes}`);
+      if (m.actionItems) lines.push(`  Actions: ${m.actionItems}`);
+    });
+  }
+
+  // Decisions
+  if (ctx.decisions && ctx.decisions.length > 0) {
+    lines.push('');
+    lines.push('── DECISIONS (decision ledger) ──');
+    ctx.decisions.forEach(d => {
+      const date = d.dateMs ? new Date(d.dateMs).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'Unknown date';
+      const status = d.status ? ` [${d.status.toUpperCase()}]` : '';
+      const cat = d.category ? ` · ${d.category}` : '';
+      lines.push(`${date}${status}${cat} · "${d.title}"`);
+      if (d.description) lines.push(`  What: ${d.description}`);
+      if (d.rationale) lines.push(`  Why: ${d.rationale}`);
+    });
+  }
+
+  // Lessons & Learned
+  if (ctx.lessons && ctx.lessons.length > 0) {
+    lines.push('');
+    lines.push('── LESSONS & LEARNED ──');
+    ctx.lessons.forEach(l => {
+      const type = l.lessonType ?? 'lesson';
+      const status = l.status ? ` [${l.status}]` : '';
+      lines.push(`[${type}]${status} "${l.title}"`);
+      if (l.description) lines.push(`  What happened: ${l.description}`);
+      if (l.rootCause) lines.push(`  Root cause: ${l.rootCause}`);
+      if (l.openMustCount && l.openMustCount > 0) lines.push(`  Open MUST actions: ${l.openMustCount}`);
+    });
   }
 
   lines.push('');

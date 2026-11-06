@@ -7,7 +7,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { X, Send, BrainCircuit, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { auth } from './firebase.ts';
+import { auth, db } from './firebase.ts';
+import {
+  collection, query, where, orderBy, limit, getDocs
+} from 'firebase/firestore';
 
 export interface ProjectChatContext {
   projectId: string;
@@ -22,6 +25,42 @@ export interface ProjectChatContext {
   supplyChainScore?: number;
   qualityScore?: number;
   manufacturingScore?: number;
+}
+
+// Tool data loaded from Firestore when chat opens
+interface MeetingRecord {
+  dateMs: number;
+  title: string;
+  kind?: string;        // 'internal' | 'external'
+  attendees?: string;
+  discussionNotes?: string;
+  actionItems?: string;
+}
+
+interface DecisionRecord {
+  dateMs: number;
+  title: string;
+  description?: string;
+  rationale?: string;
+  category?: string;
+  status?: string;
+}
+
+interface LessonRecord {
+  dateMs?: number;
+  title: string;
+  category?: string;
+  lessonType?: string;
+  status?: string;
+  description?: string;
+  rootCause?: string;
+  openMustCount?: number;
+}
+
+interface ChatToolContext {
+  meetings?: MeetingRecord[];
+  decisions?: DecisionRecord[];
+  lessons?: LessonRecord[];
 }
 
 interface Message {
@@ -43,12 +82,105 @@ export const ProjectAIChat: React.FC<{ context: ProjectChatContext }> = ({ conte
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [toolContext, setToolContext] = useState<ChatToolContext>({});
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (open) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, open]);
+
+  // Load tool data from Firestore when chat panel opens
+  useEffect(() => {
+    if (!open) return;
+    const uid = auth.currentUser?.uid;
+    if (!uid || !context.projectId) return;
+
+    const projectId = context.projectId;
+
+    async function loadToolContext() {
+      try {
+        const [meetingsSnap, decisionsSnap, lessonsSnap, pfmeasSnap] = await Promise.all([
+          getDocs(query(
+            collection(db, 'meetings'),
+            where('userId', '==', uid),
+            where('projectId', '==', projectId),
+            orderBy('dateMs', 'desc'),
+            limit(8)
+          )),
+          getDocs(query(
+            collection(db, 'decisions'),
+            where('userId', '==', uid),
+            where('projectId', '==', projectId),
+            orderBy('dateMs', 'desc'),
+            limit(10)
+          )),
+          getDocs(query(
+            collection(db, 'lessons'),
+            where('userId', '==', uid),
+            where('projectId', '==', projectId),
+            orderBy('dateMs', 'desc'),
+            limit(6)
+          )),
+          getDocs(query(
+            collection(db, 'pfmeas'),
+            where('userId', '==', uid),
+            where('projectId', '==', projectId),
+            orderBy('dateMs', 'desc'),
+            limit(3)
+          )),
+        ]);
+
+        const meetings: MeetingRecord[] = meetingsSnap.docs.map(d => {
+          const data = d.data();
+          return {
+            dateMs: data.dateMs ?? 0,
+            title: data.title ?? '',
+            kind: data.kind,
+            attendees: data.attendees ? data.attendees.slice(0, 200) : undefined,
+            discussionNotes: data.discussionNotes ? data.discussionNotes.slice(0, 200) : undefined,
+            actionItems: data.actionItems ? data.actionItems.slice(0, 200) : undefined,
+          };
+        });
+
+        const decisions: DecisionRecord[] = decisionsSnap.docs.map(d => {
+          const data = d.data();
+          return {
+            dateMs: data.dateMs ?? 0,
+            title: data.title ?? '',
+            description: data.description ? data.description.slice(0, 200) : undefined,
+            rationale: data.rationale ? data.rationale.slice(0, 150) : undefined,
+            category: data.category,
+            status: data.status,
+          };
+        });
+
+        const lessons: LessonRecord[] = lessonsSnap.docs.map(d => {
+          const data = d.data();
+          const mustItems = Array.isArray(data.actionItems)
+            ? data.actionItems.filter((a: any) => a.priority === 'must' && !a.done)
+            : [];
+          return {
+            dateMs: data.dateMs ?? 0,
+            title: data.title ?? '',
+            category: data.category,
+            lessonType: data.lessonType,
+            status: data.status,
+            description: data.description ? data.description.slice(0, 200) : undefined,
+            rootCause: data.rootCause ? data.rootCause.slice(0, 150) : undefined,
+            openMustCount: mustItems.length,
+          };
+        });
+
+        setToolContext({ meetings, decisions, lessons });
+      } catch (err) {
+        // Non-fatal — Bridget still works with the base context
+        console.warn('[Bridget] tool context load failed:', err);
+      }
+    }
+
+    loadToolContext();
+  }, [open, context.projectId]);
 
   // Auto-resize textarea
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -93,6 +225,10 @@ export const ProjectAIChat: React.FC<{ context: ProjectChatContext }> = ({ conte
             supplyChainScore: context.supplyChainScore,
             qualityScore: context.qualityScore,
             manufacturingScore: context.manufacturingScore,
+            // Enriched tool data loaded from Firestore
+            meetings: toolContext.meetings,
+            decisions: toolContext.decisions,
+            lessons: toolContext.lessons,
           }
         })
       });
