@@ -57,10 +57,23 @@ interface LessonRecord {
   openMustCount?: number;
 }
 
+interface PfmeaRiskRecord {
+  processStep: string;
+  failureMode: string;
+  failureEffect: string;
+  cause?: string;
+  controls?: string;
+  recommendedAction?: string;
+  rpn: number;
+  tier: string;
+  revisedRpn?: number;
+}
+
 interface ChatToolContext {
   meetings?: MeetingRecord[];
   decisions?: DecisionRecord[];
   lessons?: LessonRecord[];
+  pfmeaRisks?: PfmeaRiskRecord[];
 }
 
 interface Message {
@@ -172,7 +185,43 @@ export const ProjectAIChat: React.FC<{ context: ProjectChatContext }> = ({ conte
           };
         });
 
-        setToolContext({ meetings, decisions, lessons });
+        // Extract all risks from all PFMEA docs, sort by RPN, take top 12
+        type PfmeaRisk = {
+          processStep: string; failureMode: string; failureEffect: string;
+          cause?: string; controls?: string; recommendedAction?: string;
+          rpn: number; tier: string;
+          revisedRpn?: number;
+        };
+        const allRisks: PfmeaRisk[] = [];
+        pfmeasSnap.docs.forEach(d => {
+          const data = d.data();
+          const risks: any[] = Array.isArray(data.risks) ? data.risks : [];
+          risks.forEach(r => {
+            const s = Number(r.s ?? r.severity ?? 0);
+            const o = Number(r.o ?? r.occurrence ?? 0);
+            const det = Number(r.d ?? r.detection ?? 0);
+            const rpn = s * o * det;
+            if (rpn === 0) return;
+            const tier = rpn > 100 ? 'High' : rpn >= 40 ? 'Medium' : 'Low';
+            const revisedS = Number(r.revisedS ?? 0);
+            const revisedO = Number(r.revisedO ?? 0);
+            const revisedD = Number(r.revisedD ?? 0);
+            const revisedRpn = (revisedS && revisedO && revisedD) ? revisedS * revisedO * revisedD : undefined;
+            allRisks.push({
+              processStep: (r.processStep ?? '').slice(0, 80),
+              failureMode: (r.failureMode ?? '').slice(0, 100),
+              failureEffect: (r.failureEffect ?? '').slice(0, 100),
+              cause: r.cause ? String(r.cause).slice(0, 100) : undefined,
+              controls: r.controls ? String(r.controls).slice(0, 100) : undefined,
+              recommendedAction: r.recommendedAction ? String(r.recommendedAction).slice(0, 120) : undefined,
+              rpn, tier, revisedRpn,
+            });
+          });
+        });
+        allRisks.sort((a, b) => b.rpn - a.rpn);
+        const pfmeaRisks = allRisks.slice(0, 12);
+
+        setToolContext({ meetings, decisions, lessons, pfmeaRisks });
       } catch (err) {
         // Non-fatal — Bridget still works with the base context
         console.warn('[Bridget] tool context load failed:', err);
@@ -229,6 +278,7 @@ export const ProjectAIChat: React.FC<{ context: ProjectChatContext }> = ({ conte
             meetings: toolContext.meetings,
             decisions: toolContext.decisions,
             lessons: toolContext.lessons,
+            pfmeaRisks: toolContext.pfmeaRisks,
           }
         })
       });

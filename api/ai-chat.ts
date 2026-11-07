@@ -90,6 +90,18 @@ interface ProjectContext {
   supplyChainScore?: number;
   qualityScore?: number;
   manufacturingScore?: number;
+  // Full PFMEA risk list loaded from Firestore (top risks by RPN)
+  pfmeaRisks?: Array<{
+    processStep: string;
+    failureMode: string;
+    failureEffect: string;
+    cause?: string;
+    controls?: string;
+    recommendedAction?: string;
+    rpn: number;
+    tier: string;        // 'High' | 'Medium' | 'Low'
+    revisedRpn?: number;
+  }>;
   // Tool data loaded from Firestore by ProjectAIChat on panel open
   meetings?: Array<{
     dateMs: number;
@@ -167,6 +179,22 @@ function buildSystemPrompt(ctx: ProjectContext): string {
     lines.push('');
     lines.push('BOM flags / recent changes:');
     ctx.bomFlags.forEach(b => lines.push(`  - ${b}`));
+  }
+
+  // PFMEA risks (full detail — this is Bridget's primary risk intelligence source)
+  if (ctx.pfmeaRisks && ctx.pfmeaRisks.length > 0) {
+    lines.push('');
+    lines.push('── PFMEA RISKS (sorted by RPN, highest first) ──');
+    lines.push('RPN tiers: High >100 · Medium 40–100 · Low <40');
+    ctx.pfmeaRisks.forEach((r, i) => {
+      const revised = r.revisedRpn ? ` → revised RPN ${r.revisedRpn}` : '';
+      lines.push(`${i + 1}. [${r.tier}] RPN ${r.rpn}${revised} · Step: ${r.processStep}`);
+      lines.push(`   Failure mode: ${r.failureMode}`);
+      lines.push(`   Effect: ${r.failureEffect}`);
+      if (r.cause) lines.push(`   Cause: ${r.cause}`);
+      if (r.controls) lines.push(`   Current controls: ${r.controls}`);
+      if (r.recommendedAction) lines.push(`   Recommended action: ${r.recommendedAction}`);
+    });
   }
 
   // Meetings
