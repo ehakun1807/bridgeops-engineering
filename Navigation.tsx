@@ -241,7 +241,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onNavigate }) => {
       <AuthModal 
         isOpen={showAuth} 
         onClose={() => setShowAuth(false)} 
-        onSuccess={() => onNavigate('pricing')} 
+        onSuccess={() => onNavigate('dashboard')}
       />
     </nav>
   );
