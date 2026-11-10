@@ -109,7 +109,7 @@ Sent via BridgeOps Website`;
               <div className="inline-block bg-blue-600 px-3 py-1 mb-6">
                 <span className="text-[9px] font-black uppercase tracking-widest text-white">Direct Line</span>
               </div>
-              <h2 className="text-3xl font-black mb-6 leading-tight uppercase tracking-tighter">{isIntelligence ? <>Intelligence <br/><span className="text-blue-500 text-4xl italic">Access</span></> : <>Engineering <br/><span className="text-blue-500 text-4xl italic">Advisory</span></>}</h2>
+              <h2 className="text-3xl font-black mb-6 leading-tight uppercase tracking-tighter">{isIntelligence ? <>Intelligence <br/><span className="text-blue-500 text-4xl italic">Access</span></> : <>Fractional <br/><span className="text-blue-500 text-4xl italic">NPI Leadership</span></>}</h2>
               <p className="text-slate-400 text-base mb-10 font-medium leading-relaxed">{isIntelligence ? "Access is invitation-only. I run a curated cohort of licensed organizations — tell me about your NPI program and I'll be in touch." : "Let's discuss how we can stabilize your production line and improve your gross margins."}</p>
               <div className="space-y-8">
                 <a 

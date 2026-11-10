@@ -233,7 +233,7 @@ const IntelligencePage: React.FC<IntelligencePageProps> = ({ onNavigate, onReque
               <span className="relative z-10 text-white" style={{fontStyle: 'italic', letterSpacing: '-0.02em'}}>Bridget</span>
               <span className="absolute bottom-0 left-0 w-full h-[3px] rounded-full" style={{background: 'linear-gradient(90deg, #3B82F6, #60A5FA)'}}></span>
             </span>
-            <span className="uppercase text-white font-black tracking-tighter"> is your program advisor.</span><br />
+            <span className="uppercase text-white font-black tracking-tighter"> is your fractional NPI lead.</span><br />
             <span className="text-blue-400 uppercase tracking-tighter">Always in context.</span>
           </h2>
           <p className="text-slate-400 text-base font-medium leading-relaxed mb-10 max-w-xl mx-auto">

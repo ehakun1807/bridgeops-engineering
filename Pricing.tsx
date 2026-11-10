@@ -124,8 +124,8 @@ const engagements: Engagement[] = [
 
 const faqs: Array<{ q: string; a: string }> = [
   {
-    q: 'Why not buy NPI consulting from a large firm?',
-    a: "Large firms send junior consultants to learn on your project. I'm one operator with 20+ years of hands-on NPI and operations experience across regulated hardware. You're hiring the senior who will do the work, not a slide deck."
+    q: 'Why not hire a large consulting firm?',
+    a: "Large firms send junior consultants to learn on your project. I operate as your fractional NPI lead — one senior operator with 20+ years of hands-on experience across regulated hardware. You get the person who will actually do the work, not a slide deck."
   },
   {
     q: 'How long does the Expert Audit actually take?',

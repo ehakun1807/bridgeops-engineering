@@ -1202,7 +1202,7 @@ const RampScoreTool: React.FC<RampScoreToolProps> = ({ onNavigate }) => {
               <p className="font-black uppercase tracking-widest text-slate-900 mb-1">
                 BridgeOps.ENGINEERING
               </p>
-              <p>Eran Hakun — NPI & Operations Engineering Advisory</p>
+              <p>Eran Hakun — Fractional NPI & Operations Leader</p>
               <p>eran@bridgeops-engineering.com · Israel | Global Operations</p>
             </div>
             <div className="text-right">
